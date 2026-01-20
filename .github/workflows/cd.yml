@@ -28,7 +28,7 @@ jobs:
             set -a
             source /home/ubuntu/mine/backend/.env
             set +a
-            nohup java -jar build/libs/*.jar \
+            nohup java -jar build/libs/mine-0.0.1-SNAPSHOT.jar \ \
               --spring.profiles.active=dev \
               > /home/ubuntu/logs/backend.log 2>&1 &
             disown
