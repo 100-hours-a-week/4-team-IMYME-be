@@ -55,17 +55,25 @@ jobs:
       - name: Run Checkstyle
         run: ./gradlew checkstyleMain
 
-      # ========================================
-      # 빌드 (Build)
-      # ========================================
+
+
+      # 빌드
       - name: Build
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: ./gradlew build -x test
 
-      # ========================================
-      # 테스트 (Test)
-      # ========================================
+      # 테스트
       - name: Run Tests
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: ./gradlew test
+
+
 
       # ========================================
       # 아티팩트 저장 (main 브랜치만)
