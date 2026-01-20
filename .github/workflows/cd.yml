@@ -12,9 +12,9 @@ jobs:
   # CD - 개발 서버 배포 (dev 브랜치)
   deploy-dev:
     runs-on: ubuntu-latest
-    if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'dev'
+#    if: >
+#      github.event.workflow_run.conclusion == 'success' &&
+#      github.event.workflow_run.head_branch == 'dev'
 
     steps:
       # 개발 서버 배포 (SSH)
