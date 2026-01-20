@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.DEV_SERVER_HOST }}
           username: ubuntu
           key: ${{ secrets.DEV_SERVER_SSH_KEY }}
-          command_timeout: 20m    # 이거 추가 (빌드 오래 걸려서)
+          command_timeout: 20m
           script: |
             cd /home/ubuntu/mine/backend/4-team-IMYME-be
             git fetch origin dev
@@ -24,6 +24,10 @@ jobs:
             chmod +x gradlew
             ./gradlew build -x test
             pkill -f 'java.*jar' || true
+            mkdir -p /home/ubuntu/logs
+            set -a
+            source /home/ubuntu/mine/backend/.env
+            set +a
             nohup java -jar build/libs/*.jar \
               --spring.profiles.active=dev \
               > /home/ubuntu/logs/backend.log 2>&1 &
