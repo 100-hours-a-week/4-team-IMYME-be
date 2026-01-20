@@ -1,9 +1,15 @@
 name: Backend CD (v 1.6)
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches:
       - infra/cicd
+
+#
+#  push:
+#    branches:ㄴ
+#      - infra/cicd
 
 jobs:
   deploy-dev:
