@@ -47,3 +47,4 @@ application-*.yml
 ### Logs ###
 logs/
 *.log
+/src/main/resources/.env
