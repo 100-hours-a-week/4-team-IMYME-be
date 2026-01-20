@@ -1,12 +1,12 @@
 name: Backend CD
 
 on:
-  # CI 완료 후 트리거
-  workflow_run:
-    workflows: ["Backend CI"]
-    types:
-      - completed
+  pull_request:
+    types: [closed]
     branches: [dev]
+  push:
+      branches:
+          - infra/cicd
 
 jobs:
   # CD - 개발 서버 배포 (dev 브랜치)
