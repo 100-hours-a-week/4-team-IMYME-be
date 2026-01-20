@@ -1,4 +1,4 @@
-name: Backend CD (v 1.6)
+name: Backend CD (v 1.7)
 
 on:
   pull_request:
