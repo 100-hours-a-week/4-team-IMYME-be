@@ -1,4 +1,4 @@
-name: Backend CD (v 1.4)
+name: Backend CD (v 1.5)
 
 on:
   push:
