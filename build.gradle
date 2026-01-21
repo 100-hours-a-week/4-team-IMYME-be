@@ -2,6 +2,9 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.12'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.7'
+    id 'pmd'
+    id 'checkstyle'
 }
 
 group = 'com.imyme'
@@ -43,4 +46,42 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+spotbugs {
+    toolVersion = '4.8.3'
+    effort = 'max'
+    reportLevel = 'low'
+}
+
+spotbugsMain {
+    reports {
+        html.required = true
+        xml.required = false
+    }
+}
+
+pmd {
+    toolVersion = '6.55.0'
+    ruleSets = []
+    ruleSetFiles = files("config/pmd/pmd-rules.xml")
+}
+
+pmdMain {
+    reports {
+        html.required = true
+        xml.required = false
+    }
+}
+
+checkstyle {
+    toolVersion = '10.12.3'
+    configFile = file("config/checkstyle/checkstyle.xml")
+}
+
+checkstyleMain {
+    reports {
+        html.required = true
+        xml.required = false
+    }
 }
