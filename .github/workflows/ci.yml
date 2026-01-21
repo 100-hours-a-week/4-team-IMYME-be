@@ -1,16 +1,15 @@
 name: Backend CI
 
 on:
-  push:
-    branches: [main, develop, infra/cicd]
   pull_request:
-    branches: [main, develop]
+    branches:
+        - dev
 
 jobs:
   ci:
     runs-on: ubuntu-latest
 
-    
+
     steps:
       - name: Checkout code # 깃허브 액션이 코드 가져오기
         uses: actions/checkout@v2
