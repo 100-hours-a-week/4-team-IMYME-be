@@ -194,12 +194,14 @@ jobs:
           export $(cat .env | xargs)
 
           nohup java -jar mine-0.0.1-SNAPSHOT.jar \
-
             --spring.profiles.active=dev \
-            > /home/ubuntu/logs/backend.log 2>&1 &
+            > /home/ubuntu/logs/backend.log 2>&1 </dev/null &
 
-          sleep 10
+          sleep 3
           pgrep -f 'java.*jar'
+
+          exit 0
+
           EOF
 
   # ---------- CD SUCCESS ----------
