@@ -1,15 +1,17 @@
 name: Backend CD
 
+
 on:
-    pull_request:
-        types: [ closed ]
-        branches:
-            - dev
+    workflow_run:
+      workflows: ["Backend CI"]   # CI workflow 이름
+      types: [completed]
 
 
-    push:
-        branches:
-            - infra/cicd
+
+
+    # push:
+    #     branches:
+    #         - infra/cicd
 
 permissions:
   actions: read
