@@ -1,0 +1,100 @@
+spring:
+    application:
+        name: mine
+
+    # ==================================================
+    # DB (PostgreSQL) - 기존 설정 유지
+    # ==================================================
+    datasource:
+        url: jdbc:postgresql://localhost:5432/mine_project_db
+        username: mine
+        password: imymemine
+        driver-class-name: org.postgresql.Driver
+
+    # ==================================================
+    # JPA / Hibernate
+    # ==================================================
+    jpa:
+        # MVP 개발용: 자바 코드 고치면 DB 테이블 자동 변경
+        hibernate:
+            ddl-auto: update
+
+        # 실행되는 SQL 콘솔에 표시
+        show-sql: true
+
+        properties:
+            hibernate:
+                # SQL 포맷팅 (보기 좋게)
+                format_sql: true
+                # PostgreSQL 방언
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+
+        # OSIV 설정 (성능 최적화)
+        open-in-view: false
+
+    # ==================================================
+    # Security OAuth2 (카카오 로그인)
+    # ==================================================
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        # 환경변수로 관리 (기본값: 빈 문자열)
+                        client-id: ${KAKAO_CLIENT_ID:}
+                        client-secret: ${KAKAO_CLIENT_SECRET:}
+                        redirect-uri: "{baseUrl}/auth/oauth/kakao/callback"
+                        authorization-grant-type: authorization_code
+                        client-authentication-method: client_secret_post
+                        scope:
+                            - profile_nickname
+                            - profile_image
+                            - account_email
+                provider:
+                    kakao:
+                        authorization-uri: https://kauth.kakao.com/oauth/authorize
+                        token-uri: https://kauth.kakao.com/oauth/token
+                        user-info-uri: https://kapi.kakao.com/v2/user/me
+                        user-name-attribute: id
+
+# ==================================================
+# 서버 설정
+# ==================================================
+server:
+    port: 8080
+    servlet:
+        encoding:
+            charset: UTF-8
+            force: true
+
+# ==================================================
+# 로그 설정
+# ==================================================
+logging:
+    level:
+        # 우리 프로젝트 로그 (개발 시 상세하게)
+        com.imyme.mine: DEBUG
+
+        # Spring Security 로그 (인증 디버깅용)
+        org.springframework.security: DEBUG
+
+        # SQL 로그
+        org.hibernate.SQL: DEBUG
+
+        # SQL 파라미터 값 보기 (물음표에 실제 값)
+        org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+        # JPA 로그
+        org.hibernate.type: TRACE
+
+    # 콘솔 출력 패턴
+    pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# ==================================================
+# JWT 설정 (나중에 사용)
+# ==================================================
+jwt:
+    secret: ${JWT_SECRET:your-256-bit-secret-key-for-development-only-change-in-production}
+    access-token-expiration: 1800000  # 30분 (밀리초)
+    refresh-token-expiration: 1209600000  # 14일 (밀리초)
