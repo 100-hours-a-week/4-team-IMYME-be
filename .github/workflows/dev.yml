@@ -168,7 +168,8 @@ jobs:
           mkdir -p /home/ubuntu/logs
           export $(cat .env | xargs)
 
-          nohup java -jar build/libs/mine-0.0.1-SNAPSHOT.jar \
+          nohup java -jar mine-0.0.1-SNAPSHOT.jar \
+
             --spring.profiles.active=dev \
             > /home/ubuntu/logs/backend.log 2>&1 &
 
