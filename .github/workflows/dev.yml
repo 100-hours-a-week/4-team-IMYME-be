@@ -218,6 +218,9 @@ jobs:
             >> "$LOG_FILE" 2>&1 </dev/null &
           
           echo $! > "$PID_FILE"
+
+          ls -1dt "$RELEASES_DIR"/* | tail -n +4 | xargs -r rm -rf
+
           
           exit 0
           EOF
