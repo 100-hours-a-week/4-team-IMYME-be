@@ -178,7 +178,7 @@ jobs:
 
   # ---------- CD SUCCESS ----------
   cd-notify-success:
-    needs: deploy-dev
+    needs: cd
     if: success()
     runs-on: ubuntu-latest
     steps:
@@ -193,7 +193,7 @@ jobs:
 
   # ---------- CD FAILURE ----------
   cd-notify-failure:
-    needs: deploy-dev
+    needs: cd
     if: failure()
     runs-on: ubuntu-latest
     steps:
