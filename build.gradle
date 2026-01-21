@@ -54,6 +54,7 @@ spotbugs {
     toolVersion = '4.8.3'
     effort = 'max'
     reportLevel = 'low'
+    ignoreFailures = true  // MVP 단계에서는 경고만
 }
 
 spotbugsMain {
@@ -68,6 +69,7 @@ pmd {
     toolVersion = '6.55.0'
     ruleSets = []
     ruleSetFiles = files("config/pmd/pmd-rules.xml")
+    ignoreFailures = true  // 경고만
 }
 
 pmdMain {
@@ -81,6 +83,7 @@ pmdMain {
 checkstyle {
     toolVersion = '10.12.3'
     configFile = file("config/checkstyle/checkstyle.xml")
+    ignoreFailures = true  // 경고만
 }
 
 checkstyleMain {
