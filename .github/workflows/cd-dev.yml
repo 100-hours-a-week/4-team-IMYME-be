@@ -9,9 +9,9 @@ on:
 
 
 
-    push:
-        branches:
-            - infra/cicd
+    # push:
+    #     branches:
+    #         - infra/cicd
 
 permissions:
   actions: read
