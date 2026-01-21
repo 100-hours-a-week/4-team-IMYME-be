@@ -1,23 +1,15 @@
 package com.imyme.mine.common.validation;
 
 /**
- * Validation 그룹 정의
- * - 생성과 수정 시 다른 검증 규칙 적용
+ * Validation 그룹 정의 - 생성과 수정 시 다른 검증 규칙 적용
  *
- * 사용 예시:
- * @NotNull(groups = Create.class)
- * @Null(groups = Update.class)
- * private Long id;
+ * <p>사용 예시: @NotNull(groups = Create.class) @Null(groups = Update.class) private Long id;
  */
 public class ValidationGroups {
 
-    /**
-     * 생성 시 검증 그룹
-     */
-    public interface Create {}
+  /** 생성 시 검증 그룹 */
+  public interface Create {}
 
-    /**
-     * 수정 시 검증 그룹
-     */
-    public interface Update {}
+  /** 수정 시 검증 그룹 */
+  public interface Update {}
 }
