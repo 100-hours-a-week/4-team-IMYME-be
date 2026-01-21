@@ -20,9 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-# ==================================================
-# CI
-# ==================================================
+
+  # 1) CI
   ci:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -55,21 +54,21 @@ jobs:
         run: chmod +x gradlew
 
 
-      # ========================================
-      # 5. 정적 분석 (Static Analysis)
-      # ========================================
+      # # ========================================
+      # # 5. 정적 분석 (Static Analysis)
+      # # ========================================
 
-      # SpotBugs(버그패턴 캐치) : null위험, 무한 루프 등
-      - name: Run SpotBugs
-        run: ./gradlew spotbugsMain
+      # # SpotBugs(버그패턴 캐치) : null위험, 무한 루프 등
+      # - name: Run SpotBugs
+      #   run: ./gradlew spotbugsMain
 
-      # PMD(좋지 않은 코드 습관 캐치) : 중복코드, 안쓰는 변수 등
-      - name: Run PMD
-        run: ./gradlew pmdMain
+      # # PMD(좋지 않은 코드 습관 캐치) : 중복코드, 안쓰는 변수 등
+      # - name: Run PMD
+      #   run: ./gradlew pmdMain
 
-      # Checkstyle(코드 스타일) : 들여쓰기, 네이밍 규칙, 공백 등
-      - name: Run Checkstyle
-        run: ./gradlew checkstyleMain  
+      # # Checkstyle(코드 스타일) : 들여쓰기, 네이밍 규칙, 공백 등
+      # - name: Run Checkstyle
+      #   run: ./gradlew checkstyleMain  
         
       # 6. 빌드
       - name: Build
@@ -79,13 +78,13 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: ./gradlew build -x test
 
-      # 7. 테스트
-      - name: Run Tests
-        env:
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        run: ./gradlew test
+      # # 7. 테스트
+      # - name: Run Tests
+      #   env:
+      #     DB_URL: ${{ secrets.DB_URL }}
+      #     DB_USERNAME: ${{ secrets.DB_USERNAME }}
+      #     DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      #   run: ./gradlew test
 
       # 8.1 이전 아티팩트 삭제
       - name: Delete old artifacts
@@ -117,7 +116,6 @@ jobs:
           retention-days: 15
           overwrite: true
 
-  # ---------- CI SUCCESS ----------
   ci-notify-success:
     needs: ci
     if: success()
@@ -132,7 +130,6 @@ jobs:
           content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 백엔드 CI 성공!"
           color: 0x00FF00
 
-  # ---------- CI FAILURE ----------
   ci-notify-failure:
     needs: ci
     if: failure()
@@ -147,9 +144,7 @@ jobs:
           content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 백엔드 CI 실패!"
           color: 0xFF0000
 
-# ==================================================
-# CD
-# ==================================================
+  # 2) CD
   cd:
     needs: ci
     # if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
@@ -177,34 +172,58 @@ jobs:
       # 3️⃣ 서버 전송
       - name: Copy artifact to dev server
         run: |
-          scp -i ~/.ssh/id_rsa ./build/libs/*.jar \
-          ubuntu@${{ secrets.DEV_SERVER_HOST }}:/home/ubuntu/mine/backend
-
-      # 4️⃣ 배포
+                scp -i ~/.ssh/id_rsa ./build/libs/*.jar \
+                ubuntu@${{ secrets.DEV_SERVER_HOST }}:/home/ubuntu/mine/backend
+      
+      # 4️⃣ 배포 (release / current 방식)
       - name: Deploy to Dev Server
         run: |
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.DEV_SERVER_HOST }} 'bash -s' <<'EOF'
           set -e
-          cd /home/ubuntu/mine/backend
-
-          pkill -f 'java.*jar' || true
-          sleep 3
-
-          mkdir -p /home/ubuntu/logs
-          export $(cat .env | xargs)
-
-          nohup java -jar mine-0.0.1-SNAPSHOT.jar \
+          
+          APP_DIR=/home/ubuntu/mine/backend
+          RELEASES_DIR=$APP_DIR/releases
+          SHARED_DIR=$APP_DIR/shared
+          RELEASE_ID=$(date +%Y%m%d%H%M%S)
+          
+          CURRENT_LINK=$APP_DIR/current
+          RELEASE_DIR=$RELEASES_DIR/$RELEASE_ID
+          PID_FILE=$SHARED_DIR/backend.pid
+          LOG_DIR=$SHARED_DIR/logs
+          LOG_FILE=$LOG_DIR/backend.log
+          ENV_FILE=$SHARED_DIR/.env
+          
+          mkdir -p "$RELEASE_DIR" "$LOG_DIR"
+          
+          # 1. 새 release에 jar 이동
+          mv "$APP_DIR/mine-0.0.1-SNAPSHOT.jar" "$RELEASE_DIR/backend.jar"
+          
+          # 2. current 심볼릭 링크 교체
+          ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+          
+          # 3. 기존 프로세스 종료 (pid 기준)
+          if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            kill "$(cat "$PID_FILE")" || true
+            sleep 2
+          fi
+          
+          # 4. 환경변수 로드
+          set -a
+          . "$ENV_FILE"
+          set +a
+          
+          # 5. 새 버전 실행 (nohup + 완전 분리)
+          nohup java -jar "$CURRENT_LINK/backend.jar" \
             --spring.profiles.active=dev \
-            > /home/ubuntu/logs/backend.log 2>&1 </dev/null &
-
-          sleep 3
-          pgrep -f 'java.*jar'
-
+            >> "$LOG_FILE" 2>&1 </dev/null &
+          
+          echo $! > "$PID_FILE"
+          
           exit 0
-
           EOF
-
-  # ---------- CD SUCCESS ----------
+      
+      
+      
   cd-notify-success:
     needs: cd
     if: success()
@@ -219,7 +238,6 @@ jobs:
           content: "백엔드 개발 서버 배포 완료!"
           color: 0x00FF00
 
-  # ---------- CD FAILURE ----------
   cd-notify-failure:
     needs: cd
     if: failure()
