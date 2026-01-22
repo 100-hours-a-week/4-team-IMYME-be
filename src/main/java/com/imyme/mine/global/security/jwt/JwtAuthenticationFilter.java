@@ -2,7 +2,9 @@ package com.imyme.mine.global.security.jwt;
 
 import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
+import com.imyme.mine.global.error.ErrorCode;
 import com.imyme.mine.global.security.UserPrincipal;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -48,6 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = jwtTokenProvider.getUserIdFromToken(token);
 
                 // 사용자 조회
+                // TODO: 캐싱 적용 고려 혹은 토큰에 사용자 정보 포함(사용자 늘면) -> 토큰 정보로만 객체 생성 후 DB 조회 없이 인증 처리
                 User user = userRepository.findById(userId)
                         .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
@@ -69,8 +73,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 log.debug("Set authentication for user: {}", userId);
             }
-        } catch (Exception e) {
-            log.error("Could not set user authentication in security context", e);
+        } catch (ExpiredJwtException e) {
+            request.setAttribute("exception", ErrorCode.TOKEN_EXPIRED.getCode());
+        } catch (JwtException | IllegalArgumentException e) {
+            request.setAttribute("exception", ErrorCode.INVALID_TOKEN.getCode());
         }
 
         filterChain.doFilter(request, response);
