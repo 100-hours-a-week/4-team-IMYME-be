@@ -40,7 +40,6 @@ out/
 .DS_Store
 
 ### Application ###
-.env
 application-*.yml
 !application-dev.yml.example
 !application-prod.yml.example
@@ -49,5 +48,12 @@ application-*.yml
 logs/
 *.log
 
-CLAUDE.md
+# Environment variables
+/src/main/resources/.env
 .env
+*.env
+.env.local
+.env.*.local
+
+# Claude.md
+CLAUDE.md

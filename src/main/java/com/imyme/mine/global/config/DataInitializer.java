@@ -13,6 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 애플리케이션 시작 시 초기 데이터 생성
+ * - 카테고리 및 키워드 기본값 삽입
+ */
+// TODO : DB 배포 시 제거 예정
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -21,6 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoryRepository categoryRepository;
     private final KeywordRepository keywordRepository;
 
+    // 데이터 초기화 로직
     @Override
     @Transactional
     public void run(String... args) {
@@ -56,6 +62,7 @@ public class DataInitializer implements CommandLineRunner {
         log.info("초기 데이터 생성 완료!");
     }
 
+    // 카테고리 생성 헬퍼 메서드
     private Category createCategory(String name, int displayOrder) {
         Category category = Category.builder()
             .name(name)
@@ -65,6 +72,7 @@ public class DataInitializer implements CommandLineRunner {
         return categoryRepository.save(category);
     }
 
+    // 키워드 생성 헬퍼 메서드
     private void createKeyword(Category category, String name, int displayOrder) {
         Keyword keyword = Keyword.builder()
             .category(category)

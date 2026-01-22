@@ -1,80 +1,56 @@
 package com.imyme.mine.global.error;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.util.List;
-import java.util.Map;
-
+/**
+ * 에러 응답 DTO
+ * - API 명세서 형식 준수
+ * - details는 선택적 (null이면 JSON에서 제외)
+ */
 @Getter
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_NULL) // null 필드는 JSON에서 제외
 public class ErrorResponse {
 
-    private final String message;
-    private final ErrorData data;
+    private final String error; // 에러 코드 (UNAUTHORIZED, USER_NOT_FOUND)
+    private final String message; // 사용자에게 표시할 메시지
+    private final Map<String, Object> details; // 상세 정보 (선택적)
+    private final LocalDateTime timestamp; // 에러 발생 시각
+    private final String path; // 요청 경로
 
-    @Builder
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class ErrorData {
-        private final String errorCode;
-        private final List<FieldError> errors;
-        private final Map<String, Object> meta;
-
-        public ErrorData(String errorCode, List<FieldError> errors, Map<String, Object> meta) {
-            this.errorCode = errorCode;
-            this.errors = errors == null ? List.of() : List.copyOf(errors);
-            this.meta = meta == null ? Map.of() : Map.copyOf(meta);
-        }
-
-        public String getErrorCode() {
-            return errorCode;
-        }
-
-        public List<FieldError> getErrors() {
-            return errors;
-        }
-
-        public Map<String, Object> getMeta() {
-            return meta;
-        }
-    }
-
-    @Getter
-    @Builder
-    public static class FieldError {
-        private final String field;
-        private final String reason;
-        private final Object value;
-    }
-
-    public static ErrorResponse of(String message, String errorCode) {
+    // 기본 에러 응답 생성
+    public static ErrorResponse of(ErrorCode errorCode, String path) {
         return ErrorResponse.builder()
-            .message(message)
-            .data(ErrorData.builder()
-                .errorCode(errorCode)
-                .build())
-            .build();
+                .error(errorCode.getCode())
+                .message(errorCode.getMessage())
+                .timestamp(LocalDateTime.now())
+                .path(path)
+                .build();
     }
 
-    public static ErrorResponse of(String message, String errorCode, Map<String, Object> meta) {
+    // 상세 정보 포함 에러 응답 생성
+    public static ErrorResponse of(ErrorCode errorCode, String path, Map<String, Object> details) {
         return ErrorResponse.builder()
-            .message(message)
-            .data(ErrorData.builder()
-                .errorCode(errorCode)
-                .meta(meta)
-                .build())
-            .build();
+                .error(errorCode.getCode())
+                .message(errorCode.getMessage())
+                .details(details)
+                .timestamp(LocalDateTime.now())
+                .path(path)
+                .build();
     }
 
-    public static ErrorResponse of(String message, String errorCode, List<FieldError> errors) {
+    // 커스텀 메시지 에러 응답 생성
+    public static ErrorResponse of(ErrorCode errorCode, String path, String customMessage) {
         return ErrorResponse.builder()
-            .message(message)
-            .data(ErrorData.builder()
-                .errorCode(errorCode)
-                .errors(errors)
-                .build())
-            .build();
+                .error(errorCode.getCode())
+                .message(customMessage)
+                .timestamp(LocalDateTime.now())
+                .path(path)
+                .build();
     }
 }

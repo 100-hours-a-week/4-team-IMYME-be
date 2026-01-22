@@ -4,7 +4,7 @@ import com.imyme.mine.domain.category.dto.CategoryResponse;
 import com.imyme.mine.domain.category.service.CategoryService;
 import com.imyme.mine.domain.keyword.dto.CategoryKeywordsResponse;
 import com.imyme.mine.domain.keyword.service.KeywordService;
-import com.imyme.mine.global.common.ApiResponse;
+import com.imyme.mine.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +24,7 @@ public class CategoryController {
             @RequestParam(required = false) Boolean isActive
     ) {
         List<CategoryResponse> categories = categoryService.getCategories(isActive);
-        return ResponseEntity.ok(ApiResponse.success("categories_fetched", categories));
+        return ResponseEntity.ok(ApiResponse.success(categories, "categories_fetched"));
     }
 
     @GetMapping("/{categoryId}/keywords")
