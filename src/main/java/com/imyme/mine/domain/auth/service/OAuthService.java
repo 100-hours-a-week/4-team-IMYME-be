@@ -7,7 +7,7 @@ import com.imyme.mine.domain.auth.entity.OAuthProvider;
 import com.imyme.mine.domain.auth.entity.Role;
 import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
-import com.imyme.mine.global.secret.JwtTokenProvider;
+import com.imyme.mine.global.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
