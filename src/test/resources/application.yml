@@ -3,45 +3,37 @@ spring:
         activate:
             on-profile: test
 
-    # 1. 가짜 OAuth 설정 (테스트 통과용)
-    security:
-        oauth2:
-            client:
-                registration:
-                    kakao:
-                        client-id: "test-client-id"
-                        client-secret: "test-client-secret"
-                        redirect-uri: "http://localhost:3000/auth/callback/kakao"
-                        authorization-grant-type: authorization_code
-                        client-authentication-method: client_secret_post
-                        scope:
-                            - profile_nickname
-                            - profile_image
-                            - account_email
-                provider:
-                    kakao:
-                        authorization-uri: https://kauth.kakao.com/oauth/authorize
-                        token-uri: https://kauth.kakao.com/oauth/token
-                        user-info-uri: https://kapi.kakao.com/v2/user/me
-                        user-name-attribute: id
-
-    # 2. 가짜 DB 설정 (H2 메모리 DB)
     datasource:
-        url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+        # 🌟 여기가 핵심! 실제 DB 주소 대신 '메모리 DB' 주소를 씁니다.
+        url: jdbc:h2:mem:testdb;MODE=PostgreSQL
         driver-class-name: org.h2.Driver
         username: sa
         password:
+
     jpa:
-        database-platform: org.hibernate.dialect.H2Dialect
         hibernate:
-            ddl-auto: create-drop
+            ddl-auto: create-drop # 테스트 끝나면 데이터 삭제
         properties:
             hibernate:
-                format_sql: true
-                show_sql: true
+                dialect: org.hibernate.dialect.H2Dialect
 
-# 3. 가짜 JWT 설정 (Assert 에러 해결 핵심!)
+# 다른 필수 변수들도 가짜값으로 채워줍니다 (에러 방지용)
 jwt:
-    secret: "this-is-a-very-long-dummy-secret-key-for-test-environment-only-minimum-32-bytes"
-    access-token-expiration: 3600000
-    refresh-token-expiration: 1209600000
+    secret: test_secret_key_blah_blah_blah
+cloud:
+    aws:
+        credentials:
+            access-key: test
+            secret-key: test
+        region:
+            static: ap-northeast-2
+        s3:
+            bucket: test-bucket
+security:
+    oauth2:
+        client:
+            registration:
+                kakao:
+                    client-id: test
+                    client-secret: test
+                    redirect-uri: http://test
