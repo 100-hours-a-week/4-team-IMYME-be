@@ -16,13 +16,7 @@ public enum OAuthProvider {
     private final String code;
     private final String displayName;
 
-    /**
-     * 문자열로부터 OAuthProvider 찾기
-     *
-     * @param code provider 코드 (kakao, google, apple)
-     * @return OAuthProvider
-     * @throws IllegalArgumentException 유효하지 않은 provider인 경우
-     */
+    // 문자열로부터 OAuthProvider 찾기
     public static OAuthProvider fromCode(String code) {
         for (OAuthProvider provider : values()) {
             if (provider.getCode().equalsIgnoreCase(code)) {
@@ -32,12 +26,7 @@ public enum OAuthProvider {
         throw new IllegalArgumentException("Invalid OAuth provider: " + code);
     }
 
-    /**
-     * 문자열이 유효한 OAuth provider인지 확인
-     *
-     * @param code provider 코드
-     * @return 유효 여부
-     */
+    // 문자열이 유효한 OAuth provider인지 확인
     public static boolean isValid(String code) {
         try {
             fromCode(code);

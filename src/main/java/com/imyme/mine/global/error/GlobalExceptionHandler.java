@@ -2,6 +2,7 @@ package com.imyme.mine.global.error;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -74,7 +75,7 @@ public class GlobalExceptionHandler {
         log.warn("Validation Exception: {}", e.getMessage());
 
         // 첫 번째 에러만 사용
-        FieldError fieldError = e.getBindingResult().getFieldErrors().get(0);
+        FieldError fieldError = e.getBindingResult().getFieldErrors().getFirst();
 
         Map<String, Object> details = new HashMap<>();
         details.put("field", fieldError.getField());
@@ -108,7 +109,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> details = new HashMap<>();
         details.put("field", e.getName());
         details.put("reason", "타입이 일치하지 않습니다");
-        details.put("expectedType", e.getRequiredType().getSimpleName());
+        details.put("expectedType", Objects.requireNonNull(e.getRequiredType()).getSimpleName());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_REQUEST, request.getRequestURI(), details);
 
@@ -168,7 +169,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
-    // ========== 그 외 모든 예외 ==========
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e, HttpServletRequest request) {
 

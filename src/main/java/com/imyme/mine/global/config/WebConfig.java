@@ -6,7 +6,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** CORS 설정
+/**
+ * CORS 설정
  * - 프론트엔드(Next.js BFF)에서 백엔드 API 호출 허용
  */
 @Configuration

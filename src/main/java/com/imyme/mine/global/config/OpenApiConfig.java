@@ -8,6 +8,10 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * OpenAPI (Swagger) 설정
+ * - JWT 인증 스키마 추가
+ */
 @Configuration
 public class OpenApiConfig {
 

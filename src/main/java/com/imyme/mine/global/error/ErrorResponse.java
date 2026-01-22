@@ -23,9 +23,7 @@ public class ErrorResponse {
     private final LocalDateTime timestamp; // 에러 발생 시각
     private final String path; // 요청 경로
 
-    /**
-     * 기본 에러 응답 생성
-     */
+    // 기본 에러 응답 생성
     public static ErrorResponse of(ErrorCode errorCode, String path) {
         return ErrorResponse.builder()
                 .error(errorCode.getCode())
@@ -35,9 +33,7 @@ public class ErrorResponse {
                 .build();
     }
 
-    /**
-     * 상세 정보 포함 에러 응답 생성
-     */
+    // 상세 정보 포함 에러 응답 생성
     public static ErrorResponse of(ErrorCode errorCode, String path, Map<String, Object> details) {
         return ErrorResponse.builder()
                 .error(errorCode.getCode())
@@ -48,9 +44,7 @@ public class ErrorResponse {
                 .build();
     }
 
-    /**
-     * 커스텀 메시지 에러 응답 생성
-     */
+    // 커스텀 메시지 에러 응답 생성
     public static ErrorResponse of(ErrorCode errorCode, String path, String customMessage) {
         return ErrorResponse.builder()
                 .error(errorCode.getCode())

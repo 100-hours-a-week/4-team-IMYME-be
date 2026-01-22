@@ -1,5 +1,6 @@
 package com.imyme.mine.global.secret;
 
+import com.nimbusds.jose.crypto.impl.HMAC;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
@@ -22,20 +23,12 @@ public class JwtTokenProvider {
 
     private final JwtProperties jwtProperties;
 
-    /**
-     * Secret Key 생성
-     * - HMAC-SHA 알고리즘 사용
-     */
+    // Secret Key 생성 : HMAC-SHA 알고리즘 사용
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    /**
-     * Access Token 생성
-     *
-     * @param userId 사용자 ID
-     * @return Access Token
-     */
+    // Access Token 생성
     public String generateAccessToken(Long userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessTokenExpiration());
@@ -48,12 +41,7 @@ public class JwtTokenProvider {
             .compact();
     }
 
-    /**
-     * Refresh Token 생성
-     *
-     * @param userId 사용자 ID
-     * @return Refresh Token
-     */
+    // Refresh Token 생성
     public String generateRefreshToken(Long userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getRefreshTokenExpiration());
@@ -66,12 +54,7 @@ public class JwtTokenProvider {
             .compact();
     }
 
-    /**
-     * 토큰에서 사용자 ID 추출
-     *
-     * @param token JWT 토큰
-     * @return 사용자 ID
-     */
+    // 토큰에서 사용자 ID 추출
     public Long getUserIdFromToken(String token) {
         Claims claims = Jwts.parser()
             .verifyWith(getSigningKey())
@@ -82,12 +65,7 @@ public class JwtTokenProvider {
         return Long.valueOf(claims.getSubject());
     }
 
-    /**
-     * 토큰 유효성 검증
-     *
-     * @param token JWT 토큰
-     * @return 유효 여부
-     */
+    //  토큰 유효성 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
@@ -107,12 +85,7 @@ public class JwtTokenProvider {
         return false;
     }
 
-    /**
-     * 토큰 만료 여부 확인
-     *
-     * @param token JWT 토큰
-     * @return 만료 여부
-     */
+    // 토큰 만료 여부 확인
     public boolean isTokenExpired(String token) {
         try {
             Claims claims = Jwts.parser()
@@ -130,12 +103,7 @@ public class JwtTokenProvider {
         }
     }
 
-    /**
-     * 토큰 만료 시간 조회
-     *
-     * @param token JWT 토큰
-     * @return 만료 시간
-     */
+    // 토큰 만료 시간 조회
     public Date getExpirationDateFromToken(String token) {
         Claims claims = Jwts.parser()
             .verifyWith(getSigningKey())
@@ -146,12 +114,7 @@ public class JwtTokenProvider {
         return claims.getExpiration();
     }
 
-    /**
-     * 토큰 발급 시간 조회
-     *
-     * @param token JWT 토큰
-     * @return 발급 시간
-     */
+    // 토큰 발급 시간 조회
     public Date getIssuedAtFromToken(String token) {
         Claims claims = Jwts.parser()
             .verifyWith(getSigningKey())
@@ -162,12 +125,7 @@ public class JwtTokenProvider {
         return claims.getIssuedAt();
     }
 
-    /**
-     * Bearer 토큰에서 실제 토큰 값 추출
-     *
-     * @param bearerToken "Bearer {token}" 형식
-     * @return 순수 토큰 값
-     */
+    // Bearer 토큰에서 실제 토큰 값 추출
     public String extractToken(String bearerToken) {
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
@@ -175,12 +133,7 @@ public class JwtTokenProvider {
         return bearerToken;
     }
 
-    /**
-     * 토큰 남은 시간 조회 (밀리초)
-     *
-     * @param token JWT 토큰
-     * @return 남은 시간 (밀리초)
-     */
+    // 토큰 남은 시간 조회 (밀리초)
     public long getRemainingTime(String token) {
         Date expiration = getExpirationDateFromToken(token);
         return expiration.getTime() - System.currentTimeMillis();

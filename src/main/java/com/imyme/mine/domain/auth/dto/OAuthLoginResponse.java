@@ -14,7 +14,7 @@ public class OAuthLoginResponse {
 
     private String accessToken;
     private String refreshToken;
-    private Long deviceId;
+    private String deviceId;
     private UserInfo user;
 
     @Getter

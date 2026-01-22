@@ -7,12 +7,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/** Spring Security 기본 설정
- * - JWT 기반 인증을 위한 Stateless 설정
- * - JWT 인증 필터 적용
- * - CSRF 비활성화 (JWT 사용 시)
+/**
+ * Spring Security 설정
+ * - JWT 기반 인증 및 권한 관리
  */
 @Configuration
 @EnableWebSecurity
@@ -34,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/health",
+                                "/categories/**",
+                                "/keywords/**",
                                 "/auth/oauth/**", // OAuth 로그인
                                 "/auth/refresh", // 토큰 갱신
                                 "/auth/logout", // 로그아웃

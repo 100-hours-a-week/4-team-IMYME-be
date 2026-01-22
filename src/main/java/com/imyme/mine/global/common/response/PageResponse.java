@@ -9,31 +9,12 @@ import java.util.List;
 
 /**
  * 페이징 응답 DTO
- * <p>
- * 응답 예시:
- * {
- * "success": true,
- * "data": {
- * "content": [...],
- * "meta": {
- * "page": 1,
- * "size": 20,
- * "total_elements": 100,
- * "total_pages": 5,
- * "is_first": true,
- * "is_last": false
- * }
- * },
- * "timestamp": "2026-01-21T10:30:00Z"
- * }
  */
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PageResponse<T>(List<T> content, PageMeta meta) {
 
-    /**
-     * Spring Data Page 객체를 PageResponse로 변환
-     */
+    // Spring Data Page 객체를 PageResponse로 변환
     public static <T> PageResponse<T> from(Page<T> page) {
         return PageResponse.<T>builder()
             .content(page.getContent())
@@ -41,9 +22,7 @@ public record PageResponse<T>(List<T> content, PageMeta meta) {
             .build();
     }
 
-    /**
-     * 페이징 메타데이터
-     */
+    // 페이징 메타데이터
     @Getter
     @Builder
     public static class PageMeta {

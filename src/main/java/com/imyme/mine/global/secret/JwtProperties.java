@@ -18,28 +18,16 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {
 
-    /**
-     * JWT 서명용 Secret Key (최소 256bit = 32자 이상)
-     */
+    // JWT 서명용 Secret Key (최소 256bit = 32자 이상)
     private String secret;
 
-    /**
-     * Access Token 만료 시간 (밀리초)
-     * 기본값: 3600000 (1시간)
-     */
+    // Access Token 만료 시간 (밀리초) : 기본값 3600000 (1시간)
     private Long accessTokenExpiration = 3600000L;
 
-    /**
-     * Refresh Token 만료 시간 (밀리초)
-     * 기본값: 604800000 (7일)
-     */
+    // Refresh Token 만료 시간 (밀리초) : 기본값: 604800000 (7일)
     private Long refreshTokenExpiration = 604800000L;
 
-    /**
-     * JWT Secret 검증
-     * - 최소 32자 이상 (256bit)
-     * - 기본값 또는 예측 가능한 값 사용 방지
-     */
+    // JWT Secret 검증 : 최소 32자 이상 (256bit) / 기본값 또는 예측 가능한 값 사용 방지
     @PostConstruct
     public void validateSecret() {
         if (secret == null || secret.trim().isEmpty()) {

@@ -14,9 +14,7 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /**
-     * OAuth ID로 회원 조회
-     */
+    // OAuth ID로 회원 조회
     Optional<User> findByOauthId(String oauthId);
 
     // OAuth ID와 Provider로 회원 조회

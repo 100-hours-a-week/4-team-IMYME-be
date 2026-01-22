@@ -77,9 +77,7 @@ public enum ErrorCode {
     private final HttpStatus status;
     private final String message;
 
-    /**
-     * Enum name을 에러 코드로 사용 (대문자 스네이크 케이스) 예: UNAUTHORIZED, USER_NOT_FOUND
-     */
+    // Enum name을 에러 코드로 사용 (대문자 스네이크 케이스) 예: UNAUTHORIZED, USER_NOT_FOUND
     public String getCode() {
         return this.name();
     }
