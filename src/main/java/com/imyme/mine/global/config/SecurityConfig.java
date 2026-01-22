@@ -34,6 +34,7 @@ public class SecurityConfig {
                                 "/health",
                                 "/categories/**",
                                 "/keywords/**",
+                                "/cards/**", // TODO: JWT 필터 구현 후 제거
                                 "/auth/oauth/**", // OAuth 로그인
                                 "/auth/refresh", // 토큰 갱신
                                 "/auth/logout", // 로그아웃

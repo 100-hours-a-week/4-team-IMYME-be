@@ -1,5 +1,9 @@
 package com.imyme.mine.global.config;
 
+import com.imyme.mine.domain.auth.entity.OAuthProvider;
+import com.imyme.mine.domain.auth.entity.Role;
+import com.imyme.mine.domain.auth.entity.User;
+import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
@@ -25,13 +29,17 @@ public class DataInitializer implements CommandLineRunner {
 
     private final CategoryRepository categoryRepository;
     private final KeywordRepository keywordRepository;
+    private final UserRepository userRepository;
 
     // 데이터 초기화 로직
     @Override
     @Transactional
     public void run(String... args) {
+        // 테스트용 사용자는 항상 체크
+        createTestUser();
+
         if (categoryRepository.count() > 0) {
-            log.info("데이터가 이미 존재합니다. 초기화를 건너뜁니다.");
+            log.info("카테고리/키워드 데이터가 이미 존재합니다. 초기화를 건너뜁니다.");
             return;
         }
 
@@ -60,6 +68,30 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         log.info("초기 데이터 생성 완료!");
+    }
+
+    // 테스트용 사용자 생성 헬퍼 메서드
+    private void createTestUser() {
+        if (userRepository.count() > 0) {
+            log.info("테스트 사용자가 이미 존재합니다.");
+            return;
+        }
+
+        User testUser = User.builder()
+            .oauthId("test_user_1")
+            .oauthProvider(OAuthProvider.KAKAO)
+            .email("test@example.com")
+            .nickname("테스트유저")
+            .role(Role.USER)
+            .level(1)
+            .totalCardCount(0)
+            .activeCardCount(0)
+            .consecutiveDays(1)
+            .winCount(0)
+            .build();
+
+        userRepository.save(testUser);
+        log.info("테스트 사용자 생성 완료 - id: {}", testUser.getId());
     }
 
     // 카테고리 생성 헬퍼 메서드

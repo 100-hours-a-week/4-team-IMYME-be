@@ -39,10 +39,7 @@ out/
 ### macOS ###
 .DS_Store
 
-### Application ###
-application-*.yml
-!application-dev.yml.example
-!application-prod.yml.example
+
 
 ### Logs ###
 logs/
