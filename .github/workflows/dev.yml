@@ -1,0 +1,256 @@
+name: Backend CI/CD v1
+
+on:
+  pull_request:
+    branches:
+      - dev
+#      - infra/cicd
+
+  push:
+    branches:
+#      - infra/cicd
+      - dev   # dev merge 결과 → CD
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: backend-cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # 1) CI
+  ci:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # 2. JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      # 3. Gradle Cache
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # 4. gradlew 권한
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+
+      # ========================================
+      # 5. 정적 분석 (Static Analysis)
+      # ========================================
+
+      # SpotBugs(버그패턴 캐치) : null위험, 무한 루프 등
+      - name: Run SpotBugs
+        run: ./gradlew spotbugsMain
+
+      # PMD(좋지 않은 코드 습관 캐치) : 중복코드, 안쓰는 변수 등
+      - name: Run PMD
+        run: ./gradlew pmdMain
+
+      # Checkstyle(코드 스타일) : 들여쓰기, 네이밍 규칙, 공백 등
+      - name: Run Checkstyle
+        run: ./gradlew checkstyleMain
+
+      # 6. 빌드
+      - name: Build
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: ./gradlew build -x test
+
+       # 7. 테스트
+      - name: Run Tests
+        env:
+           DB_URL: ${{ secrets.DB_URL }}
+           DB_USERNAME: ${{ secrets.DB_USERNAME }}
+           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: ./gradlew test
+
+      # 8.1 이전 아티팩트 삭제
+      - name: Delete old artifacts
+        if: github.ref == 'refs/heads/dev' || github.event.pull_request.merged == true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            for (const artifact of artifacts.data.artifacts) {
+              if (artifact.name === 'backend-dev-latest') {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }
+
+      # 8.2 아티팩트 업로드
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/dev' || github.event.pull_request.merged == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dev-latest
+          path: build/libs/*.jar
+          retention-days: 15
+          overwrite: true
+
+  ci-notify-success:
+    needs: ci
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord CI success
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          status: success
+          title: "🟢 Backend CI Success"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 백엔드 CI 성공!"
+          color: 0x00FF00
+
+  ci-notify-failure:
+    needs: ci
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord CI failure
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          status: failure
+          title: "🔴 Backend CI Failed"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 백엔드 CI 실패!"
+          color: 0xFF0000
+
+  # 2) CD
+  cd:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+
+
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ SSH 세팅
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEV_SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      # 2️⃣ 아티팩트 다운로드
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-dev-latest
+          path: ./build/libs
+
+      # 3️⃣ 서버 전송
+      - name: Copy artifact to dev server
+        run: |
+                scp -i ~/.ssh/id_rsa ./build/libs/*.jar \
+                ubuntu@${{ secrets.DEV_SERVER_HOST }}:/home/ubuntu/mine/backend
+
+      # 4️⃣ 배포 (release / current 방식)
+      - name: Deploy to Dev Server
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.DEV_SERVER_HOST }} 'bash -s' <<'EOF'
+          set -e
+
+          APP_DIR=/home/ubuntu/mine/backend
+          RELEASES_DIR=$APP_DIR/releases
+          SHARED_DIR=$APP_DIR/shared
+          RELEASE_ID=$(date +%Y%m%d%H%M%S)
+
+          CURRENT_LINK=$APP_DIR/current
+          RELEASE_DIR=$RELEASES_DIR/$RELEASE_ID
+          PID_FILE=$SHARED_DIR/backend.pid
+          LOG_DIR=$SHARED_DIR/logs
+          LOG_FILE=$LOG_DIR/backend.log
+          ENV_FILE=$SHARED_DIR/.env
+
+          mkdir -p "$RELEASE_DIR" "$LOG_DIR"
+
+          # 1. 새 release에 jar 이동
+          mv "$APP_DIR/mine-0.0.1-SNAPSHOT.jar" "$RELEASE_DIR/backend.jar"
+
+          # 2. current 심볼릭 링크 교체
+          ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+
+          # 3. 기존 프로세스 종료 (pid 기준)
+          if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            kill "$(cat "$PID_FILE")" || true
+            sleep 2
+          fi
+
+
+
+            # env 파일 변수 주입
+            set -a
+            . "$ENV_FILE"
+            set +a
+
+            # nohup 실행 (spring.config.location 제거)
+            nohup java -jar "$CURRENT_LINK/backend.jar" \
+                  --spring.profiles.active=dev \
+                  >> "$LOG_FILE" 2>&1 </dev/null &
+
+
+          echo $! > "$PID_FILE"
+
+          ls -1dt "$RELEASES_DIR"/* | tail -n +4 | xargs -r rm -rf
+
+
+          exit 0
+          EOF
+
+  cd-notify-success:
+    needs: cd
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord CD success
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          status: success
+          title: "🟢 Backend Deploy Success"
+          content: "백엔드 개발 서버 배포 완료!"
+          color: 0x00FF00
+
+  cd-notify-failure:
+    needs: cd
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord CD failure
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          status: failure
+          title: "🔴 Backend Deploy Failed"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 백엔드 배포 실패!"
+          color: 0xFF0000
