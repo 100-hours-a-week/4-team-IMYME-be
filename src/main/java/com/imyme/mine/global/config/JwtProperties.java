@@ -1,4 +1,4 @@
-package com.imyme.mine.global.secret;
+package com.imyme.mine.global.config;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
