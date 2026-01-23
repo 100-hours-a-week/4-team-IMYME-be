@@ -6,6 +6,7 @@ import jakarta.persistence.Table;
 import lombok.*;
 import org.hibernate.annotations.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -41,7 +42,7 @@ public class User {
     // OAuth 제공자 (KAKAO, GOOGLE, APPLE)
     @Column(name = "oauth_provider", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
-    private OAuthProvider oauthProvider;
+    private OAuthProviderType oauthProvider;
 
     // 이메일 (선택)
     @Column(name = "email", length = 255)
@@ -64,7 +65,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'USER'")
     @Builder.Default
-    private Role role = Role.USER;
+    private RoleType role = RoleType.USER;
 
     // 유저 레벨 (누적 카드 수 기반)
     @Column(name = "level", nullable = false)
@@ -132,9 +133,29 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 로그인 시 마지막 접속일 갱신
+    // 로그인 시 마지막 접속일 갱신 및 연속 접속일 계산
     public void updateLastLogin() {
-        this.lastLoginAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        if (this.lastLoginAt != null) {
+            LocalDate lastDate = this.lastLoginAt.toLocalDate();
+            LocalDate today = now.toLocalDate();
+
+            // 마지막 로그인이 어제라면 -> 연속 접속 +1
+            if (lastDate.equals(today.minusDays(1))) {
+                this.consecutiveDays++;
+            }
+            // 마지막 로그인이 어제보다 더 과거라면 (오늘도 아니고 어제도 아님) -> 1로 초기화
+            else if (lastDate.isBefore(today.minusDays(1))) {
+                this.consecutiveDays = 1;
+            }
+            // 오늘 이미 로그인했다면(lastDate equals today) -> 변경 없음
+        } else {
+            // 최초 로그인 시
+            this.consecutiveDays = 1;
+        }
+
+        this.lastLoginAt = now;
     }
 
     // 레벨 재계산 (누적 카드 수 기반) -> 레벨업 조건: 5, 15, 30, 50, 75... (+5씩 증가)
