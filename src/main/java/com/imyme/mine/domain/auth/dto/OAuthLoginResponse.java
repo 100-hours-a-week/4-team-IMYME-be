@@ -1,36 +1,45 @@
 package com.imyme.mine.domain.auth.dto;
 
-import lombok.AllArgsConstructor;
+import com.imyme.mine.domain.auth.entity.OAuthProviderType;
+import com.imyme.mine.domain.auth.entity.User;
 import lombok.Builder;
-import lombok.Getter;
 
-/**
- * OAuth 로그인 응답 DTO
- */
-@Getter
 @Builder
-@AllArgsConstructor
-public class OAuthLoginResponse {
-
-    private String accessToken;
-    private String refreshToken;
-    private String deviceId;
-    private UserInfo user;
-
-    @Getter
+public record OAuthLoginResponse(
+    String accessToken,
+    String refreshToken,
+    Long deviceId,
+    Long expiresIn,
+    UserInfo user
+) {
     @Builder
-    @AllArgsConstructor
-    public static class UserInfo {
-        private Long id;
-        private String oauthId;
-        private String oauthProvider;
-        private String nickname;
-        private String profileImageUrl;
-        private Integer level;
-        private Integer totalCardCount;
-        private Integer activeCardCount;
-        private Integer consecutiveDays;
-        private Integer winCount;
-        private Boolean isNewUser;
+    public record UserInfo(
+        Long id,
+        String oauthId,
+        OAuthProviderType oauthProvider,
+        String nickname,
+        String profileImageUrl,
+        Integer level,
+        Integer totalCardCount,
+        Integer activeCardCount,
+        Integer consecutiveDays,
+        Integer winCount,
+        Boolean isNewUser
+    ) {
+        public static UserInfo from(User user, boolean isNewUser) {
+            return UserInfo.builder()
+                .id(user.getId())
+                .oauthId(user.getOauthId())
+                .oauthProvider(user.getOauthProvider())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .level(user.getLevel())
+                .totalCardCount(user.getTotalCardCount())
+                .activeCardCount(user.getActiveCardCount())
+                .consecutiveDays(user.getConsecutiveDays())
+                .winCount(user.getWinCount())
+                .isNewUser(isNewUser)
+                .build();
+        }
     }
 }
