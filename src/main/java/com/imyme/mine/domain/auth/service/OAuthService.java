@@ -69,6 +69,8 @@ public class OAuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
+        long expiresIn = jwtProperties.getAccessTokenExpiration() / 1000;
+
         LocalDateTime expiresAt = LocalDateTime.now()
                 .plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000);
 
@@ -85,6 +87,7 @@ public class OAuthService {
             .accessToken(accessToken)
             .refreshToken(refreshToken)
             .deviceId(device.getId())
+            .expiresIn(expiresIn)
             .user(OAuthLoginResponse.UserInfo.from(user, isNewUser))
             .build();
     }

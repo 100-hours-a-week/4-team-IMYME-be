@@ -50,6 +50,7 @@ public class TokenRefreshService {
 
         String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        long expiresIn = jwtProperties.getAccessTokenExpiration() / 1000;
         LocalDateTime newExpiresAt = LocalDateTime.now()
                 .plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000);
 
@@ -60,6 +61,7 @@ public class TokenRefreshService {
         return TokenRefreshResponse.builder()
             .accessToken(newAccessToken)
             .refreshToken(newRefreshToken)
+            .expiresIn(expiresIn)
             .build();
     }
 }
