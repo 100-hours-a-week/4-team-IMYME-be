@@ -73,7 +73,7 @@ public class UserSession {
     }
 
     // Refresh Token 갱신 (RT Rotation)
-    public void updateRefreshToken(String newRefreshToken, LocalDateTime newExpiresAt) {
+    public void rotateRefreshToken(String newRefreshToken, LocalDateTime newExpiresAt) {
         this.refreshToken = newRefreshToken;
         this.expiresAt = newExpiresAt;
         this.lastUsedAt = LocalDateTime.now();
