@@ -57,11 +57,13 @@ public enum ErrorCode {
     ROOM_FULL(HttpStatus.CONFLICT, "방이 가득 찼습니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 방입니다."),
 
-    // ========== 검증 실패 (422) ==========
+    // ========== 검증 실패 (400, 422) ==========
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "입력값 검증에 실패했습니다."),
     FORBIDDEN_WORD(HttpStatus.UNPROCESSABLE_ENTITY, "금지어가 포함되어 있습니다."),
     NICKNAME_LENGTH(HttpStatus.UNPROCESSABLE_ENTITY, "닉네임은 1~20자여야 합니다."),
     TITLE_LENGTH(HttpStatus.UNPROCESSABLE_ENTITY, "제목은 1~100자여야 합니다."),
+    EMPTY_TITLE(HttpStatus.BAD_REQUEST, "제목이 비어있습니다."),
+    INVALID_TITLE_LENGTH(HttpStatus.BAD_REQUEST, "제목은 1~20자여야 합니다."),
 
     // ========== 타임아웃/만료 (410) ==========
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 제한 시간이 초과되었습니다."),

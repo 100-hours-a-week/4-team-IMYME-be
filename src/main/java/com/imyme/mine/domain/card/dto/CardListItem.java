@@ -1,0 +1,57 @@
+package com.imyme.mine.domain.card.dto;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.imyme.mine.domain.card.entity.Card;
+
+import java.time.LocalDateTime;
+
+public record CardListItem(
+
+    Long id,
+
+    @JsonProperty("category_id")
+    Long categoryId,
+
+    @JsonProperty("category_name")
+    String categoryName,
+
+    @JsonProperty("keyword_id")
+    Long keywordId,
+
+    @JsonProperty("keyword_name")
+    String keywordName,
+
+    String title,
+
+    @JsonProperty("best_level")
+    Integer bestLevel,
+
+    @JsonProperty("attempt_count")
+    Integer attemptCount,
+
+    @JsonProperty("created_at")
+    LocalDateTime createdAt
+
+) {
+
+    /**
+     * Card 엔티티 → CardListItem 변환
+     *
+     * [ JOIN FETCH 전제 ]
+     * - Repository에서 category, keyword를 JOIN FETCH로 조회
+     * - N+1 문제 없이 안전하게 접근 가능
+     */
+    public static CardListItem from(Card card) {
+        return new CardListItem(
+            card.getId(),
+            card.getCategory().getId(),
+            card.getCategory().getName(),
+            card.getKeyword().getId(),
+            card.getKeyword().getName(),
+            card.getTitle(),
+            card.getBestLevel(),
+            card.getAttemptCount(),
+            card.getCreatedAt()
+        );
+    }
+}
