@@ -6,7 +6,10 @@ import com.imyme.mine.domain.auth.dto.OAuthLoginResponse;
 import com.imyme.mine.domain.auth.entity.OAuthProvider;
 import com.imyme.mine.domain.auth.entity.Role;
 import com.imyme.mine.domain.auth.entity.User;
+import com.imyme.mine.domain.auth.entity.UserSession;
 import com.imyme.mine.domain.auth.repository.UserRepository;
+import com.imyme.mine.domain.auth.repository.UserSessionRepository;
+import com.imyme.mine.global.config.JwtProperties;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +31,9 @@ public class OAuthService {
 
     private final KakaoOAuthClient kakaoOAuthClient;
     private final UserRepository userRepository;
+    private final UserSessionRepository userSessionRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtProperties jwtProperties;
 
     // 카카오 로그인 메인 로직
     public OAuthLoginResponse loginWithKakao(OAuthLoginRequest request) {
@@ -65,6 +70,19 @@ public class OAuthService {
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+
+        // UserSession 저장 (RT Rotation 지원)
+        LocalDateTime expiresAt = LocalDateTime.now()
+                .plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000);
+
+        UserSession userSession = UserSession.builder()
+                .user(user)
+                .refreshToken(refreshToken)
+                .expiresAt(expiresAt)
+                .build();
+
+        userSessionRepository.save(userSession);
+        log.info("UserSession saved for user: {}", user.getId());
 
         return OAuthLoginResponse.builder()
             .accessToken(accessToken)

@@ -1,0 +1,103 @@
+spring:
+    config:
+        # .env 파일을 불러오는 설정
+        import: optional:file:.env[.yaml]
+
+    application:
+        name: mine
+
+    mvc:
+        throw-exception-if-no-handler-found: true
+    web:
+        resources:
+            add-mappings: false
+
+    # ==================================================
+    # DB (PostgreSQL)
+    # ==================================================
+    datasource:
+        url: ${DB_URL}
+        username: ${DB_USERNAME}
+        password: ${DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+
+    # ==================================================
+    # JPA / Hibernate
+    # ==================================================
+    jpa:
+        hibernate:
+            ddl-auto: update # 개발용 (운영 시 validate 권장)
+        show-sql: true
+        properties:
+            hibernate:
+                format_sql: true
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+        open-in-view: false
+
+    # ==================================================
+    # Security OAuth2 (카카오 로그인)
+    # ==================================================
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        client-id: ${KAKAO_CLIENT_ID}
+                        client-secret: ${KAKAO_CLIENT_SECRET}
+                        redirect-uri: ${KAKAO_REDIRECT_URI}
+                        authorization-grant-type: authorization_code
+                        client-authentication-method: client_secret_post
+                        scope:
+                            - profile_nickname
+                            - profile_image
+                            - account_email
+                provider:
+                    kakao:
+                        authorization-uri: https://kauth.kakao.com/oauth/authorize
+                        token-uri: https://kauth.kakao.com/oauth/token
+                        user-info-uri: https://kapi.kakao.com/v2/user/me
+                        user-name-attribute: id
+
+# ==================================================
+# AWS S3 설정
+# ==================================================
+cloud:
+    aws:
+        credentials:
+            access-key: ${S3_ACCESS_KEY}
+            secret-key: ${S3_SECRET_KEY}
+        region:
+            static: ${AWS_REGION}
+        s3:
+            bucket: ${S3BUCKET_NAME}
+
+# ==================================================
+# 서버 설정
+# ==================================================
+server:
+    port: 8080
+    servlet:
+        encoding:
+            charset: UTF-8
+            force: true
+
+# ==================================================
+# 로그 설정
+# ==================================================
+logging:
+    level:
+        com.imyme.mine: DEBUG
+        org.springframework.security: INFO
+        org.hibernate.SQL: DEBUG
+        org.hibernate.type.descriptor.sql.BasicBinder: TRACE # 바인딩 변수 보려면 TRACE 권장
+        org.hibernate.type: INFO # 너무 시끄러운 로그 방지
+    pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# ==================================================
+# JWT 설정
+# ==================================================
+jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 3600000    # 1시간
+    refresh-token-expiration: 604800000 # 7일
