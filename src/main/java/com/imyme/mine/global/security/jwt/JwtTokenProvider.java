@@ -1,6 +1,6 @@
-package com.imyme.mine.global.secret;
+package com.imyme.mine.global.security.jwt;
 
-import com.nimbusds.jose.crypto.impl.HMAC;
+import com.imyme.mine.global.config.JwtProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;

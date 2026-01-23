@@ -1,4 +1,4 @@
-name: Backend CI/CD v1
+name: Backend CI/CD v2
 
 on:
   pull_request:
@@ -220,6 +220,23 @@ jobs:
 
 
           echo $! > "$PID_FILE"
+
+          # 4. Health Check
+          echo "🔍 Health check"
+          for i in {1..10}; do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "✅ Health check passed"
+              break
+            fi
+            echo "⏳ Waiting for backend..."
+            sleep 3
+          done
+
+          if ! curl -sf http://127.0.0.1:8080/health > /dev/null; then
+            echo "❌ Health check failed"
+            cat "$LOG_FILE"
+            exit 1
+          fi
 
           ls -1dt "$RELEASES_DIR"/* | tail -n +4 | xargs -r rm -rf
 

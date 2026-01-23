@@ -2,8 +2,11 @@ package com.imyme.mine.domain.auth.controller;
 
 import com.imyme.mine.domain.auth.dto.OAuthLoginRequest;
 import com.imyme.mine.domain.auth.dto.OAuthLoginResponse;
+import com.imyme.mine.domain.auth.dto.TokenRefreshRequest;
+import com.imyme.mine.domain.auth.dto.TokenRefreshResponse;
 import com.imyme.mine.domain.auth.entity.OAuthProvider;
 import com.imyme.mine.domain.auth.service.OAuthService;
+import com.imyme.mine.domain.auth.service.TokenRefreshService;
 import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -19,8 +22,10 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final OAuthService oauthService;
+    private final TokenRefreshService tokenRefreshService;
 
 
+    // OAuth 로그인 및 회원가입
     @PostMapping("/oauth/{provider}")
     public ApiResponse<OAuthLoginResponse> oauthLogin(
         @PathVariable String provider,
@@ -46,5 +51,17 @@ public class AuthController {
         } else {
             return ApiResponse.success(response, "로그인되었습니다.");
         }
+    }
+
+    // 토큰 갱신
+    @PostMapping("/refresh")
+    public ApiResponse<TokenRefreshResponse> refreshToken(
+        @Valid @RequestBody TokenRefreshRequest request
+    ) {
+        log.info("Token refresh attempt");
+
+        TokenRefreshResponse response = tokenRefreshService.refreshTokens(request);
+
+        return ApiResponse.success(response, "토큰이 갱신되었습니다.");
     }
 }
