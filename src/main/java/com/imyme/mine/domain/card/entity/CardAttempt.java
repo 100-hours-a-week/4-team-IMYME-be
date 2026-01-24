@@ -76,9 +76,20 @@ public class CardAttempt {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
     }
 
     public void markUploaded(String audioUrl, Integer durationSeconds) {

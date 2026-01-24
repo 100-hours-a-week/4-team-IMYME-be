@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -77,6 +78,20 @@ public class AttemptController {
         UploadCompleteResponse response = attemptService.uploadComplete(userId, cardId, attemptId, request);
 
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{attemptId}")
+    public ResponseEntity<Void> deleteAttempt(
+        @RequestHeader("Authorization") String authorization,
+        @PathVariable Long cardId,
+        @PathVariable Long attemptId
+    ) {
+        Long userId = extractUserId(authorization);
+        log.info("DELETE /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
+
+        attemptService.deleteAttempt(userId, cardId, attemptId);
+
+        return ResponseEntity.noContent().build();
     }
 
     private Long extractUserId(String authorization) {

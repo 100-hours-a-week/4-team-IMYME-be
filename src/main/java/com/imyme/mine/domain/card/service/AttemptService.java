@@ -108,6 +108,33 @@ public class AttemptService {
         return UploadCompleteResponse.from(attempt);
     }
 
+    @Transactional
+    public void deleteAttempt(Long userId, Long cardId, Long attemptId) {
+        log.debug("학습 시도 삭제 시작 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
+
+        Card card = cardRepository.findByIdAndUserId(cardId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+
+        if (!attempt.getCard().getId().equals(card.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
+        }
+
+        if (attempt.isDeleted()) {
+            throw new BusinessException(ErrorCode.ALREADY_DELETED);
+        }
+
+        if (attempt.getStatus() == AttemptStatus.UPLOADED) {
+            throw new BusinessException(ErrorCode.CANNOT_DELETE_UPLOADED);
+        }
+
+        attempt.softDelete();
+
+        log.info("학습 시도 삭제 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
+    }
+
     private Short calculateNextAttemptNo(Long cardId) {
         Short maxAttemptNo = cardAttemptRepository.findMaxAttemptNoByCardId(cardId);
         return (maxAttemptNo == null) ? 1 : (short) (maxAttemptNo + 1);
