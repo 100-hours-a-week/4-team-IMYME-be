@@ -1,39 +1,19 @@
 package com.imyme.mine.domain.card.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.imyme.mine.domain.card.entity.Card;
-
 import java.time.LocalDateTime;
 
 public record CardListItem(
-
     Long id,
-
-    @JsonProperty("category_id")
     Long categoryId,
-
-    @JsonProperty("category_name")
     String categoryName,
-
-    @JsonProperty("keyword_id")
     Long keywordId,
-
-    @JsonProperty("keyword_name")
     String keywordName,
-
     String title,
-
-    @JsonProperty("best_level")
     Integer bestLevel,
-
-    @JsonProperty("attempt_count")
     Integer attemptCount,
-
-    @JsonProperty("created_at")
     LocalDateTime createdAt
-
 ) {
-
     /**
      * Card 엔티티 → CardListItem 변환
      *
