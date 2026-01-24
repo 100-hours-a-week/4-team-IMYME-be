@@ -29,8 +29,13 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     @Query("UPDATE Device d SET d.deletedAt = CURRENT_TIMESTAMP WHERE d.deviceUuid = :deviceUuid AND d.deletedAt IS NULL")
     int softDeleteByDeviceUuid(@Param("deviceUuid") String deviceUuid);
 
-    // userId와 deviceUuid로 기기 Soft Delete
+    // 기기 삭제용 : userId와 deviceUuid로 기기 Soft Delete
     @Modifying
     @Query("UPDATE Device d SET d.deletedAt = CURRENT_TIMESTAMP WHERE d.lastUser.id = :userId AND d.deviceUuid = :deviceUuid AND d.deletedAt IS NULL")
-    int softDeleteByUserIdAndDeviceUuid(@Param("userId") Long userId, @Param("deviceUuid") String deviceUuid);
+    void softDeleteByUserIdAndDeviceUuid(@Param("userId") Long userId, @Param("deviceUuid") String deviceUuid);
+
+    // 회원 탈퇴용 : 기기를 삭제하는 게 아니라 '주인 없음' 상태로 만듦
+    @Modifying
+    @Query("UPDATE Device d SET d.lastUser = null WHERE d.lastUser.id = :userId")
+    void unlinkAllByUserId(@Param("userId") Long userId);
 }
