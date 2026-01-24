@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/auth/oauth/**", // OAuth 로그인
                                 "/auth/refresh", // 토큰 갱신
                                 "/auth/logout", // 로그아웃
+                                "/test/**", // 테스트용 (TODO: 운영 시 제거)
                                 "/error",
                                 "/swagger-ui/**", // Swagger UI
                                 "/v3/api-docs/**") // OpenAPI 문서
