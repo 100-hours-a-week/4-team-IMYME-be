@@ -3,7 +3,10 @@ package com.imyme.mine.domain.card.controller;
 import com.imyme.mine.domain.card.dto.AttemptCreateRequest;
 import com.imyme.mine.domain.card.dto.AttemptCreateResponse;
 import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
+import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
+import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.service.AttemptService;
+import jakarta.validation.Valid;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
@@ -14,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,6 +60,21 @@ public class AttemptController {
         log.info("GET /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
 
         AttemptDetailResponse response = attemptService.getAttemptDetail(userId, cardId, attemptId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{attemptId}/upload-complete")
+    public ResponseEntity<UploadCompleteResponse> uploadComplete(
+        @RequestHeader("Authorization") String authorization,
+        @PathVariable Long cardId,
+        @PathVariable Long attemptId,
+        @Valid @RequestBody UploadCompleteRequest request
+    ) {
+        Long userId = extractUserId(authorization);
+        log.info("PUT /cards/{}/attempts/{}/upload-complete - userId: {}", cardId, attemptId, userId);
+
+        UploadCompleteResponse response = attemptService.uploadComplete(userId, cardId, attemptId, request);
 
         return ResponseEntity.ok(response);
     }

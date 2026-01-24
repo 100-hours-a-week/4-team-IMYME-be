@@ -5,6 +5,8 @@ import com.imyme.mine.domain.card.dto.AttemptCreateResponse;
 import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
 import com.imyme.mine.domain.card.dto.CardCreateRequest;
 import com.imyme.mine.domain.card.dto.CardResponse;
+ import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
+import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.service.AttemptService;
 import com.imyme.mine.domain.card.service.CardService;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
@@ -14,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -64,6 +67,16 @@ public class TestController {
         @PathVariable Long attemptId
     ) {
         AttemptDetailResponse response = attemptService.getAttemptDetail(TEST_USER_ID, cardId, attemptId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/cards/{cardId}/attempts/{attemptId}/upload-complete")
+    public ResponseEntity<UploadCompleteResponse> uploadComplete(
+        @PathVariable Long cardId,
+        @PathVariable Long attemptId,
+        @RequestBody UploadCompleteRequest request
+    ) {
+        UploadCompleteResponse response = attemptService.uploadComplete(TEST_USER_ID, cardId, attemptId, request);
         return ResponseEntity.ok(response);
     }
 }

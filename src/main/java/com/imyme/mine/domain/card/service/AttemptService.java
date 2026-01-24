@@ -3,6 +3,8 @@ package com.imyme.mine.domain.card.service;
 import com.imyme.mine.domain.card.dto.AttemptCreateRequest;
 import com.imyme.mine.domain.card.dto.AttemptCreateResponse;
 import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
+import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
+import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.entity.AttemptStatus;
 import com.imyme.mine.domain.card.entity.Card;
 import com.imyme.mine.domain.card.entity.CardAttempt;
@@ -74,6 +76,36 @@ public class AttemptService {
         }
 
         return buildAttemptDetailResponse(attempt);
+    }
+
+    @Transactional
+    public UploadCompleteResponse uploadComplete(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
+        log.debug("업로드 완료 처리 시작 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
+
+        Card card = cardRepository.findByIdAndUserId(cardId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+
+        if (!attempt.getCard().getId().equals(card.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
+        }
+
+        if (attempt.getStatus() != AttemptStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS);
+        }
+
+        LocalDateTime expiresAt = attempt.getCreatedAt().plus(UPLOAD_EXPIRATION);
+        if (LocalDateTime.now().isAfter(expiresAt)) {
+            throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
+        }
+
+        attempt.markUploaded(request.audioUrl(), request.durationSeconds());
+
+        log.info("업로드 완료 처리 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
+
+        return UploadCompleteResponse.from(attempt);
     }
 
     private Short calculateNextAttemptNo(Long cardId) {
