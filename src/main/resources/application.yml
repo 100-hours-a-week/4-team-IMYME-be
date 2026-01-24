@@ -69,7 +69,7 @@ cloud:
         region:
             static: ${AWS_REGION}
         s3:
-            bucket: ${S3BUCKET_NAME}
+            bucket: ${BUCKET_NAME}
 
 # ==================================================
 # 서버 설정
