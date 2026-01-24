@@ -17,10 +17,12 @@ import java.time.LocalDateTime;
     name = "users",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_users_oauth_id_provider", columnNames = {"oauth_id", "oauth_provider"}),
-        @UniqueConstraint(name = "uk_users_nickname", columnNames = {"nickname"})
+        // 닉네임 유니크 제약조건(@UniqueConstraint) 삭제 후 DB에 직접 Partial Index 생성 완료
+        // @UniqueConstraint(name = "uk_users_nickname", columnNames = {"nickname"})
     },
     indexes = {
-        @Index(name = "idx_users_email", columnList = "email")
+        // JPA로는 Partial Index 생성이 불가능하여 주석 처리함. DB에서 직접 생성 필요.
+        // @Index(name = "idx_users_email", columnList = "email")
     }
 )
 @Getter
@@ -49,7 +51,7 @@ public class User {
     private String email;
 
     // 닉네임 (1~20자, 중복 불가)
-    @Column(name = "nickname", nullable = false, unique = true, length = 20)
+    @Column(name = "nickname", nullable = false, length = 20)
     private String nickname;
 
     // 프로필 이미지 URL
@@ -194,5 +196,16 @@ public class User {
     // PvP 승리 횟수 증가
     public void incrementWinCount() {
         this.winCount++;
+    }
+
+    // 닉네임 변경
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    // 프로필 이미지 변경
+    public void updateProfileImage(String profileImageUrl, String profileImageKey) {
+        this.profileImageUrl = profileImageUrl;
+        this.profileImageKey = profileImageKey;
     }
 }

@@ -48,7 +48,7 @@ public class UserSession {
     private Device device;
 
     // Refresh Token (암호화 저장 권장)
-    @Column(name = "refresh_token", nullable = false, unique = true, length = 500)
+    @Column(name = "refresh_token", nullable = false, length = 500)
     private String refreshToken;
 
     // Refresh Token 만료 시간
