@@ -47,6 +47,8 @@ public enum ErrorCode {
     INVALID_AUDIO_URL(HttpStatus.BAD_REQUEST, "유효하지 않은 오디오 URL입니다."),
     INVALID_CARD_ATTEMPT_MISMATCH(HttpStatus.BAD_REQUEST, "카드와 시도 ID가 일치하지 않습니다."),
     INVALID_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 타입입니다."),
+    INVALID_AGENT_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 Agent Type입니다."),
+    INVALID_PLATFORM_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 Platform Type입니다."),
     CHECKSUM_MISMATCH(HttpStatus.BAD_REQUEST, "파일 체크섬이 일치하지 않습니다."),
 
     // ========== 충돌 (409) ==========
@@ -56,6 +58,7 @@ public enum ErrorCode {
     CANNOT_DELETE_UPLOADED(HttpStatus.CONFLICT, "AI 분석 대기 중인 시도는 삭제할 수 없습니다."),
     ROOM_FULL(HttpStatus.CONFLICT, "방이 가득 찼습니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 방입니다."),
+    MAX_ATTEMPTS_EXCEEDED(HttpStatus.CONFLICT, "최대 시도 횟수(5회)를 초과했습니다."),
 
     // ========== 검증 실패 (400, 422) ==========
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "입력값 검증에 실패했습니다."),
@@ -77,7 +80,8 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "일시적으로 서비스를 이용할 수 없습니다."),
     AI_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스에 일시적인 문제가 발생했습니다."),
-    CACHE_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "캐시 서버에 일시적인 문제가 발생했습니다.");
+    CACHE_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "캐시 서버에 일시적인 문제가 발생했습니다."),
+    S3_UPLOAD_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "파일 업로드 서비스에 일시적인 문제가 발생했습니다.");
 
     private final HttpStatus status;
     private final String message;

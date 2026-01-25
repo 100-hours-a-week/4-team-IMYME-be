@@ -3,10 +3,8 @@ package com.imyme.mine.domain.auth.service;
 import com.imyme.mine.domain.auth.client.KakaoOAuthClient;
 import com.imyme.mine.domain.auth.dto.OAuthLoginRequest;
 import com.imyme.mine.domain.auth.dto.OAuthLoginResponse;
-import com.imyme.mine.domain.auth.entity.OAuthProvider;
-import com.imyme.mine.domain.auth.entity.Role;
-import com.imyme.mine.domain.auth.entity.User;
-import com.imyme.mine.domain.auth.entity.UserSession;
+import com.imyme.mine.domain.auth.entity.*;
+import com.imyme.mine.domain.auth.repository.DeviceRepository;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.auth.repository.UserSessionRepository;
 import com.imyme.mine.global.config.JwtProperties;
@@ -32,6 +30,7 @@ public class OAuthService {
     private final KakaoOAuthClient kakaoOAuthClient;
     private final UserRepository userRepository;
     private final UserSessionRepository userSessionRepository;
+    private final DeviceRepository deviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
 
@@ -39,12 +38,12 @@ public class OAuthService {
     public OAuthLoginResponse loginWithKakao(OAuthLoginRequest request) {
         KakaoOAuthClient.KakaoUserInfo userInfo = fetchKakaoUserInfo(request);
         String oauthId = "kakao_" + userInfo.getId();
-        return processLogin(oauthId, request.getDeviceUuid(), userInfo);
+        return processLogin(oauthId, request.deviceUuid(), userInfo);
     }
 
     private KakaoOAuthClient.KakaoUserInfo fetchKakaoUserInfo(OAuthLoginRequest request) {
         KakaoOAuthClient.KakaoTokenResponse tokenResponse =
-            kakaoOAuthClient.getAccessToken(request.getCode(), request.getRedirectUri());
+            kakaoOAuthClient.getAccessToken(request.code(), request.redirectUri());
 
         return kakaoOAuthClient.getUserInfo(tokenResponse.getAccessToken());
     }
@@ -52,51 +51,43 @@ public class OAuthService {
     @Transactional
     protected OAuthLoginResponse processLogin(String oauthId, String deviceUuid, KakaoOAuthClient.KakaoUserInfo userInfo) {
 
-        Optional<User> existingUser = userRepository.findByOauthId(oauthId);
-        User user;
-        boolean isNewUser;
+        User user = userRepository.findByOauthId(oauthId)
+            .orElseGet(() -> createNewUser(oauthId, userInfo));
 
-        if (existingUser.isPresent()) {
-            user = existingUser.get();
-            isNewUser = false;
-            user.updateLastLogin();
+        boolean isNewUser = user.getCreatedAt().isEqual(user.getUpdatedAt());
+        user.updateLastLogin();
 
-            log.info("기존 유저 로그인: {}", user.getId());
-        } else {
-            user = createNewUser(oauthId, userInfo);
-            isNewUser = true;
-            log.info("신규 유저 가입: {}", user.getId());
-        }
+        Device device = deviceRepository.findByDeviceUuid(deviceUuid)
+            .orElseGet(() -> deviceRepository.save(Device.builder()
+                .deviceUuid(deviceUuid)
+                .agentType(AgentType.CHROME) // TODO: 추후 헤더 파싱 필요
+                .platformType(PlatformType.MOBILE_WEB) // TODO: 추후 헤더 파싱 필요
+                .build()));
+
+        device.login(user);
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
-        // UserSession 저장 (RT Rotation 지원)
+        long expiresIn = jwtProperties.getAccessTokenExpiration() / 1000;
+
         LocalDateTime expiresAt = LocalDateTime.now()
                 .plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000);
 
         UserSession userSession = UserSession.builder()
                 .user(user)
+                .device(device)
                 .refreshToken(refreshToken)
                 .expiresAt(expiresAt)
                 .build();
 
         userSessionRepository.save(userSession);
-        log.info("UserSession saved for user: {}", user.getId());
 
         return OAuthLoginResponse.builder()
             .accessToken(accessToken)
             .refreshToken(refreshToken)
-            .deviceId(deviceUuid)
-            .user(OAuthLoginResponse.UserInfo.builder()
-                .id(user.getId())
-                .oauthId(user.getOauthId())
-                .oauthProvider(user.getOauthProvider().name())
-                .nickname(user.getNickname())
-                .profileImageUrl(user.getProfileImageUrl())
-                .level(user.getLevel())
-                .isNewUser(isNewUser)
-                .build())
+            .expiresIn(expiresIn)
+            .user(OAuthLoginResponse.UserInfo.from(user, isNewUser))
             .build();
     }
 
@@ -122,11 +113,11 @@ public class OAuthService {
 
         User user = User.builder()
             .oauthId(oauthId)
-            .oauthProvider(OAuthProvider.KAKAO)
+            .oauthProvider(OAuthProviderType.KAKAO)
             .email(email)
             .nickname(uniqueNickname)
             .profileImageUrl(profileImage)
-            .role(Role.USER)
+            .role(RoleType.USER)
             .level(1)
             .totalCardCount(0)
             .activeCardCount(0)

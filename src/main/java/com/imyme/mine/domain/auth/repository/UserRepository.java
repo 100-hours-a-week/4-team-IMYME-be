@@ -1,5 +1,6 @@
 package com.imyme.mine.domain.auth.repository;
 
+import com.imyme.mine.domain.auth.entity.OAuthProviderType;
 import com.imyme.mine.domain.auth.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,8 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // OAuth ID로 회원 조회
     Optional<User> findByOauthId(String oauthId);
 
-    // OAuth ID와 Provider로 회원 조회
-    Optional<User> findByOauthIdAndOauthProvider(String oauthId, String oauthProvider);
+    // OAuth ID와 OauthProviderType으로 회원 조회
+    Optional<User> findByOauthIdAndOauthProvider(String oauthId, OAuthProviderType oauthProvider);
 
     // 닉네임으로 회원 조회
     Optional<User> findByNickname(String nickname);
@@ -50,15 +51,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByLastLoginAtBefore(LocalDateTime date);
 
     // 탈퇴 후 일정 기간 경과한 회원 조회 (배치 삭제용)
-    @Query("SELECT u FROM User u WHERE u.deletedAt IS NOT NULL AND u.deletedAt < :date")
+    // 중요: @SQLRestriction 때문에 JPQL로는 deletedUser 조회가 안 됩니다. nativeQuery를 써야 합니다.
+    @Query(value = "SELECT * FROM users u WHERE u.deleted_at IS NOT NULL AND u.deleted_at < :date", nativeQuery = true)
     List<User> findDeletedUsersBefore(@Param("date") LocalDateTime date);
 
     // 특정 OAuth Provider의 회원 수 조회
-    long countByOauthProvider(String oauthProvider);
+    long countByOauthProvider(OAuthProviderType oauthProvider);
 
     // 전체 활성 회원 수 조회
-    @Query("SELECT COUNT(u) FROM User u")
-    long countActiveUsers();
+    long count();
 
     // 오늘 가입한 회원 수 조회
     @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :startOfDay")
