@@ -1,7 +1,7 @@
 package com.imyme.mine.global.config;
 
-import com.imyme.mine.domain.auth.entity.OAuthProvider;
-import com.imyme.mine.domain.auth.entity.Role;
+import com.imyme.mine.domain.auth.entity.OAuthProviderType;
+import com.imyme.mine.domain.auth.entity.RoleType;
 import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.category.entity.Category;
@@ -79,10 +79,10 @@ public class DataInitializer implements CommandLineRunner {
 
         User testUser = User.builder()
             .oauthId("test_user_1")
-            .oauthProvider(OAuthProvider.KAKAO)
+            .oauthProvider(OAuthProviderType.KAKAO)
             .email("test@example.com")
             .nickname("테스트유저")
-            .role(Role.USER)
+            .role(RoleType.USER)
             .level(1)
             .totalCardCount(0)
             .activeCardCount(0)

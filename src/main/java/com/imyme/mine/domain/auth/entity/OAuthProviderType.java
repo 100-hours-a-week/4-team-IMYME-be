@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum OAuthProvider {
+public enum OAuthProviderType {
     KAKAO("kakao", "카카오"),
     GOOGLE("google", "구글"),
     APPLE("apple", "애플");
@@ -17,8 +17,8 @@ public enum OAuthProvider {
     private final String displayName;
 
     // 문자열로부터 OAuthProvider 찾기
-    public static OAuthProvider fromCode(String code) {
-        for (OAuthProvider provider : values()) {
+    public static OAuthProviderType fromCode(String code) {
+        for (OAuthProviderType provider : values()) {
             if (provider.getCode().equalsIgnoreCase(code)) {
                 return provider;
             }

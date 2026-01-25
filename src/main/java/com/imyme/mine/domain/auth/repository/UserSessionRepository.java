@@ -35,6 +35,20 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     @Query("DELETE FROM UserSession s WHERE s.user.id = :userId")
     int deleteAllByUserId(@Param("userId") Long userId);
 
+    // 특정 사용자의 특정 기기 세션 삭제 (device_uuid 기반 로그아웃)
+    @Modifying
+    @Query("DELETE FROM UserSession s WHERE s.user.id = :userId AND s.device.deviceUuid = :deviceUuid")
+    void deleteByUserIdAndDeviceUuid(@Param("userId") Long userId, @Param("deviceUuid") String deviceUuid);
+
+    // device_uuid로 세션 조회
+    @Query("SELECT s FROM UserSession s WHERE s.user.id = :userId AND s.device.deviceUuid = :deviceUuid")
+    Optional<UserSession> findByUserIdAndDeviceUuid(@Param("userId") Long userId, @Param("deviceUuid") String deviceUuid);
+
+    // deviceId로 모든 세션 삭제 (기기 삭제 시)
+    @Modifying
+    @Query("DELETE FROM UserSession s WHERE s.device.id = :deviceId")
+    int deleteAllByDeviceId(@Param("deviceId") Long deviceId);
+
     // Refresh Token 존재 여부 확인
     boolean existsByRefreshToken(String refreshToken);
 }

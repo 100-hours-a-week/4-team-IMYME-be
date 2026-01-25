@@ -5,7 +5,7 @@ import com.imyme.mine.domain.card.dto.AttemptCreateResponse;
 import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
 import com.imyme.mine.domain.card.dto.CardCreateRequest;
 import com.imyme.mine.domain.card.dto.CardResponse;
- import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
+import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
 import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.service.AttemptService;
 import com.imyme.mine.domain.card.service.CardService;
