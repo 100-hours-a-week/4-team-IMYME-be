@@ -11,6 +11,7 @@ import com.imyme.mine.domain.card.service.AttemptService;
 import com.imyme.mine.domain.card.service.CardService;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+// @Profile: 로컬/개발 환경에서만 활성화
+// - 운영(prod) 환경에서는 빈이 생성되지 않아 /test 엔드포인트가 노출되지 않음
+// - 로컬 테스트 시 spring.profiles.active=local 설정 필요
+@Profile({"local", "dev"})
 @RestController
 @RequestMapping("/test")
 @RequiredArgsConstructor

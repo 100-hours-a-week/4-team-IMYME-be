@@ -12,6 +12,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
  * Spring Security 설정
@@ -31,6 +36,9 @@ public class SecurityConfig {
         http
                 // CSRF 비활성화 (JWT 사용 시 불필요)
                 .csrf(AbstractHttpConfigurer::disable)
+
+                // CORS 설정 활성화
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // 세션 사용 안 함 (Stateless)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -65,5 +73,49 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * CORS 설정
+     * - 프론트엔드 도메인에서의 API 요청 허용
+     * - credentials(쿠키, Authorization 헤더) 포함 요청 허용
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // 허용할 Origin (프론트엔드 도메인)
+        configuration.setAllowedOrigins(List.of(
+                "https://imymemine.kr",           // 운영 프론트엔드
+                "http://localhost:3000",          // 로컬 개발 (React 기본 포트)
+                "http://localhost:5173"           // 로컬 개발 (Vite 기본 포트)
+        ));
+
+        // 허용할 HTTP 메서드
+        configuration.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+        ));
+
+        // 허용할 헤더
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With"
+        ));
+
+        // 노출할 헤더 (프론트엔드에서 읽을 수 있는 헤더)
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Content-Type"
+        ));
+
+        // credentials(쿠키, Authorization 헤더) 포함 허용
+        configuration.setAllowCredentials(true);
+
+        // 모든 경로에 CORS 설정 적용
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source;
     }
 }

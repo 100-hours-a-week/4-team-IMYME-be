@@ -101,3 +101,15 @@ jwt:
     secret: ${JWT_SECRET}
     access-token-expiration: 3600000    # 1시간
     refresh-token-expiration: 604800000 # 7일
+
+# ==================================================
+# Swagger / OpenAPI 설정
+# ==================================================
+springdoc:
+    swagger-ui:
+        # HTTPS 서버 URL 명시 (Mixed Content 에러 방지)
+        servers:
+            - url: https://imymemine.kr/server
+              description: Production Server (HTTPS)
+            - url: http://localhost:8080
+              description: Local Development Server
