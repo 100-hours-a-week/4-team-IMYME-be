@@ -1,8 +1,11 @@
 package com.imyme.mine.domain.user.controller;
 
 import com.imyme.mine.domain.user.dto.NicknameCheckResponse;
+import com.imyme.mine.domain.user.dto.ProfileImagePresignedUrlRequest;
+import com.imyme.mine.domain.user.dto.ProfileImagePresignedUrlResponse;
 import com.imyme.mine.domain.user.dto.UpdateProfileRequest;
 import com.imyme.mine.domain.user.dto.UserProfileResponse;
+import com.imyme.mine.domain.user.service.ProfileImageService;
 import com.imyme.mine.domain.user.service.UserService;
 import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.security.UserPrincipal;
@@ -16,8 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 사용자 관리 컨트롤러
- * - 프로필 조회/수정, 닉네임 중복 확인, 회원 탈퇴
+ * 사용자 관련 API 컨트롤러
+ * - 프로필 조회/수정, 닉네임 중복 확인, 프로필 이미지 업로드용 Presigned URL 발급, 회원 탈퇴
  */
 @Slf4j
 @RestController
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final ProfileImageService profileImageService;
 
     // 프로필 조회
     @GetMapping("/me")
@@ -68,6 +72,21 @@ public class UserController {
         NicknameCheckResponse response = userService.checkNickname(nickname, currentUserId);
 
         return ApiResponse.success(response, "닉네임 확인 완료");
+    }
+
+    // 프로필 이미지 업로드용 Presigned URL 발급
+    @PostMapping("/me/profile-image/presigned-url")
+    public ApiResponse<ProfileImagePresignedUrlResponse> generateProfileImagePresignedUrl(
+            @CurrentUser UserPrincipal userPrincipal,
+            @Valid @RequestBody ProfileImagePresignedUrlRequest request
+    ) {
+        log.info("프로필 이미지 Presigned URL 요청: userId={}, contentType={}",
+                userPrincipal.getId(), request.contentType());
+
+        ProfileImagePresignedUrlResponse response =
+                profileImageService.generatePresignedUrl(userPrincipal.getId(), request);
+
+        return ApiResponse.success(response, "Presigned URL이 생성되었습니다.");
     }
 
     // 회원 탈퇴

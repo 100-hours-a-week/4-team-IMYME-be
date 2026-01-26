@@ -49,6 +49,7 @@ public enum ErrorCode {
     INVALID_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 타입입니다."),
     INVALID_AGENT_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 Agent Type입니다."),
     INVALID_PLATFORM_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 Platform Type입니다."),
+    INVALID_CONTENT_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     CHECKSUM_MISMATCH(HttpStatus.BAD_REQUEST, "파일 체크섬이 일치하지 않습니다."),
 
     // ========== 충돌 (409) ==========
