@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(
-    name = "devices",
+    name = "devices"
+    /* JPA 레벨의 UniqueConstraint, Indexes 설정 제거 (DB Partial Index 사용)
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_devices_uuid", columnNames = {"device_uuid"})
     },
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_devices_fcm_token", columnList = "fcm_token"),
         @Index(name = "idx_devices_last_user", columnList = "last_user_id, last_active_at")
     }
+     */
 )
 @Getter
 @Builder
@@ -37,7 +39,7 @@ public class Device {
     private Long id;
 
     // 기기 UUID (고유 식별자)
-    @Column(name = "device_uuid", nullable = false, unique = true, length = 36)
+    @Column(name = "device_uuid", nullable = false, length = 36)
     private String deviceUuid;
 
     // FCM 토큰 (푸시 알림용)
@@ -47,30 +49,36 @@ public class Device {
     // 브라우저 타입 (iOS, Android, Web)
     @Enumerated(EnumType.STRING)
     @Column(name = "agent_type", nullable = false, length = 20)
-    private AgentType agentType;
+    @ColumnDefault("'CHROME'")
+    @Builder.Default
+    private AgentType agentType = AgentType.CHROME;
 
     // 플랫폼 (Mobile Web, Desktop Web)
     @Enumerated(EnumType.STRING)
-    @Column(name = "platform", nullable = false, length = 20)
-    private PlatformType platformType;
+    @Column(name = "platform_type", nullable = false, length = 20)
+    @ColumnDefault("'MOBILE_WEB'")
+    @Builder.Default
+    private PlatformType platformType = PlatformType.MOBILE_WEB;
 
     // PWA 모드 여부 (홈 화면 추가 여부)
-    @Builder.Default
     @Column(name = "is_standalone", nullable = false)
+    @Builder.Default
     private boolean isStandalone = false;
 
     // 마지막 로그인 유저 (리텐션 마케팅용, Nullable)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "last_user_id")
+    @JoinColumn(name = "last_user_id") // DB FK 설정에서 ON DELETE SET NULL 적용 필요
     private User lastUser;
 
     // 푸시 수신 동의 여부
-    @Builder.Default
     @Column(name = "is_push_enabled", nullable = false)
-    private boolean isPushEnabled = false;
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean isPushEnabled = true;
 
     // 마지막 활동 일시
     @Column(name = "last_active_at", nullable = false)
+    @ColumnDefault("CURRENT_TIMESTAMP")
     @Builder.Default
     private LocalDateTime lastActiveAt = LocalDateTime.now();
 
