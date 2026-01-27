@@ -211,8 +211,9 @@ jobs:
 
           mkdir -p "$RELEASE_DIR" "$LOG_DIR"
 
-          # 1. 새 release에 jar 이동
-          mv "$APP_DIR/mine-0.0.1-SNAPSHOT.jar" "$RELEASE_DIR/backend.jar"
+          # 1. 새 release에 jar 이동 - $APP_DIR에서 최신의 jar파일 찾아서 이동 시킴
+          JAR_PATH=$(ls -1t "$APP_DIR"/*.jar | head -n 1)
+          mv "$JAR_PATH" "$RELEASE_DIR/backend.jar"
 
           # 2. current 심볼릭 링크 교체
           ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
@@ -223,17 +224,15 @@ jobs:
             sleep 2
           fi
 
+          # env 파일 변수 주입
+          set -a
+          . "$ENV_FILE"
+          set +a
 
-
-            # env 파일 변수 주입
-            set -a
-            . "$ENV_FILE"
-            set +a
-
-            # nohup 실행 (spring.config.location 제거)
-            nohup java -jar "$CURRENT_LINK/backend.jar" \
-                  --spring.profiles.active=dev \
-                  >> "$LOG_FILE" 2>&1 </dev/null &
+          # nohup 실행 (spring.config.location 제거)
+          nohup java -jar "$CURRENT_LINK/backend.jar" \
+                --spring.profiles.active=dev \
+                >> "$LOG_FILE" 2>&1 </dev/null &
 
 
           echo $! > "$PID_FILE"
@@ -260,6 +259,15 @@ jobs:
 
           exit 0
           EOF
+      # 5️⃣ 배포 후 스모크 테스트
+      - name: Post-deploy Smoke Test
+        run: |
+            set -e
+            # Nginx가 물려있는 엔드포인트로 헬스체크
+            curl -fsS "${{ secrets.DEV_BASE_URL }}/server/health" >/dev/null
+            # 카테고리 리스트업
+            curl -fsS "${{ secrets.DEV_BASE_URL }}/server/categories" >/dev/null
+
 
       # 5️⃣ 보안 그룹에서 IP 제거 (항상 실행)
       - name: Remove IP from Security Group
