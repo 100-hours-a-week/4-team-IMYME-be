@@ -11,6 +11,13 @@ import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -25,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "8. Study Attempt", description = "학습 시도 생성/조회/삭제, 오디오 업로드 완료 처리 API")
 @Slf4j
 @RestController
 @RequestMapping("/cards/{cardId}/attempts")
@@ -34,11 +42,32 @@ public class AttemptController {
     private final AttemptService attemptService;
     private final JwtTokenProvider jwtTokenProvider;
 
+    @Operation(
+        summary = "학습 시도 생성",
+        description = "새로운 학습 시도를 생성하고 S3 업로드용 Presigned URL을 발급합니다.",
+        security = @SecurityRequirement(name = "JWT")
+    )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "201",
+            description = "학습 시도 생성 성공 및 Presigned URL 발급"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "카드를 찾을 수 없음 - CARD_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AttemptCreateResponse> createAttempt(
         @RequestHeader("Authorization") String authorization,
-        @PathVariable Long cardId,
+        @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
         @RequestBody(required = false) AttemptCreateRequest request
     ) {
         Long userId = extractUserId(authorization);
@@ -53,11 +82,32 @@ public class AttemptController {
         return ApiResponse.success(response);
     }
 
+    @Operation(
+        summary = "학습 시도 상세 조회",
+        description = "특정 학습 시도의 상세 정보를 조회합니다.",
+        security = @SecurityRequirement(name = "JWT")
+    )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "학습 시도 조회 성공"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "학습 시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @GetMapping("/{attemptId}")
     public ApiResponse<AttemptDetailResponse> getAttemptDetail(
         @RequestHeader("Authorization") String authorization,
-        @PathVariable Long cardId,
-        @PathVariable Long attemptId
+        @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
+        @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId
     ) {
         Long userId = extractUserId(authorization);
         log.info("GET /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
@@ -67,11 +117,37 @@ public class AttemptController {
         return ApiResponse.success(response);
     }
 
+    @Operation(
+        summary = "오디오 업로드 완료 처리",
+        description = "S3 업로드 완료 후 호출하여 학습 시도를 확정합니다. 업로드한 오디오 파일의 S3 Key를 전달합니다.",
+        security = @SecurityRequirement(name = "JWT")
+    )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "업로드 완료 처리 성공"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "400",
+            description = "잘못된 요청 - Validation 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "학습 시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @PutMapping("/{attemptId}/upload-complete")
     public ApiResponse<UploadCompleteResponse> uploadComplete(
         @RequestHeader("Authorization") String authorization,
-        @PathVariable Long cardId,
-        @PathVariable Long attemptId,
+        @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
+        @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId,
         @Valid @RequestBody UploadCompleteRequest request
     ) {
         Long userId = extractUserId(authorization);
@@ -82,12 +158,33 @@ public class AttemptController {
         return ApiResponse.success(response);
     }
 
+    @Operation(
+        summary = "학습 시도 삭제",
+        description = "학습 시도를 삭제합니다. (Soft Delete)",
+        security = @SecurityRequirement(name = "JWT")
+    )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "204",
+            description = "학습 시도 삭제 성공"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "학습 시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @DeleteMapping("/{attemptId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAttempt(
         @RequestHeader("Authorization") String authorization,
-        @PathVariable Long cardId,
-        @PathVariable Long attemptId
+        @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
+        @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId
     ) {
         Long userId = extractUserId(authorization);
         log.info("DELETE /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
