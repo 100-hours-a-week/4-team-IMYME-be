@@ -8,9 +8,8 @@ import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.service.AttemptService;
 import jakarta.validation.Valid;
 import com.imyme.mine.global.common.response.ApiResponse;
-import com.imyme.mine.global.error.BusinessException;
-import com.imyme.mine.global.error.ErrorCode;
-import com.imyme.mine.global.security.jwt.JwtTokenProvider;
+import com.imyme.mine.global.security.UserPrincipal;
+import com.imyme.mine.global.security.annotation.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,7 +38,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AttemptController {
 
     private final AttemptService attemptService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(
         summary = "학습 시도 생성",
@@ -66,11 +63,11 @@ public class AttemptController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AttemptCreateResponse> createAttempt(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
         @RequestBody(required = false) AttemptCreateRequest request
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("POST /cards/{}/attempts - userId: {}", cardId, userId);
 
         if (request == null) {
@@ -105,11 +102,11 @@ public class AttemptController {
     })
     @GetMapping("/{attemptId}")
     public ApiResponse<AttemptDetailResponse> getAttemptDetail(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
         @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("GET /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
 
         AttemptDetailResponse response = attemptService.getAttemptDetail(userId, cardId, attemptId);
@@ -145,12 +142,12 @@ public class AttemptController {
     })
     @PutMapping("/{attemptId}/upload-complete")
     public ApiResponse<UploadCompleteResponse> uploadComplete(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
         @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId,
         @Valid @RequestBody UploadCompleteRequest request
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("PUT /cards/{}/attempts/{}/upload-complete - userId: {}", cardId, attemptId, userId);
 
         UploadCompleteResponse response = attemptService.uploadComplete(userId, cardId, attemptId, request);
@@ -182,23 +179,13 @@ public class AttemptController {
     @DeleteMapping("/{attemptId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAttempt(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "학습 카드 ID", required = true) @PathVariable Long cardId,
         @Parameter(description = "학습 시도 ID", required = true) @PathVariable Long attemptId
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("DELETE /cards/{}/attempts/{} - userId: {}", cardId, attemptId, userId);
 
         attemptService.deleteAttempt(userId, cardId, attemptId);
-    }
-
-    private Long extractUserId(String authorization) {
-        String token = jwtTokenProvider.extractToken(authorization);
-
-        if (token == null || !jwtTokenProvider.validateToken(token)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
-        }
-
-        return jwtTokenProvider.getUserIdFromToken(token);
     }
 }

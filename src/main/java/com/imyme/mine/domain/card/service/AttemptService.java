@@ -8,7 +8,9 @@ import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.entity.AttemptStatus;
 import com.imyme.mine.domain.card.entity.Card;
 import com.imyme.mine.domain.card.entity.CardAttempt;
+import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
+import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -27,6 +29,7 @@ public class AttemptService {
 
     private final CardRepository cardRepository;
     private final CardAttemptRepository cardAttemptRepository;
+    private final CardFeedbackRepository cardFeedbackRepository;
 
     private static final int MAX_ATTEMPTS_PER_CARD = 5;
     private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
@@ -126,7 +129,11 @@ public class AttemptService {
             throw new BusinessException(ErrorCode.ALREADY_DELETED);
         }
 
-        if (attempt.getStatus() == AttemptStatus.UPLOADED) {
+        // 삭제 가능한 상태: PENDING, FAILED, EXPIRED만 허용
+        // 삭제 불가 상태: UPLOADED(AI 대기 중), PROCESSING(처리 중), COMPLETED(결과 보존 필요)
+        if (attempt.getStatus() == AttemptStatus.UPLOADED ||
+            attempt.getStatus() == AttemptStatus.PROCESSING ||
+            attempt.getStatus() == AttemptStatus.COMPLETED) {
             throw new BusinessException(ErrorCode.CANNOT_DELETE_UPLOADED);
         }
 
@@ -148,8 +155,14 @@ public class AttemptService {
             }
             case UPLOADED -> AttemptDetailResponse.fromUploaded(attempt);
             case PROCESSING -> AttemptDetailResponse.fromProcessing(attempt);
-            case COMPLETED -> AttemptDetailResponse.fromCompleted(attempt);
+            case COMPLETED -> {
+                // CardFeedback 조회 (1:1 관계)
+                CardFeedback feedback = cardFeedbackRepository.findByAttemptId(attempt.getId())
+                    .orElse(null);
+                yield AttemptDetailResponse.fromCompleted(attempt, feedback);
+            }
             case FAILED -> AttemptDetailResponse.fromFailed(attempt);
+            case EXPIRED -> AttemptDetailResponse.fromExpired(attempt);
         };
     }
 }
