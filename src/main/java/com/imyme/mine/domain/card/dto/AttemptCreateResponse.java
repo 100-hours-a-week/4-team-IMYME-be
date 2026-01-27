@@ -1,29 +1,17 @@
 package com.imyme.mine.domain.card.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.imyme.mine.domain.card.entity.CardAttempt;
 
 import java.time.LocalDateTime;
 
 public record AttemptCreateResponse(
 
-    @JsonProperty("card_id")
     Long cardId,
-
-    @JsonProperty("attempt_id")
     Long attemptId,
-
-    @JsonProperty("attempt_no")
     Short attemptNo,
-
     String status,
-
-    @JsonProperty("created_at")
     LocalDateTime createdAt,
-
-    @JsonProperty("expires_at")
     LocalDateTime expiresAt,
-
     String message
 
 ) {

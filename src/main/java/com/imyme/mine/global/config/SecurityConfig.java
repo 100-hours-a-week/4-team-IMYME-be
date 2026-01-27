@@ -21,6 +21,7 @@ import java.util.List;
 /**
  * Spring Security 설정
  * - JWT 기반 인증 및 권한 관리
+ * - CORS 설정
  */
 @Configuration
 @EnableWebSecurity
@@ -34,88 +35,73 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF 비활성화 (JWT 사용 시 불필요)
+                // 1. CSRF 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // CORS 설정 활성화
+                // 2. CORS 설정 연결 (아래 corsConfigurationSource 메서드 사용)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 세션 사용 안 함 (Stateless)
+                // 3. 세션 미사용
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 예외 처리 설정
+                // 4. 예외 처리
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)  // 401 처리
-                        .accessDeniedHandler(jwtAccessDeniedHandler))  // 403 처리
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler))
 
-                // URL별 권한 설정
+                // 5. 권한 설정 (중복 경로 제거 & 와일드카드 활용)
                 .authorizeHttpRequests(auth -> auth
-                        // 인증 없이 접근 가능한 경로
                         .requestMatchers(
                                 "/",
-                                "/health",
+                                "/health",        // Nginx가 /server 떼고 줌
+                                "/server/health", // Nginx 설정 꼬였을 때를 대비해 비상용으로만 남김
                                 "/categories/**",
                                 "/keywords/**",
-                                "/auth/oauth/**", // OAuth 로그인
-                                "/auth/refresh", // 토큰 갱신
-                                "/auth/logout", // 로그아웃
-                                "/test/**", // 테스트용 (TODO: 운영 시 제거)
+                                "/auth/**",
+                                "/oauth2/**",     // 혹시 모를 OAuth 기본 경로
                                 "/error",
-                                "/swagger-ui/**", // Swagger UI
-                                "/v3/api-docs/**") // OpenAPI 문서
-                        .permitAll()
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
+                        .anyRequest().authenticated())
 
-                        // 그 외 모든 요청은 인증 필요
-                        .anyRequest()
-                        .authenticated())
-
-                // JWT 인증 필터 추가 (UsernamePasswordAuthenticationFilter 이전에 실행)
+                // 6. 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     * CORS 설정
-     * - 프론트엔드 도메인에서의 API 요청 허용
-     * - credentials(쿠키, Authorization 헤더) 포함 요청 허용
-     */
+    // 🔥 CORS 설정을 여기서 직접 정의 (가장 안전함)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 허용할 Origin (프론트엔드 도메인)
+        // 1. 허용할 출처 (명시적으로 지정)
         configuration.setAllowedOrigins(List.of(
-                "https://imymemine.kr",           // 운영 프론트엔드
-                "http://localhost:3000",          // 로컬 개발 (React 기본 포트)
-                "http://localhost:5173"           // 로컬 개발 (Vite 기본 포트)
+                "http://localhost:3000",  // 프론트엔드 로컬
+                "http://localhost:8080",  // 백엔드 로컬 (Swagger 등)
+                "https://imymemine.kr"   // 운영 서버
         ));
 
-        // 허용할 HTTP 메서드
-        configuration.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-        ));
+        // 2. 허용할 메소드
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // 허용할 헤더
-        configuration.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With"
-        ));
+        // 3. 허용할 헤더
+        configuration.setAllowedHeaders(List.of("*"));
 
-        // 노출할 헤더 (프론트엔드에서 읽을 수 있는 헤더)
-        configuration.setExposedHeaders(List.of(
-                "Authorization",
-                "Content-Type"
-        ));
-
-        // credentials(쿠키, Authorization 헤더) 포함 허용
+        // 4. 자격 증명 허용 (쿠키, Authorization 헤더 등)
         configuration.setAllowCredentials(true);
 
-        // 모든 경로에 CORS 설정 적용
+        // 5. 브라우저가 Authorization 헤더를 읽을 수 있게 노출
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
+
+        configuration.setMaxAge(3600L); // 1시간 캐시
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-
         return source;
     }
 }

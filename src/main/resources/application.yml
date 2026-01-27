@@ -6,8 +6,22 @@ spring:
     application:
         name: mine
 
+    # JSON 날짜 포맷 설정 (배열 대신 문자열로 반환)
+    jackson:
+        serialization:
+            write-dates-as-timestamps: false
+        time-zone: Asia/Seoul
+
+    # 파일 업로드 용량 설정 (기본 1MB -> 20MB)
+    servlet:
+        multipart:
+            max-file-size: 20MB
+            max-request-size: 20MB
+
     mvc:
         throw-exception-if-no-handler-found: true
+        path match:
+            matching-strategy: ant_path_matcher
     web:
         resources:
             add-mappings: false
@@ -103,13 +117,18 @@ jwt:
     refresh-token-expiration: 604800000 # 7일
 
 # ==================================================
-# Swagger / OpenAPI 설정
+# Swagger 설정
 # ==================================================
 springdoc:
     swagger-ui:
-        # HTTPS 서버 URL 명시 (Mixed Content 에러 방지)
-        servers:
-            - url: https://imymemine.kr/server
-              description: Production Server (HTTPS)
-            - url: http://localhost:8080
-              description: Local Development Server
+        path: /swagger-ui.html
+        tags-sorter: alpha
+        groups-order: DESC
+        operations-sorter: method # 메소드 순 정렬 (GET -> POST -> PUT)
+        disable-swagger-default-url: true
+        display-request-duration: true # 요청 소요 시간 표시
+    api-docs:
+        path: /v3/api-docs
+    show-actuator: true
+    default-consumes-media-type: application/json
+    default-produces-media-type: application/json
