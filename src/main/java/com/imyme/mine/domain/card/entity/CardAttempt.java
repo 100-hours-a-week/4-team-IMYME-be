@@ -79,6 +79,12 @@ public class CardAttempt {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "error_message", length = 500)
+    private String errorMessage;
+
+    @Column(name = "expired_at")
+    private LocalDateTime expiredAt;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -96,6 +102,7 @@ public class CardAttempt {
         this.audioUrl = audioUrl;
         this.durationSeconds = durationSeconds;
         this.status = AttemptStatus.UPLOADED;
+        this.submittedAt = LocalDateTime.now();
     }
 
     public void startProcessing() {
@@ -109,8 +116,14 @@ public class CardAttempt {
         this.finishedAt = LocalDateTime.now();
     }
 
-    public void fail() {
+    public void fail(String errorMessage) {
+        this.errorMessage = errorMessage;
         this.status = AttemptStatus.FAILED;
         this.finishedAt = LocalDateTime.now();
+    }
+
+    public void expire() {
+        this.status = AttemptStatus.EXPIRED;
+        this.expiredAt = LocalDateTime.now();
     }
 }
