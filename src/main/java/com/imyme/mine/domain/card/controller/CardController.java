@@ -8,9 +8,8 @@ import com.imyme.mine.domain.card.dto.CardUpdateRequest;
 import com.imyme.mine.domain.card.dto.CardUpdateResponse;
 import com.imyme.mine.domain.card.service.CardService;
 import com.imyme.mine.global.common.response.ApiResponse;
-import com.imyme.mine.global.error.BusinessException;
-import com.imyme.mine.global.error.ErrorCode;
-import com.imyme.mine.global.security.jwt.JwtTokenProvider;
+import com.imyme.mine.global.security.UserPrincipal;
+import com.imyme.mine.global.security.annotation.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,7 +27,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -44,7 +42,6 @@ import java.util.List;
 public class CardController {
 
     private final CardService cardService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(
         summary = "학습 카드 생성",
@@ -70,10 +67,10 @@ public class CardController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CardResponse> createCard(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Valid @RequestBody CardCreateRequest request
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("POST /cards - userId: {}", userId);
 
         CardResponse response = cardService.createCard(userId, request);
@@ -109,11 +106,11 @@ public class CardController {
     })
     @PatchMapping("/{cardId}")
     public ApiResponse<CardUpdateResponse> updateCardTitle(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "수정할 카드 ID", required = true) @PathVariable Long cardId,
         @Valid @RequestBody CardUpdateRequest request
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("PATCH /cards/{} - userId: {}", cardId, userId);
 
         CardUpdateResponse response = cardService.updateCardTitle(userId, cardId, request);
@@ -145,10 +142,10 @@ public class CardController {
     @DeleteMapping("/{cardId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCard(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "삭제할 카드 ID", required = true) @PathVariable Long cardId
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("DELETE /cards/{} - userId: {}", cardId, userId);
 
         cardService.deleteCard(userId, cardId);
@@ -172,7 +169,7 @@ public class CardController {
     })
     @GetMapping
     public ApiResponse<CardListResponse> getCards(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "카테고리 ID 필터") @RequestParam(name = "category_id", required = false) Long categoryId,
         @Parameter(description = "키워드 ID 목록 필터") @RequestParam(name = "keyword_ids", required = false) List<Long> keywordIds,
         @Parameter(description = "고스트 카드 포함 여부 (기본값: true)") @RequestParam(name = "ghost", required = false, defaultValue = "true") Boolean ghost,
@@ -180,7 +177,7 @@ public class CardController {
         @Parameter(description = "커서 (페이지네이션용)") @RequestParam(name = "cursor", required = false) String cursor,
         @Parameter(description = "한 번에 가져올 카드 수 (기본값: 20)") @RequestParam(name = "limit", required = false, defaultValue = "20") Integer limit
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("GET /cards - userId: {}, categoryId: {}, keywordIds: {}, ghost: {}, sort: {}",
             userId, categoryId, keywordIds, ghost, sort);
 
@@ -216,24 +213,14 @@ public class CardController {
     })
     @GetMapping("/{cardId}")
     public ApiResponse<CardDetailResponse> getCardDetail(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Parameter(description = "조회할 카드 ID", required = true) @PathVariable Long cardId
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("GET /cards/{} - userId: {}", cardId, userId);
 
         CardDetailResponse response = cardService.getCardDetail(userId, cardId);
 
         return ApiResponse.success(response);
-    }
-
-    private Long extractUserId(String authorization) {
-        String token = jwtTokenProvider.extractToken(authorization);
-
-        if (token == null || !jwtTokenProvider.validateToken(token)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
-        }
-
-        return jwtTokenProvider.getUserIdFromToken(token);
     }
 }

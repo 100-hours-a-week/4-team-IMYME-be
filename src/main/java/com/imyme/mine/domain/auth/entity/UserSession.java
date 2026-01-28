@@ -47,7 +47,7 @@ public class UserSession {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Device device;
 
-    // Refresh Token (암호화 저장 권장)
+    // Refresh Token (SHA-256 해시값으로 저장)
     @Column(name = "refresh_token", nullable = false, length = 500)
     private String refreshToken;
 

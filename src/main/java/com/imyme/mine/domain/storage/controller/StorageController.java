@@ -4,9 +4,8 @@ import com.imyme.mine.domain.storage.dto.PresignedUrlRequest;
 import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
 import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.common.response.ApiResponse;
-import com.imyme.mine.global.error.BusinessException;
-import com.imyme.mine.global.error.ErrorCode;
-import com.imyme.mine.global.security.jwt.JwtTokenProvider;
+import com.imyme.mine.global.security.UserPrincipal;
+import com.imyme.mine.global.security.annotation.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -17,12 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "9. Study Audio", description = "학습 오디오 업로드용 Presigned URL 발급 API")
 @Slf4j
@@ -32,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class StorageController {
 
     private final StorageService storageService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(
         summary = "학습 오디오 Presigned URL 발급",
@@ -63,24 +56,14 @@ public class StorageController {
     @PostMapping("/presigned-url")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PresignedUrlResponse> generatePresignedUrl(
-        @RequestHeader("Authorization") String authorization,
+        @CurrentUser UserPrincipal userPrincipal,
         @Valid @RequestBody PresignedUrlRequest request
     ) {
-        Long userId = extractUserId(authorization);
+        Long userId = userPrincipal.getId();
         log.info("POST /learning/presigned-url - userId: {}, cardId: {}", userId, request.cardId());
 
         PresignedUrlResponse response = storageService.generatePresignedUrl(userId, request);
 
         return ApiResponse.success(response);
-    }
-
-    private Long extractUserId(String authorization) {
-        String token = jwtTokenProvider.extractToken(authorization);
-
-        if (token == null || !jwtTokenProvider.validateToken(token)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
-        }
-
-        return jwtTokenProvider.getUserIdFromToken(token);
     }
 }
