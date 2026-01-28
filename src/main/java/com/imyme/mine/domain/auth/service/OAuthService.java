@@ -9,6 +9,7 @@ import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.auth.repository.UserSessionRepository;
 import com.imyme.mine.global.config.JwtProperties;
 import com.imyme.mine.global.security.jwt.JwtTokenProvider;
+import com.imyme.mine.global.security.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 /*
  * OAuthService
@@ -66,6 +66,7 @@ public class OAuthService {
 
         device.login(user);
 
+        // JWT 토큰 생성 (Access Token + Refresh Token)
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
@@ -74,10 +75,12 @@ public class OAuthService {
         LocalDateTime expiresAt = LocalDateTime.now()
                 .plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000);
 
+        String hashedRefreshToken = TokenHasher.hash(refreshToken);
+
         UserSession userSession = UserSession.builder()
                 .user(user)
                 .device(device)
-                .refreshToken(refreshToken)
+                .refreshToken(hashedRefreshToken)  // 해싱된 값 저장
                 .expiresAt(expiresAt)
                 .build();
 
