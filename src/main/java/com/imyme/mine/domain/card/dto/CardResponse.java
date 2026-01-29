@@ -10,8 +10,8 @@ public record CardResponse(
     Long keywordId,
     String keywordName,
     String title,
-    Integer bestLevel,
-    Integer attemptCount,
+    Short bestLevel,
+    Short attemptCount,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {

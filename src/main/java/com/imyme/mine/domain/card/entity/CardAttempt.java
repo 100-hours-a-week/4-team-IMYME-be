@@ -24,16 +24,9 @@ import org.hibernate.annotations.ColumnDefault;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "card_attempts",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_attempts_card_no", columnNames = {"card_id", "attempt_no"})
-    },
-    indexes = {
-        @Index(name = "idx_attempts_card_created", columnList = "card_id, created_at DESC"),
-        @Index(name = "idx_attempts_status", columnList = "status, created_at")
-    }
-)
+@Table(name = "card_attempts", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_attempts_card_no", columnNames = {"card_id", "attempt_no"})
+})
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -62,12 +55,10 @@ public class CardAttempt {
 
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'UPLOADED'")
     @Builder.Default
     private AttemptStatus status = AttemptStatus.UPLOADED;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    @ColumnDefault("CURRENT_TIMESTAMP")
     private LocalDateTime createdAt;
 
     @Column(name = "submitted_at")
@@ -76,26 +67,12 @@ public class CardAttempt {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     @Column(name = "error_message", length = 500)
     private String errorMessage;
-
-    @Column(name = "expired_at")
-    private LocalDateTime expiredAt;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-    }
-
-    public boolean isDeleted() {
-        return this.deletedAt != null;
-    }
-
-    public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
     }
 
     public void markUploaded(String audioUrl, Integer durationSeconds) {
@@ -124,6 +101,6 @@ public class CardAttempt {
 
     public void expire() {
         this.status = AttemptStatus.EXPIRED;
-        this.expiredAt = LocalDateTime.now();
+        this.finishedAt = LocalDateTime.now();
     }
 }

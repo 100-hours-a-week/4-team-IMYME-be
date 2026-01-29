@@ -5,17 +5,20 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
 @Entity
 @Table(
     name = "categories",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_categories_name", columnNames = "name")
+        @UniqueConstraint(
+            name = "uk_categories_name",
+            columnNames = {"name"}
+        )
     }
 )
+@Getter
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Category {
 
     @Id

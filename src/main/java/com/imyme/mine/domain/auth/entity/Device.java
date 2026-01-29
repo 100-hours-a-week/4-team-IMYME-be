@@ -14,18 +14,7 @@ import java.time.LocalDateTime;
  * - User와 느슨한 관계 (유저가 없어도 기기는 존재 가능)
  */
 @Entity
-@Table(
-    name = "devices"
-    /* JPA 레벨의 UniqueConstraint, Indexes 설정 제거 (DB Partial Index 사용)
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_devices_uuid", columnNames = {"device_uuid"})
-    },
-    indexes = {
-        @Index(name = "idx_devices_fcm_token", columnList = "fcm_token"),
-        @Index(name = "idx_devices_last_user", columnList = "last_user_id, last_active_at")
-    }
-     */
-)
+@Table(name = "devices")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

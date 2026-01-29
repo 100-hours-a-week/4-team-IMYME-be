@@ -115,36 +115,41 @@ public class AttemptService {
     public void deleteAttempt(Long userId, Long cardId, Long attemptId) {
         log.debug("학습 시도 삭제 시작 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
 
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+        CardAttempt attempt = findAttemptWithValidation(userId, cardId, attemptId);
 
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
-
-        if (!attempt.getCard().getId().equals(card.getId())) {
-            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
-        }
-
-        if (attempt.isDeleted()) {
-            throw new BusinessException(ErrorCode.ALREADY_DELETED);
-        }
-
-        // 삭제 가능한 상태: PENDING, FAILED, EXPIRED만 허용
-        // 삭제 불가 상태: UPLOADED(AI 대기 중), PROCESSING(처리 중), COMPLETED(결과 보존 필요)
-        if (attempt.getStatus() == AttemptStatus.UPLOADED ||
-            attempt.getStatus() == AttemptStatus.PROCESSING ||
-            attempt.getStatus() == AttemptStatus.COMPLETED) {
+        // 삭제 가능한 상태인지 확인 (PENDING, FAILED, EXPIRED 만 삭제 가능)
+        if (isNotDeletable(attempt.getStatus())) {
             throw new BusinessException(ErrorCode.CANNOT_DELETE_UPLOADED);
         }
 
-        attempt.softDelete();
+        // 🚨 중요: Hard Delete (DB에서 완전 삭제)
+        // 그래야 count가 줄어들어 사용자가 다시 시도할 수 있음
+        cardAttemptRepository.delete(attempt);
 
-        log.info("학습 시도 삭제 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
+        log.info("학습 시도 삭제 완료 (Hard Delete) - attemptId: {}", attemptId);
+    }
+
+    private CardAttempt findAttemptWithValidation(Long userId, Long cardId, Long attemptId) {
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+
+        // 카드 일치 여부 및 소유권 확인
+        if (!attempt.getCard().getId().equals(cardId) || !attempt.getCard().getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
+        }
+        return attempt;
     }
 
     private Short calculateNextAttemptNo(Long cardId) {
         Short maxAttemptNo = cardAttemptRepository.findMaxAttemptNoByCardId(cardId);
         return (maxAttemptNo == null) ? 1 : (short) (maxAttemptNo + 1);
+    }
+
+    private boolean isNotDeletable(AttemptStatus status) {
+        // 진행 중이거나 완료된 건은 결과 보존을 위해 삭제 불가
+        return status == AttemptStatus.UPLOADED ||
+            status == AttemptStatus.PROCESSING ||
+            status == AttemptStatus.COMPLETED;
     }
 
     private AttemptDetailResponse buildAttemptDetailResponse(CardAttempt attempt) {

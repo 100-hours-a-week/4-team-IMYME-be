@@ -27,13 +27,7 @@ import org.hibernate.annotations.SQLRestriction;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "cards",
-    indexes = {
-        @Index(name = "idx_cards_user_id", columnList = "user_id"),
-        @Index(name = "idx_cards_keyword_id", columnList = "keyword_id")
-    }
-)
+@Table(name = "cards")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -64,12 +58,12 @@ public class Card {
     @Column(name = "best_level", nullable = false)
     @ColumnDefault("0")
     @Builder.Default
-    private Integer bestLevel = 0;
+    private Short bestLevel = 0;
 
     @Column(name = "attempt_count", nullable = false)
     @ColumnDefault("0")
     @Builder.Default
-    private Integer attemptCount = 0;
+    private Short attemptCount = 0;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
@@ -98,7 +92,7 @@ public class Card {
         this.title = newTitle;
     }
 
-    public void completeAttempt(int achievedLevel) {
+    public void completeAttempt(short achievedLevel) {
         this.attemptCount++;
         if (achievedLevel > this.bestLevel) {
             this.bestLevel = achievedLevel;

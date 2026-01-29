@@ -13,8 +13,8 @@ public record CardDetailResponse(
     Long keywordId,
     String keywordName,
     String title,
-    Integer bestLevel,
-    Integer attemptCount,
+    Short bestLevel,
+    Short attemptCount,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     List<AttemptResponse> attempts

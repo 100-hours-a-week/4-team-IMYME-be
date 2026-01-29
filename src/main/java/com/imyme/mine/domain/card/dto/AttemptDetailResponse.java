@@ -35,6 +35,8 @@ public record AttemptDetailResponse(
     Boolean retryAvailable,
     String message
 ) {
+    // 업로드 제한 시간 (10분)
+    private static final long UPLOAD_LIMIT_MINUTES = 10;
 
     /**
      * PENDING 상태 응답
@@ -150,7 +152,7 @@ public record AttemptDetailResponse(
             attempt.getAudioUrl(),
             attempt.getDurationSeconds(),
             attempt.getSttText(),
-            FeedbackDto.from(feedback),
+            feedback != null ? FeedbackDto.from(feedback) : null,
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
             attempt.getFinishedAt(),
@@ -185,15 +187,15 @@ public record AttemptDetailResponse(
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
             null,
-            attempt.getFinishedAt(),
+            attempt.getFinishedAt(), // 실패 시각
             null,
             null,
             null,
             null,
             null,
-            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "STT 변환에 실패했습니다. 다시 시도해주세요.",
+            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "알 수 없는 오류가 발생했습니다.",
             true,
-            null
+            "오류가 발생했습니다. 다시 시도해주세요."
         );
     }
 
@@ -204,6 +206,8 @@ public record AttemptDetailResponse(
      * - retry_available: 재시도 불가 (처음부터 다시)
      */
     public static AttemptDetailResponse fromExpired(CardAttempt attempt) {
+        LocalDateTime calculatedExpiredAt = attempt.getCreatedAt().plusMinutes(UPLOAD_LIMIT_MINUTES);
+
         return new AttemptDetailResponse(
             attempt.getId(),
             attempt.getAttemptNo(),
@@ -218,7 +222,7 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
-            attempt.getExpiredAt(),
+            calculatedExpiredAt, // 계산된 만료 시간 반환
             null,
             null,
             null,
