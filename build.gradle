@@ -58,6 +58,13 @@ dependencies {
     implementation 'software.amazon.awssdk:s3'
 
     testImplementation 'com.h2database:h2'
+
+    // Flyway (DB 마이그레이션 도구)
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+
+    // JSONB 처리를 위한 라이브러리 (선택사항이지만 추천)
+    implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.3'
 }
 
 tasks.named('test') {
