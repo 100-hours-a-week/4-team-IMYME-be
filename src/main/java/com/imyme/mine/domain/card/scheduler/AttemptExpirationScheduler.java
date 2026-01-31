@@ -30,7 +30,8 @@ public class AttemptExpirationScheduler {
      * PENDING 상태 만료 처리
      * - 생성 후 10분 초과한 PENDING 시도를 EXPIRED로 전환
      */
-    @Scheduled(fixedRate = 60000) // 1분마다 실행
+    // TODO: DB 제약 조건에 EXPIRED 추가 후 활성화
+    // @Scheduled(fixedRate = 60000) // 1분마다 실행
     @Transactional
     public void expirePendingAttempts() {
         LocalDateTime expirationThreshold = LocalDateTime.now().minus(UPLOAD_EXPIRATION);
