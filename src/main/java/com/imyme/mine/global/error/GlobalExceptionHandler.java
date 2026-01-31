@@ -7,6 +7,7 @@ import java.util.Objects;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -33,7 +34,7 @@ public class GlobalExceptionHandler {
     // ========== 비즈니스 예외 ==========
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Business Exception: {} - {}", e.getErrorCode(), e.getMessage());
 
         ErrorResponse response = e.getDetails() != null
@@ -47,7 +48,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationException(
             AuthenticationException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Authentication Exception: {}", e.getMessage());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.UNAUTHORIZED, request.getRequestURI());
@@ -59,7 +60,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDeniedException(
             AccessDeniedException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Access Denied: {}", e.getMessage());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.FORBIDDEN, request.getRequestURI());
@@ -71,7 +72,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
             MethodArgumentNotValidException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Validation Exception: {}", e.getMessage());
 
         // 첫 번째 에러만 사용
@@ -91,7 +92,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolationException(
             ConstraintViolationException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Constraint Violation: {}", e.getMessage());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.VALIDATION_FAILED, request.getRequestURI(), e.getMessage());
@@ -103,7 +104,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
             MethodArgumentTypeMismatchException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Type Mismatch: {} - expected {}", e.getName(), e.getRequiredType());
 
         Map<String, Object> details = new HashMap<>();
@@ -120,7 +121,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
             MissingServletRequestParameterException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Missing Parameter: {}", e.getParameterName());
 
         Map<String, Object> details = new HashMap<>();
@@ -136,7 +137,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Invalid JSON: {}", e.getMessage());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_REQUEST, request.getRequestURI(), "잘못된 JSON 형식입니다");
@@ -148,7 +149,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedException(
             HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("Method Not Supported: {} for {}", e.getMethod(), request.getRequestURI());
 
         ErrorResponse response = ErrorResponse.of(
@@ -161,7 +162,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoHandlerFoundException(
             NoHandlerFoundException e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.warn("No Handler Found: {}", request.getRequestURI());
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.NOT_FOUND, request.getRequestURI());
@@ -171,7 +172,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e, HttpServletRequest request) {
-
+        MDC.put("exception", e.getClass().getSimpleName());
         log.error("Unexpected Exception: ", e);
 
         ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request.getRequestURI());
