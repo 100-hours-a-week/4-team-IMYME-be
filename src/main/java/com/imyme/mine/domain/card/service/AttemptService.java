@@ -14,6 +14,8 @@ import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
+import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
+import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
 import com.imyme.mine.domain.learning.service.SoloService;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
@@ -28,6 +30,9 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -37,6 +42,7 @@ public class AttemptService {
     private final CardRepository cardRepository;
     private final CardAttemptRepository cardAttemptRepository;
     private final CardFeedbackRepository cardFeedbackRepository;
+    private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final AiServerClient aiServerClient;
     private final SoloService soloService;
     private final S3Presigner s3Presigner;
@@ -138,11 +144,14 @@ public class AttemptService {
             // Solo 모드 분석 시작 (Virtual Thread 백그라운드 처리)
             try {
                 log.info("Solo 분석 시작 - attemptId: {}", attemptId);
+                String userText = sttText;
+                Map<String, Object> criteria = resolveCriteria(card);
+                List<Map<String, Object>> history = List.of();
                 soloService.startSoloAnalysisAsync(
                     attemptId,
-                    request.userText(),
-                    request.criteria(),
-                    request.history()
+                    userText,
+                    criteria,
+                    history
                 );
                 log.info("Solo 분석 백그라운드 실행 시작 - attemptId: {}", attemptId);
             } catch (Exception soloException) {
@@ -268,6 +277,22 @@ public class AttemptService {
             log.error("읽기용 Presigned URL 생성 실패 - objectKey: {}", objectKey, e);
             throw new BusinessException(ErrorCode.S3_UPLOAD_ERROR);
         }
+    }
+
+    private Map<String, Object> resolveCriteria(Card card) {
+        Map<String, Object> defaults = new HashMap<>();
+        defaults.put("maxScore", 100);
+        defaults.put("keywords", List.of(card.getKeyword().getName()));
+
+        List<String> knowledgeContents = knowledgeBaseRepository.findByKeywordId(card.getKeyword().getId())
+            .stream()
+            .filter(KnowledgeBase::getIsActive)
+            .map(KnowledgeBase::getContent)
+            .toList();
+        if (!knowledgeContents.isEmpty()) {
+            defaults.put("knowledgeBase", knowledgeContents);
+        }
+        return defaults;
     }
 
     private AttemptProcessingStep resolveProcessingStep(CardAttempt attempt) {
