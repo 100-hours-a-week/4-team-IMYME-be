@@ -65,6 +65,9 @@ dependencies {
 
     // JSONB 처리를 위한 라이브러리 (선택사항이지만 추천)
     implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.3'
+
+    // JSON 로깅 (Loki 연동)
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 }
 
 tasks.named('test') {

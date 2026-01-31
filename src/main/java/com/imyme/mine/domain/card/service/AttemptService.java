@@ -13,6 +13,7 @@ import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
+import com.imyme.mine.domain.learning.service.SoloService;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -36,6 +37,7 @@ public class AttemptService {
     private final CardAttemptRepository cardAttemptRepository;
     private final CardFeedbackRepository cardFeedbackRepository;
     private final AiServerClient aiServerClient;
+    private final SoloService soloService;
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
 
@@ -130,6 +132,22 @@ public class AttemptService {
             String sttText = aiServerClient.transcribe(readPresignedUrl);
             attempt.complete(sttText);
             log.info("STT 처리 성공 - attemptId: {}, status: COMPLETED, 텍스트 길이: {}", attemptId, sttText.length());
+
+            // Solo 모드 분석 시작 (Virtual Thread 백그라운드 처리)
+            try {
+                log.info("Solo 분석 시작 - attemptId: {}", attemptId);
+                soloService.startSoloAnalysisAsync(
+                    attemptId,
+                    request.userText(),
+                    request.criteria(),
+                    request.history()
+                );
+                log.info("Solo 분석 백그라운드 실행 시작 - attemptId: {}", attemptId);
+            } catch (Exception soloException) {
+                // Solo 분석 실패해도 STT는 성공했으므로 COMPLETED 유지
+                log.error("Solo 분석 시작 실패 (STT는 성공) - attemptId: {}", attemptId, soloException);
+            }
+
         } catch (BusinessException e) {
             // AI 서버 오류 시 FAILED 상태로 변경
             String errorMessage = e.getMessage();

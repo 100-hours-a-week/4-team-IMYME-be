@@ -3,13 +3,16 @@ package com.imyme.mine.domain.ai.client;
 import com.imyme.mine.domain.ai.dto.TranscriptionRequest;
 import com.imyme.mine.domain.ai.dto.TranscriptionResponse;
 import com.imyme.mine.domain.ai.dto.knowledge.*;
+import com.imyme.mine.domain.ai.dto.solo.*;
 import com.imyme.mine.global.config.AiServerProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -24,6 +27,7 @@ import java.util.List;
  * AI 서버 API 클라이언트
  * - STT(Speech-to-Text) API 호출
  * - Knowledge Management API 호출 (RAG 기반 채점 기준 업데이트)
+ * - Solo 모드 심층 분석 API 호출
  */
 @Slf4j
 @Component
@@ -33,7 +37,13 @@ public class AiServerClient {
     private final AiServerProperties properties;
     private final RestTemplate restTemplate;
 
-    // 음성 파일을 텍스트로 변환 (STT)
+    /**
+     * 음성 파일을 텍스트로 변환 (STT)
+     *
+     * @param audioUrl S3 오디오 파일 URL
+     * @return 변환된 텍스트
+     * @throws BusinessException AI 서버 오류 시
+     */
     public String transcribe(String audioUrl) {
         String url = properties.getBaseUrl() + "/api/v1/transcriptions";
 
@@ -98,7 +108,8 @@ public class AiServerClient {
     }
 
     /**
-     * GPU 워밍업 요청 (비동기) : AI 서버의 GPU 콜드 스타트 방지
+     * GPU 워밍업 요청 (비동기)
+     * - AI 서버의 GPU 콜드 스타트 방지
      * - 실패해도 예외를 던지지 않고 로그만 기록
      */
     public void warmup() {
@@ -107,7 +118,6 @@ public class AiServerClient {
         log.debug("GPU 워밍업 API 호출 시작 - url: {}", url);
 
         HttpHeaders headers = createHeaders();
-
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         try {
@@ -128,6 +138,18 @@ public class AiServerClient {
     /**
      * 지식 후보 배치 생성 (Knowledge Candidate Batch)
      * POST /api/v1/knowledge/candidates/batch
+     *
+     * <h3>사용 시나리오</h3>
+     * <p>AI 피드백 텍스트를 정제하고 벡터 임베딩을 생성합니다.</p>
+     * <ul>
+     *   <li>피드백 텍스트 정제 (불필요한 내용 제거)</li>
+     *   <li>OpenAI 임베딩 생성 (1024차원)</li>
+     *   <li>배치 처리로 효율성 향상 (최대 100개)</li>
+     * </ul>
+     *
+     * @param request 피드백 배치 요청 (items 배열)
+     * @return 생성된 지식 후보 목록
+     * @throws BusinessException AI 서버 오류 시
      */
     public List<KnowledgeCandidate> createKnowledgeCandidatesBatch(
             KnowledgeCandidateBatchRequest request) {
@@ -192,6 +214,17 @@ public class AiServerClient {
     /**
      * 지식 평가 및 업데이트 결정 (Knowledge Evaluation)
      * POST /api/v1/knowledge/evaluations
+     *
+     * <h3>사용 시나리오</h3>
+     * <p>새로운 지식 후보와 기존 유사 지식을 LLM이 비교하여 업데이트 여부를 결정합니다.</p>
+     * <ul>
+     *   <li>UPDATE: 기존 지식을 개선 (finalContent, finalVector 반환)</li>
+     *   <li>IGNORE: 중복이므로 무시</li>
+     * </ul>
+     *
+     * @param request 지식 평가 요청 (candidate + similars)
+     * @return LLM의 판단 결과 (decision, targetId, finalContent, finalVector, reasoning)
+     * @throws BusinessException AI 서버 오류 시
      */
     public KnowledgeEvaluationResponse.Data evaluateKnowledge(
             KnowledgeEvaluationRequest request) {
@@ -253,7 +286,136 @@ public class AiServerClient {
         }
     }
 
-    // HTTP 헤더 생성 (X-Internal-Secret + Content-Type)
+    /**
+     * Solo 모드 심층 분석 요청
+     * POST /api/v1/solo/submissions
+     *
+     * @param request Solo 분석 요청 (attemptId, userText, criteria, history)
+     * @return attemptId와 status ("pending")
+     * @throws BusinessException AI 서버 오류 시
+     */
+    public SoloSubmissionData submitSolo(SoloSubmissionRequest request) {
+        String url = properties.getBaseUrl() + "/api/v1/solo/submissions";
+
+        log.debug("Solo 분석 요청 시작 - url: {}, attemptId: {}", url, request.attemptId());
+
+        // 헤더 설정
+        HttpHeaders headers = createHeaders();
+        HttpEntity<SoloSubmissionRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            // AI 서버 호출
+            ResponseEntity<AiSoloResponse<SoloSubmissionData>> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                new ParameterizedTypeReference<AiSoloResponse<SoloSubmissionData>>() {}
+            );
+
+            // 응답 검증
+            AiSoloResponse<SoloSubmissionData> body = response.getBody();
+            if (body == null || body.getData() == null) {
+                log.error("Solo 분석 요청 응답 데이터가 null입니다.");
+                throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+            }
+
+            if (!Boolean.TRUE.equals(body.getSuccess())) {
+                log.error("Solo 분석 요청 실패 응답 - error: {}", body.getError());
+                throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+            }
+
+            SoloSubmissionData data = body.getData();
+            log.info("Solo 분석 요청 성공 - attemptId: {}, status: {}", data.attemptId(), data.status());
+            return data;
+
+        } catch (HttpClientErrorException e) {
+            log.error("Solo 분석 요청 클라이언트 오류 - status: {}, body: {}",
+                e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (HttpServerErrorException e) {
+            log.error("Solo 분석 요청 서버 오류 - status: {}, body: {}",
+                e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (ResourceAccessException e) {
+            log.error("Solo 분석 요청 타임아웃 또는 연결 실패 - message: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (BusinessException e) {
+            throw e;
+
+        } catch (Exception e) {
+            log.error("Solo 분석 요청 중 예상치 못한 오류 발생", e);
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * Solo 모드 심층 분석 결과 조회
+     * GET /api/v1/solo/submissions/{attemptId}
+     *
+     * @param attemptId 시도 ID
+     * @return 분석 상태 및 결과 (pending / completed / failed)
+     * @throws BusinessException AI 서버 오류 시
+     */
+    public SoloResultData pollSoloResult(Long attemptId) {
+        String url = properties.getBaseUrl() + "/api/v1/solo/submissions/" + attemptId;
+
+        log.debug("Solo 분석 결과 조회 - url: {}, attemptId: {}", url, attemptId);
+
+        // 헤더 설정
+        HttpHeaders headers = createHeaders();
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            // AI 서버 호출
+            ResponseEntity<AiSoloResponse<SoloResultData>> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                entity,
+                new ParameterizedTypeReference<AiSoloResponse<SoloResultData>>() {}
+            );
+
+            // 응답 검증
+            AiSoloResponse<SoloResultData> body = response.getBody();
+            if (body == null || body.getData() == null) {
+                log.error("Solo 분석 결과 조회 응답 데이터가 null입니다.");
+                throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+            }
+
+            SoloResultData data = body.getData();
+            log.debug("Solo 분석 결과 조회 성공 - attemptId: {}, status: {}", attemptId, data.status());
+            return data;
+
+        } catch (HttpClientErrorException e) {
+            log.error("Solo 분석 결과 조회 클라이언트 오류 - status: {}, body: {}",
+                e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (HttpServerErrorException e) {
+            log.error("Solo 분석 결과 조회 서버 오류 - status: {}, body: {}",
+                e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (ResourceAccessException e) {
+            log.error("Solo 분석 결과 조회 타임아웃 또는 연결 실패 - message: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (BusinessException e) {
+            throw e;
+
+        } catch (Exception e) {
+            log.error("Solo 분석 결과 조회 중 예상치 못한 오류 발생", e);
+            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    // ==================== Private Helper Methods ====================
+
+    /**
+     * HTTP 헤더 생성 (X-Internal-Secret + Content-Type)
+     */
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Internal-Secret", properties.getSecret());
@@ -261,7 +423,9 @@ public class AiServerClient {
         return headers;
     }
 
-    // Knowledge API 에러 메시지를 파싱하여 적절한 예외 발생
+    /**
+     * Knowledge API 에러 메시지를 파싱하여 적절한 예외 발생
+     */
     private void handleKnowledgeApiError(String errorMessage) {
         if (errorMessage == null) {
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
@@ -284,7 +448,9 @@ public class AiServerClient {
         }
     }
 
-    // HTTP 상태 코드를 Knowledge 에러로 매핑
+    /**
+     * HTTP 상태 코드를 Knowledge 에러로 매핑
+     */
     private BusinessException mapToKnowledgeError(int statusCode) {
         return switch (statusCode) {
             case 400 -> new BusinessException(ErrorCode.INVALID_CANDIDATE);
