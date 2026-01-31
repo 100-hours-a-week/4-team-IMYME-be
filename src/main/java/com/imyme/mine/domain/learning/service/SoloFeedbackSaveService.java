@@ -61,6 +61,9 @@ public class SoloFeedbackSaveService {
 
         feedbackRepository.save(newFeedback);
 
+        // 피드백 저장 완료 시 상태를 COMPLETED로 전환
+        attempt.complete(attempt.getSttText());
+
         log.info("Solo feedback saved - attemptId: {}, score: {}, level: {}",
             attemptId, result.overallScore(), result.level());
     }

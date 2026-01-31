@@ -93,6 +93,10 @@ public class CardAttempt {
         this.finishedAt = LocalDateTime.now();
     }
 
+    public void recordSttResult(String sttText) {
+        this.sttText = sttText;
+    }
+
     public void fail(String errorMessage) {
         this.errorMessage = errorMessage;
         this.status = AttemptStatus.FAILED;

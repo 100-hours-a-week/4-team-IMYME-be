@@ -2,6 +2,7 @@ package com.imyme.mine.domain.learning.service;
 
 import com.imyme.mine.domain.ai.client.AiServerClient;
 import com.imyme.mine.domain.ai.dto.solo.*;
+import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class SoloService {
 
     private final AiServerClient aiServerClient;
     private final SoloFeedbackSaveService feedbackSaveService;
+    private final CardAttemptRepository attemptRepository;
 
     private static final int MAX_RETRIES = 60;  // 최대 60회 (3분)
     private static final long POLL_INTERVAL_MS = 3000;  // 3초 간격
@@ -105,7 +107,8 @@ public class SoloService {
                 // 실패 상태 확인
                 if ("failed".equalsIgnoreCase(response.status())) {
                     log.error("Solo 분석 실패 - attemptId: {}", attemptId);
-                    throw new BusinessException(ErrorCode.AI_ANALYSIS_FAILED);
+                    markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+                    return;
                 }
 
                 // 아직 진행 중이면 3초 대기
@@ -114,11 +117,15 @@ public class SoloService {
             } catch (InterruptedException e) {
                 log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
                 Thread.currentThread().interrupt();
-                throw new BusinessException(ErrorCode.AI_POLLING_TIMEOUT);
+                markAttemptFailed(attemptId, "UNKNOWN_ERROR");
+                return;
 
             } catch (BusinessException e) {
-                // BusinessException은 그대로 던짐
-                throw e;
+                if (e.getErrorCode() == ErrorCode.AI_ANALYSIS_FAILED || e.getErrorCode() == ErrorCode.AI_POLLING_TIMEOUT) {
+                    markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+                    return;
+                }
+                log.error("Solo 폴링 비즈니스 에러 - attemptId: {}, retry: {}", attemptId, i + 1, e);
 
             } catch (Exception e) {
                 log.error("Solo 폴링 에러 - attemptId: {}, retry: {}", attemptId, i + 1, e);
@@ -128,7 +135,14 @@ public class SoloService {
 
         // 최대 재시도 횟수 초과
         log.warn("Solo 폴링 타임아웃 (3분 초과) - attemptId: {}", attemptId);
-        throw new BusinessException(ErrorCode.AI_POLLING_TIMEOUT);
+        markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+    }
+
+    private void markAttemptFailed(Long attemptId, String errorCode) {
+        attemptRepository.findById(attemptId).ifPresent(attempt -> {
+            attempt.fail(errorCode);
+            log.info("Solo 분석 실패 상태 저장 - attemptId: {}, errorCode: {}", attemptId, errorCode);
+        });
     }
 
 }

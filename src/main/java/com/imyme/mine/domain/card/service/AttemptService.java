@@ -4,6 +4,7 @@ import com.imyme.mine.domain.ai.client.AiServerClient;
 import com.imyme.mine.domain.card.dto.AttemptCreateRequest;
 import com.imyme.mine.domain.card.dto.AttemptCreateResponse;
 import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
+import com.imyme.mine.domain.card.dto.AttemptProcessingStep;
 import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
 import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
 import com.imyme.mine.domain.card.entity.AttemptStatus;
@@ -116,6 +117,7 @@ public class AttemptService {
         }
 
         attempt.markUploaded(request.audioUrl(), request.durationSeconds());
+        attempt.startProcessing();
 
         // STT (Speech-to-Text) 처리 - 동기 호출
         try {
@@ -130,8 +132,8 @@ public class AttemptService {
 
             // AI 서버에 읽기용 URL 전달
             String sttText = aiServerClient.transcribe(readPresignedUrl);
-            attempt.complete(sttText);
-            log.info("STT 처리 성공 - attemptId: {}, status: COMPLETED, 텍스트 길이: {}", attemptId, sttText.length());
+            attempt.recordSttResult(sttText);
+            log.info("STT 처리 성공 - attemptId: {}, status: PROCESSING, 텍스트 길이: {}", attemptId, sttText.length());
 
             // Solo 모드 분석 시작 (Virtual Thread 백그라운드 처리)
             try {
@@ -145,14 +147,15 @@ public class AttemptService {
                 log.info("Solo 분석 백그라운드 실행 시작 - attemptId: {}", attemptId);
             } catch (Exception soloException) {
                 // Solo 분석 실패해도 STT는 성공했으므로 COMPLETED 유지
-                log.error("Solo 분석 시작 실패 (STT는 성공) - attemptId: {}", attemptId, soloException);
+                log.error("Solo 분석 시작 실패 - attemptId: {}", attemptId, soloException);
+                attempt.fail("AI_FEEDBACK_FAILED");
             }
 
         } catch (BusinessException e) {
-            // AI 서버 오류 시 FAILED 상태로 변경
-            String errorMessage = e.getMessage();
-            attempt.fail(errorMessage);
-            log.error("STT 처리 실패 - attemptId: {}, status: FAILED, error: {}", attemptId, errorMessage);
+            // STT 오류 시 FAILED 상태로 변경 (에러 코드 저장)
+            String errorCode = mapSttErrorCode(e);
+            attempt.fail(errorCode);
+            log.error("STT 처리 실패 - attemptId: {}, status: FAILED, errorCode: {}", attemptId, errorCode);
         }
 
         log.info("업로드 완료 처리 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
@@ -208,7 +211,7 @@ public class AttemptService {
                 yield AttemptDetailResponse.fromPending(attempt, expiresAt);
             }
             case UPLOADED -> AttemptDetailResponse.fromUploaded(attempt);
-            case PROCESSING -> AttemptDetailResponse.fromProcessing(attempt);
+            case PROCESSING -> AttemptDetailResponse.fromProcessing(attempt, resolveProcessingStep(attempt));
             case COMPLETED -> {
                 // CardFeedback 조회 (1:1 관계)
                 CardFeedback feedback = cardFeedbackRepository.findByAttemptId(attempt.getId())
@@ -265,5 +268,19 @@ public class AttemptService {
             log.error("읽기용 Presigned URL 생성 실패 - objectKey: {}", objectKey, e);
             throw new BusinessException(ErrorCode.S3_UPLOAD_ERROR);
         }
+    }
+
+    private AttemptProcessingStep resolveProcessingStep(CardAttempt attempt) {
+        return (attempt.getSttText() == null)
+            ? AttemptProcessingStep.AUDIO_ANALYSIS
+            : AttemptProcessingStep.FEEDBACK_GENERATION;
+    }
+
+    private String mapSttErrorCode(BusinessException e) {
+        return switch (e.getErrorCode()) {
+            case INVALID_AUDIO_URL -> "STT_RECOGNIZE_FAILED";
+            case AI_SERVICE_UNAVAILABLE, S3_UPLOAD_ERROR -> "STT_SERVER_ERROR";
+            default -> "UNKNOWN_ERROR";
+        };
     }
 }
