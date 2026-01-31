@@ -78,6 +78,15 @@ public enum ErrorCode {
     // ========== Rate Limit (429) ==========
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수 제한을 초과했습니다. 잠시 후 다시 시도해주세요."),
 
+    // ========== Knowledge API (400, 408, 500) ==========
+    INVALID_FEEDBACK(HttpStatus.BAD_REQUEST, "피드백 형식이 올바르지 않거나 길이가 초과되었습니다."),
+    TOO_MANY_ITEMS(HttpStatus.BAD_REQUEST, "배치 항목이 최대 개수(100개)를 초과했습니다."),
+    INVALID_CANDIDATE(HttpStatus.BAD_REQUEST, "지식 후보 형식이 올바르지 않습니다."),
+    TOO_MANY_SIMILARS(HttpStatus.BAD_REQUEST, "유사 지식 항목이 최대 개수(10개)를 초과했습니다."),
+    LLM_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "LLM 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."),
+    EMBEDDING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "임베딩 벡터 생성 중 오류가 발생했습니다."),
+    LLM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "LLM 처리 중 오류가 발생했습니다."),
+
     // ========== 서버 오류 (500, 503) ==========
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "일시적으로 서비스를 이용할 수 없습니다."),
