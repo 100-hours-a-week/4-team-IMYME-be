@@ -65,7 +65,6 @@ public class CardService {
         Card savedCard = cardRepository.save(card);
 
         user.incrementTotalCardCount();
-        user.incrementActiveCardCount();
 
         log.info("카드 생성 완료 - cardId: {}, userId: {}", savedCard.getId(), userId);
 
@@ -98,7 +97,9 @@ public class CardService {
 
         cardRepository.delete(card);
 
-        user.decrementActiveCardCount();
+        if (card.getAttemptCount() != null && card.getAttemptCount() > 0) {
+            user.decrementActiveCardCount();
+        }
 
         log.info("카드 삭제 완료 - cardId: {}, userId: {}", cardId, userId);
     }

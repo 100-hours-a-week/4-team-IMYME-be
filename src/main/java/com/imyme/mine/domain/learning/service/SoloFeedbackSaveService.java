@@ -3,6 +3,7 @@ package com.imyme.mine.domain.learning.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.imyme.mine.domain.ai.dto.solo.SoloFeedback;
 import com.imyme.mine.domain.ai.dto.solo.SoloResult;
+import com.imyme.mine.domain.card.entity.Card;
 import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
@@ -61,8 +62,14 @@ public class SoloFeedbackSaveService {
 
         feedbackRepository.save(newFeedback);
 
-        // 피드백 저장 완료 시 상태를 COMPLETED로 전환
+        // 피드백 저장 완료 시 상태를 COMPLETED로 전환 + 카드 통계 갱신
+        Card card = attempt.getCard();
+        boolean wasGhost = card.getAttemptCount() == null || card.getAttemptCount() == 0;
         attempt.complete(attempt.getSttText());
+        card.completeAttempt(result.level().shortValue());
+        if (wasGhost) {
+            card.getUser().incrementActiveCardCount();
+        }
 
         log.info("Solo feedback saved - attemptId: {}, score: {}, level: {}",
             attemptId, result.overallScore(), result.level());
