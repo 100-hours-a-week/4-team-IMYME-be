@@ -41,7 +41,7 @@ public class KnowledgeBatchService {
     private final KeywordRepository keywordRepository;
     private final AiServerClient aiServerClient;
     private final KnowledgeProperties properties;
-    private final ObjectMapper objectMapper;  // 재사용을 위해 주입
+    private final ObjectMapper objectMapper; // 재사용을 위해 주입
 
     /**
      * 전체 키워드에 대해 Knowledge 배치 실행 (매일 자정)
@@ -54,7 +54,7 @@ public class KnowledgeBatchService {
         LocalDateTime yesterday = LocalDateTime.now().minusDays(1).withHour(0).withMinute(0).withSecond(0);
         LocalDateTime today = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         KnowledgeBatchResult.Builder resultBuilder = KnowledgeBatchResult.builder()
-            .startTime(startTime);
+                .startTime(startTime);
 
         // 활성 키워드 조회
         List<Keyword> keywords = getActiveKeywords();
@@ -83,11 +83,11 @@ public class KnowledgeBatchService {
                 ignoredCount += keywordResult.ignoredCandidates();
 
                 log.info("키워드 처리 완료: {} - 피드백 {}, 생성 {}, 업데이트 {}, 무시 {}",
-                    keyword.getName(),
-                    keywordResult.totalFeedbacks(),
-                    keywordResult.createdKnowledge(),
-                    keywordResult.updatedKnowledge(),
-                    keywordResult.ignoredCandidates());
+                        keyword.getName(),
+                        keywordResult.totalFeedbacks(),
+                        keywordResult.createdKnowledge(),
+                        keywordResult.updatedKnowledge(),
+                        keywordResult.ignoredCandidates());
 
                 // 키워드 간 지연 (AI 서버 부하 방지)
                 if (properties.getKeywordDelayMs() > 0) {
@@ -97,7 +97,7 @@ public class KnowledgeBatchService {
             } catch (Exception e) {
                 failedCount++;
                 String errorMsg = String.format("키워드 처리 실패: %s (ID: %d) - %s",
-                    keyword.getName(), keyword.getId(), e.getMessage());
+                        keyword.getName(), keyword.getId(), e.getMessage());
                 log.error(errorMsg, e);
                 resultBuilder.addError(errorMsg);
             }
@@ -106,19 +106,19 @@ public class KnowledgeBatchService {
         LocalDateTime endTime = LocalDateTime.now();
 
         KnowledgeBatchResult result = resultBuilder
-            .endTime(endTime)
-            .successKeywords(successCount)
-            .failedKeywords(failedCount)
-            .totalFeedbacks(totalFeedbacks)
-            .createdKnowledge(createdCount)
-            .updatedKnowledge(updatedCount)
-            .ignoredCandidates(ignoredCount)
-            .build();
+                .endTime(endTime)
+                .successKeywords(successCount)
+                .failedKeywords(failedCount)
+                .totalFeedbacks(totalFeedbacks)
+                .createdKnowledge(createdCount)
+                .updatedKnowledge(updatedCount)
+                .ignoredCandidates(ignoredCount)
+                .build();
 
         log.info("=== Knowledge 일일 배치 완료 ===");
         log.info("처리 시간: {}초", java.time.Duration.between(startTime, endTime).getSeconds());
         log.info("성공: {}, 실패: {}, 총 피드백: {}, 생성: {}, 업데이트: {}, 무시: {}",
-            successCount, failedCount, totalFeedbacks, createdCount, updatedCount, ignoredCount);
+                successCount, failedCount, totalFeedbacks, createdCount, updatedCount, ignoredCount);
 
         return result;
     }
@@ -146,12 +146,12 @@ public class KnowledgeBatchService {
     public KnowledgeBatchResult processKeyword(Long keywordId, LocalDateTime startDate, LocalDateTime endDate) {
         LocalDateTime batchStartTime = LocalDateTime.now();
         KnowledgeBatchResult.Builder resultBuilder = KnowledgeBatchResult.builder()
-            .startTime(batchStartTime)
-            .totalKeywords(1);
+                .startTime(batchStartTime)
+                .totalKeywords(1);
 
         // 1. 키워드 존재 확인
         Keyword keyword = keywordRepository.findById(keywordId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
 
         // 2. 피드백 조회 (날짜 조건 분기 처리)
         List<CardFeedback> feedbacks;
@@ -167,9 +167,9 @@ public class KnowledgeBatchService {
 
         if (feedbacks.isEmpty()) {
             return resultBuilder
-                .endTime(LocalDateTime.now())
-                .successKeywords(1)
-                .build();
+                    .endTime(LocalDateTime.now())
+                    .successKeywords(1)
+                    .build();
         }
 
         // 3. 중복 제거 및 해시 계산
@@ -187,10 +187,9 @@ public class KnowledgeBatchService {
                     // 이미 존재하는 지식인지 확인 (중복 방지)
                     if (!knowledgeRepository.existsByContentHash(contentHash)) {
                         feedbackItems.add(new FeedbackItem(
-                            String.valueOf(feedback.getAttemptId()),
-                            keyword.getName(),
-                            personalizedFeedback
-                        ));
+                                String.valueOf(feedback.getAttemptId()),
+                                keyword.getName(),
+                                personalizedFeedback));
                     } else {
                         log.debug("이미 존재하는 지식 스킵 - Hash: {}", contentHash);
                     }
@@ -206,9 +205,9 @@ public class KnowledgeBatchService {
 
         if (feedbackItems.isEmpty()) {
             return resultBuilder
-                .endTime(LocalDateTime.now())
-                .successKeywords(1)
-                .build();
+                    .endTime(LocalDateTime.now())
+                    .successKeywords(1)
+                    .build();
         }
 
         int createdCount = 0;
@@ -243,7 +242,7 @@ public class KnowledgeBatchService {
                 if (!candidates.isEmpty()) {
                     long sleepTime = 120_000; // 2분 (ms 단위)
                     log.info("🔥 서버 과부하 방지를 위해 {}분간 대기합니다... (현재 시간: {})",
-                        sleepTime / 60000, LocalDateTime.now());
+                            sleepTime / 60000, LocalDateTime.now());
 
                     try {
                         Thread.sleep(sleepTime);
@@ -259,20 +258,21 @@ public class KnowledgeBatchService {
                     try {
                         String embeddingVector = convertEmbeddingToString(candidate.embedding());
 
+                        // Hybrid RRF Search: 키워드 + 벡터 검색 결합
                         List<KnowledgeSearchResult> similars = knowledgeRepository
-                            .findSimilarKnowledgeByKeyword(
-                                embeddingVector,
-                                keywordId,
-                                properties.getMaxSimilarCount()
-                            );
+                                .findSimilarKnowledgeByHybridRRF(
+                                        candidate.refinedText(), // queryText: 키워드 검색용
+                                        embeddingVector, // queryEmbedding: 벡터 검색용
+                                        keywordId,
+                                        properties.getMaxSimilarCount());
 
                         double threshold = 1.0 - properties.getSimilarityThreshold();
                         List<KnowledgeSearchResult> filteredSimilars = similars.stream()
-                            .filter(s -> s.getDistance() <= threshold)
-                            .collect(Collectors.toList());
+                                .filter(s -> s.getDistance() <= threshold)
+                                .collect(Collectors.toList());
 
                         log.debug("유사 지식 검색 결과: {} -> 필터링 후 {}",
-                            similars.size(), filteredSimilars.size());
+                                similars.size(), filteredSimilars.size());
 
                         KnowledgeEvaluationRequest evalRequest = buildEvaluationRequest(candidate, filteredSimilars);
                         KnowledgeEvaluationResponse.Data evalResult = aiServerClient.evaluateKnowledge(evalRequest);
@@ -311,12 +311,12 @@ public class KnowledgeBatchService {
         }
 
         return resultBuilder
-            .endTime(LocalDateTime.now())
-            .successKeywords(1)
-            .createdKnowledge(createdCount)
-            .updatedKnowledge(updatedCount)
-            .ignoredCandidates(ignoredCount)
-            .build();
+                .endTime(LocalDateTime.now())
+                .successKeywords(1)
+                .createdKnowledge(createdCount)
+                .updatedKnowledge(updatedCount)
+                .ignoredCandidates(ignoredCount)
+                .build();
     }
 
     /**
@@ -328,12 +328,12 @@ public class KnowledgeBatchService {
         String embeddingVector = convertEmbeddingToString(candidate.embedding());
 
         KnowledgeBase knowledge = KnowledgeBase.builder()
-            .keyword(keyword)
-            .content(candidate.refinedText())
-            .embedding(embeddingVector)
-            .contentHash(contentHash)
-            .isActive(true)
-            .build();
+                .keyword(keyword)
+                .content(candidate.refinedText())
+                .embedding(embeddingVector)
+                .contentHash(contentHash)
+                .isActive(true)
+                .build();
 
         knowledgeRepository.save(knowledge);
         log.debug("지식 생성 완료 - ID: {}", knowledge.getId());
@@ -345,7 +345,7 @@ public class KnowledgeBatchService {
     @Transactional
     public void updateKnowledge(Long knowledgeId, KnowledgeCandidate candidate) {
         KnowledgeBase knowledge = knowledgeRepository.findById(knowledgeId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.KNOWLEDGE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.KNOWLEDGE_NOT_FOUND));
 
         String newContentHash = calculateSHA256(candidate.refinedText());
         String newEmbedding = convertEmbeddingToString(candidate.embedding());
@@ -371,8 +371,8 @@ public class KnowledgeBatchService {
         } else {
             Set<Long> enabledIds = new HashSet<>(properties.getEnabledKeywords());
             return allKeywords.stream()
-                .filter(k -> enabledIds.contains(k.getId()))
-                .collect(Collectors.toList());
+                    .filter(k -> enabledIds.contains(k.getId()))
+                    .collect(Collectors.toList());
         }
     }
 
@@ -387,8 +387,8 @@ public class KnowledgeBatchService {
 
             if (feedbackNode.isMissingNode() || feedbackNode.isNull()) {
                 feedbackNode = root.path("data")
-                    .path("feedback_content")
-                    .path("socratic_feedback");
+                        .path("feedback_content")
+                        .path("socratic_feedback");
             }
 
             if (feedbackNode.isMissingNode() || feedbackNode.isNull()) {
@@ -413,7 +413,8 @@ public class KnowledgeBatchService {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             return hexString.toString();
@@ -428,31 +429,30 @@ public class KnowledgeBatchService {
      */
     private String convertEmbeddingToString(List<Double> embedding) {
         return embedding.stream()
-            .map(String::valueOf)
-            .collect(Collectors.joining(",", "[", "]"));
+                .map(String::valueOf)
+                .collect(Collectors.joining(",", "[", "]"));
     }
 
     /**
      * 평가 요청 DTO 생성
      */
     private KnowledgeEvaluationRequest buildEvaluationRequest(
-        KnowledgeCandidate candidate,
-        List<KnowledgeSearchResult> similars
-    ) {
+            KnowledgeCandidate candidate,
+            List<KnowledgeSearchResult> similars) {
         // EvaluationCandidate(String text, String sourceId)
         EvaluationCandidate evalCandidate = new EvaluationCandidate(
-            candidate.refinedText(),  // text
-            candidate.id()  // sourceId
+                candidate.refinedText(), // text
+                candidate.id() // sourceId
         );
 
         // SimilarKnowledge(String id, String text, Double similarity)
         List<SimilarKnowledge> similarList = similars.stream()
-            .map(s -> new SimilarKnowledge(
-                String.valueOf(s.getId()),  // String ID로 변환
-                s.getContent(),
-                1.0 - s.getDistance()  // 거리를 유사도로 변환 (1 - distance)
-            ))
-            .collect(Collectors.toList());
+                .map(s -> new SimilarKnowledge(
+                        String.valueOf(s.getId()), // String ID로 변환
+                        s.getContent(),
+                        1.0 - s.getDistance() // 거리를 유사도로 변환 (1 - distance)
+                ))
+                .collect(Collectors.toList());
 
         return new KnowledgeEvaluationRequest(evalCandidate, similarList);
     }
