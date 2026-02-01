@@ -1,0 +1,470 @@
+package com.imyme.mine.domain.learning.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.imyme.mine.domain.ai.client.AiServerClient;
+import com.imyme.mine.domain.ai.dto.knowledge.*;
+import com.imyme.mine.domain.card.entity.CardFeedback;
+import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
+import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
+import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
+import com.imyme.mine.domain.knowledge.repository.KnowledgeSearchResult;
+import com.imyme.mine.domain.keyword.entity.Keyword;
+import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.learning.dto.KnowledgeBatchResult;
+import com.imyme.mine.global.config.KnowledgeProperties;
+import com.imyme.mine.global.error.BusinessException;
+import com.imyme.mine.global.error.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Knowledge 배치 작업 서비스
+ * - 매일 자정 실행되는 Knowledge 업데이트 파이프라인
+ * - SHA-256 해시 기반 중복 방지로 OpenAI API 비용 최소화
+ * - 트랜잭션은 DB 저장 메서드에만 적용 (HTTP 호출 시 트랜잭션 미사용)
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class KnowledgeBatchService {
+
+    private final CardFeedbackRepository feedbackRepository;
+    private final KnowledgeBaseRepository knowledgeRepository;
+    private final KeywordRepository keywordRepository;
+    private final AiServerClient aiServerClient;
+    private final KnowledgeProperties properties;
+    private final ObjectMapper objectMapper;  // 재사용을 위해 주입
+
+    /**
+     * 전체 키워드에 대해 Knowledge 배치 실행 (매일 자정)
+     * - @Transactional 없음: HTTP 호출과 Thread.sleep이 포함되어 있어 장시간 트랜잭션 방지
+     */
+    public KnowledgeBatchResult executeDaily() {
+        log.info("=== Knowledge 일일 배치 시작 ===");
+
+        LocalDateTime startTime = LocalDateTime.now();
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1).withHour(0).withMinute(0).withSecond(0);
+        LocalDateTime today = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+        KnowledgeBatchResult.Builder resultBuilder = KnowledgeBatchResult.builder()
+            .startTime(startTime);
+
+        // 활성 키워드 조회
+        List<Keyword> keywords = getActiveKeywords();
+        resultBuilder.totalKeywords(keywords.size());
+
+        log.info("처리 대상 키워드: {}개", keywords.size());
+
+        int successCount = 0;
+        int failedCount = 0;
+        int totalFeedbacks = 0;
+        int createdCount = 0;
+        int updatedCount = 0;
+        int ignoredCount = 0;
+
+        // 각 키워드별 처리
+        for (Keyword keyword : keywords) {
+            try {
+                log.info("키워드 처리 시작: {} (ID: {})", keyword.getName(), keyword.getId());
+
+                KnowledgeBatchResult keywordResult = processKeyword(keyword.getId(), yesterday, today);
+
+                successCount++;
+                totalFeedbacks += keywordResult.totalFeedbacks();
+                createdCount += keywordResult.createdKnowledge();
+                updatedCount += keywordResult.updatedKnowledge();
+                ignoredCount += keywordResult.ignoredCandidates();
+
+                log.info("키워드 처리 완료: {} - 피드백 {}, 생성 {}, 업데이트 {}, 무시 {}",
+                    keyword.getName(),
+                    keywordResult.totalFeedbacks(),
+                    keywordResult.createdKnowledge(),
+                    keywordResult.updatedKnowledge(),
+                    keywordResult.ignoredCandidates());
+
+                // 키워드 간 지연 (AI 서버 부하 방지)
+                if (properties.getKeywordDelayMs() > 0) {
+                    Thread.sleep(properties.getKeywordDelayMs());
+                }
+
+            } catch (Exception e) {
+                failedCount++;
+                String errorMsg = String.format("키워드 처리 실패: %s (ID: %d) - %s",
+                    keyword.getName(), keyword.getId(), e.getMessage());
+                log.error(errorMsg, e);
+                resultBuilder.addError(errorMsg);
+            }
+        }
+
+        LocalDateTime endTime = LocalDateTime.now();
+
+        KnowledgeBatchResult result = resultBuilder
+            .endTime(endTime)
+            .successKeywords(successCount)
+            .failedKeywords(failedCount)
+            .totalFeedbacks(totalFeedbacks)
+            .createdKnowledge(createdCount)
+            .updatedKnowledge(updatedCount)
+            .ignoredCandidates(ignoredCount)
+            .build();
+
+        log.info("=== Knowledge 일일 배치 완료 ===");
+        log.info("처리 시간: {}초", java.time.Duration.between(startTime, endTime).getSeconds());
+        log.info("성공: {}, 실패: {}, 총 피드백: {}, 생성: {}, 업데이트: {}, 무시: {}",
+            successCount, failedCount, totalFeedbacks, createdCount, updatedCount, ignoredCount);
+
+        return result;
+    }
+
+    /**
+     * [Admin용] 전체 기간 배치 실행 (오버로딩)
+     * - 날짜에 null을 넘겨서 전체 조회가 되도록 함
+     */
+    public KnowledgeBatchResult processKeyword(Long keywordId) {
+        return processKeyword(keywordId, null, null);
+    }
+
+    /**
+     * [구버전 호환용] 날짜 지정 배치 실행 (오버로딩)
+     */
+    public KnowledgeBatchResult processKeywordByDateRange(Long keywordId, LocalDateTime start, LocalDateTime end) {
+        return processKeyword(keywordId, start, end);
+    }
+
+    /**
+     * [핵심 로직 통합] 특정 키워드에 대해 Knowledge 배치 실행
+     * - startDate, endDate가 있으면 해당 기간만 조회 (일일 배치용)
+     * - 날짜가 null이면 전체 조회 (Admin 수동 실행용)
+     */
+    public KnowledgeBatchResult processKeyword(Long keywordId, LocalDateTime startDate, LocalDateTime endDate) {
+        LocalDateTime batchStartTime = LocalDateTime.now();
+        KnowledgeBatchResult.Builder resultBuilder = KnowledgeBatchResult.builder()
+            .startTime(batchStartTime)
+            .totalKeywords(1);
+
+        // 1. 키워드 존재 확인
+        Keyword keyword = keywordRepository.findById(keywordId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+
+        // 2. 피드백 조회 (날짜 조건 분기 처리)
+        List<CardFeedback> feedbacks;
+        if (startDate != null && endDate != null) {
+            feedbacks = feedbackRepository.findByKeywordIdAndCreatedAtBetween(keywordId, startDate, endDate);
+            log.info("키워드 '{}' 기간 조회 ({} ~ {}): {}개", keyword.getName(), startDate, endDate, feedbacks.size());
+        } else {
+            feedbacks = feedbackRepository.findByKeywordId(keywordId);
+            log.info("키워드 '{}' 전체 기간 조회: {}개", keyword.getName(), feedbacks.size());
+        }
+
+        resultBuilder.totalFeedbacks(feedbacks.size());
+
+        if (feedbacks.isEmpty()) {
+            return resultBuilder
+                .endTime(LocalDateTime.now())
+                .successKeywords(1)
+                .build();
+        }
+
+        // 3. 중복 제거 및 해시 계산
+        List<FeedbackItem> feedbackItems = new ArrayList<>();
+        for (CardFeedback feedback : feedbacks) {
+            try {
+                String personalizedFeedback = extractPersonalizedFeedback(feedback.getFeedbackJson());
+
+                // [디버깅] 추출 결과 확인
+                log.info("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), personalizedFeedback);
+
+                if (personalizedFeedback != null && !personalizedFeedback.isBlank()) {
+                    String contentHash = calculateSHA256(personalizedFeedback);
+
+                    // 이미 존재하는 지식인지 확인 (중복 방지)
+                    if (!knowledgeRepository.existsByContentHash(contentHash)) {
+                        feedbackItems.add(new FeedbackItem(
+                            String.valueOf(feedback.getAttemptId()),
+                            keyword.getName(),
+                            personalizedFeedback
+                        ));
+                    } else {
+                        log.debug("이미 존재하는 지식 스킵 - Hash: {}", contentHash);
+                    }
+                } else {
+                    log.warn("ID: {} - 텍스트 추출 실패 (null 또는 빈 값)", feedback.getAttemptId());
+                }
+            } catch (Exception e) {
+                log.warn("피드백 추출 실패 - attemptId: {}", feedback.getAttemptId(), e);
+            }
+        }
+
+        log.info("중복 제거 후 처리 대상: {}개", feedbackItems.size());
+
+        if (feedbackItems.isEmpty()) {
+            return resultBuilder
+                .endTime(LocalDateTime.now())
+                .successKeywords(1)
+                .build();
+        }
+
+        int createdCount = 0;
+        int updatedCount = 0;
+        int ignoredCount = 0;
+
+        // 4. 배치 처리 (AI 서버 호출)
+        List<List<FeedbackItem>> batches = partitionList(feedbackItems, properties.getBatchSize());
+        log.info("배치 개수: {} (배치 크기: {})", batches.size(), properties.getBatchSize());
+
+        for (int i = 0; i < batches.size(); i++) {
+            try {
+                List<FeedbackItem> batch = batches.get(i);
+                log.info("배치 {}/{} 처리 중 - 항목 수: {}", i + 1, batches.size(), batch.size());
+
+                // AI 서버 요청 객체 생성
+                KnowledgeCandidateBatchRequest request = new KnowledgeCandidateBatchRequest(batch);
+
+                // [추가됨] AI 서버로 보내는 실제 JSON 데이터 로깅
+                try {
+                    String requestBodyJson = objectMapper.writeValueAsString(request);
+                    log.info(">>> [AI Request Body] Batch {}: {}", i + 1, requestBodyJson);
+                } catch (Exception e) {
+                    log.warn("요청 데이터 로깅 실패", e);
+                }
+
+                // AI 서버 요청
+                List<KnowledgeCandidate> candidates = aiServerClient.createKnowledgeCandidatesBatch(request);
+
+                log.info("AI 서버 응답: {} 개 후보 생성", candidates.size());
+
+                if (!candidates.isEmpty()) {
+                    long sleepTime = 120_000; // 2분 (ms 단위)
+                    log.info("🔥 서버 과부하 방지를 위해 {}분간 대기합니다... (현재 시간: {})",
+                        sleepTime / 60000, LocalDateTime.now());
+
+                    try {
+                        Thread.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+
+                    log.info("💤 휴식 끝! 평가 작업을 시작합니다.");
+                }
+
+                // 각 후보 평가 및 저장
+                for (KnowledgeCandidate candidate : candidates) {
+                    try {
+                        String embeddingVector = convertEmbeddingToString(candidate.embedding());
+
+                        List<KnowledgeSearchResult> similars = knowledgeRepository
+                            .findSimilarKnowledgeByKeyword(
+                                embeddingVector,
+                                keywordId,
+                                properties.getMaxSimilarCount()
+                            );
+
+                        double threshold = 1.0 - properties.getSimilarityThreshold();
+                        List<KnowledgeSearchResult> filteredSimilars = similars.stream()
+                            .filter(s -> s.getDistance() <= threshold)
+                            .collect(Collectors.toList());
+
+                        log.debug("유사 지식 검색 결과: {} -> 필터링 후 {}",
+                            similars.size(), filteredSimilars.size());
+
+                        KnowledgeEvaluationRequest evalRequest = buildEvaluationRequest(candidate, filteredSimilars);
+                        KnowledgeEvaluationResponse.Data evalResult = aiServerClient.evaluateKnowledge(evalRequest);
+
+                        log.debug("평가 결과: {} - {}", evalResult.decision(), evalResult.reasoning());
+
+                        if ("UPDATE".equalsIgnoreCase(evalResult.decision())) {
+                            if (filteredSimilars.isEmpty()) {
+                                createKnowledge(keyword, candidate);
+                                createdCount++;
+                                log.info("새 지식 생성 완료 - feedbackId: {}", candidate.id());
+                            } else {
+                                updateKnowledge(filteredSimilars.get(0).getId(), candidate);
+                                updatedCount++;
+                                log.info("기존 지식 업데이트 완료 - knowledgeId: {}", filteredSimilars.get(0).getId());
+                            }
+                        } else {
+                            ignoredCount++;
+                            log.debug("지식 후보 무시 - feedbackId: {}", candidate.id());
+                        }
+                    } catch (Exception e) {
+                        log.error("후보 처리 실패 - feedbackId: {}", candidate.id(), e);
+                        resultBuilder.addError("후보 처리 실패: " + e.getMessage());
+                    }
+                }
+
+                // 배치 간 지연
+                if (i < batches.size() - 1 && properties.getBatchDelayMs() > 0) {
+                    Thread.sleep(properties.getBatchDelayMs());
+                }
+
+            } catch (Exception e) {
+                log.error("배치 {}/{} 처리 실패", i + 1, batches.size(), e);
+                resultBuilder.addError(String.format("배치 %d 처리 실패: %s", i + 1, e.getMessage()));
+            }
+        }
+
+        return resultBuilder
+            .endTime(LocalDateTime.now())
+            .successKeywords(1)
+            .createdKnowledge(createdCount)
+            .updatedKnowledge(updatedCount)
+            .ignoredCandidates(ignoredCount)
+            .build();
+    }
+
+    /**
+     * 새 지식 생성 (트랜잭션 적용)
+     */
+    @Transactional
+    public void createKnowledge(Keyword keyword, KnowledgeCandidate candidate) {
+        String contentHash = calculateSHA256(candidate.refinedText());
+        String embeddingVector = convertEmbeddingToString(candidate.embedding());
+
+        KnowledgeBase knowledge = KnowledgeBase.builder()
+            .keyword(keyword)
+            .content(candidate.refinedText())
+            .embedding(embeddingVector)
+            .contentHash(contentHash)
+            .isActive(true)
+            .build();
+
+        knowledgeRepository.save(knowledge);
+        log.debug("지식 생성 완료 - ID: {}", knowledge.getId());
+    }
+
+    /**
+     * 기존 지식 업데이트 (트랜잭션 적용)
+     */
+    @Transactional
+    public void updateKnowledge(Long knowledgeId, KnowledgeCandidate candidate) {
+        KnowledgeBase knowledge = knowledgeRepository.findById(knowledgeId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.KNOWLEDGE_NOT_FOUND));
+
+        String newContentHash = calculateSHA256(candidate.refinedText());
+        String newEmbedding = convertEmbeddingToString(candidate.embedding());
+
+        knowledge.updateContent(candidate.refinedText(), newContentHash);
+        knowledge.updateEmbedding(newEmbedding);
+
+        knowledgeRepository.save(knowledge);
+        log.debug("지식 업데이트 완료 - ID: {}", knowledge.getId());
+    }
+
+    // ========== Helper Methods ==========
+
+    /**
+     * 활성 키워드 조회 (필터링 적용)
+     */
+    private List<Keyword> getActiveKeywords() {
+        List<Keyword> allKeywords = keywordRepository.findAllWithCategoryByIsActive(true);
+
+        // 설정에서 활성화된 키워드 필터링
+        if (properties.getEnabledKeywords().isEmpty()) {
+            return allKeywords;
+        } else {
+            Set<Long> enabledIds = new HashSet<>(properties.getEnabledKeywords());
+            return allKeywords.stream()
+                .filter(k -> enabledIds.contains(k.getId()))
+                .collect(Collectors.toList());
+        }
+    }
+
+    /**
+     * 피드백 JSON에서 개인화 피드백 추출
+     */
+    private String extractPersonalizedFeedback(String feedbackJson) {
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(feedbackJson);
+
+            com.fasterxml.jackson.databind.JsonNode feedbackNode = root.path("socratic_feedback");
+
+            if (feedbackNode.isMissingNode() || feedbackNode.isNull()) {
+                feedbackNode = root.path("data")
+                    .path("feedback_content")
+                    .path("socratic_feedback");
+            }
+
+            if (feedbackNode.isMissingNode() || feedbackNode.isNull()) {
+                return null;
+            }
+
+            return feedbackNode.asText();
+        } catch (Exception e) {
+            log.warn("피드백 JSON 파싱 실패", e);
+            return null;
+        }
+    }
+
+    /**
+     * SHA-256 해시 계산
+     */
+    private String calculateSHA256(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 임베딩 벡터를 PostgreSQL vector 형식으로 변환
+     */
+    private String convertEmbeddingToString(List<Double> embedding) {
+        return embedding.stream()
+            .map(String::valueOf)
+            .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /**
+     * 평가 요청 DTO 생성
+     */
+    private KnowledgeEvaluationRequest buildEvaluationRequest(
+        KnowledgeCandidate candidate,
+        List<KnowledgeSearchResult> similars
+    ) {
+        // EvaluationCandidate(String text, String sourceId)
+        EvaluationCandidate evalCandidate = new EvaluationCandidate(
+            candidate.refinedText(),  // text
+            candidate.id()  // sourceId
+        );
+
+        // SimilarKnowledge(String id, String text, Double similarity)
+        List<SimilarKnowledge> similarList = similars.stream()
+            .map(s -> new SimilarKnowledge(
+                String.valueOf(s.getId()),  // String ID로 변환
+                s.getContent(),
+                1.0 - s.getDistance()  // 거리를 유사도로 변환 (1 - distance)
+            ))
+            .collect(Collectors.toList());
+
+        return new KnowledgeEvaluationRequest(evalCandidate, similarList);
+    }
+
+    /**
+     * 리스트를 배치 크기로 분할
+     */
+    private <T> List<List<T>> partitionList(List<T> list, int batchSize) {
+        List<List<T>> partitions = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += batchSize) {
+            partitions.add(list.subList(i, Math.min(i + batchSize, list.size())));
+        }
+        return partitions;
+    }
+}
