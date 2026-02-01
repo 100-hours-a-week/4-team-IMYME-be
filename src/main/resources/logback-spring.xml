@@ -2,8 +2,8 @@
 <configuration>
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
 
-    <!-- ==================== LOCAL 환경: 텍스트 로그 ==================== -->
-    <springProfile name="local,default">
+    <!-- ==================== LOCAL/DEV 환경: 텍스트 로그! ==================== -->
+    <springProfile name="local,default,dev">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
                 <pattern>${LOG_PATTERN}</pattern>
@@ -20,8 +20,8 @@
         <logger name="org.hibernate.SQL" level="DEBUG"/>
     </springProfile>
 
-    <!-- ==================== DEV/PROD 환경: JSON 로그 (Loki용) ==================== -->
-    <springProfile name="dev,prod">
+    <!-- ==================== PROD 환경: JSON 로그 (Loki용) ==================== -->
+    <springProfile name="prod">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdcKeyName>clientIp</includeMdcKeyName>
