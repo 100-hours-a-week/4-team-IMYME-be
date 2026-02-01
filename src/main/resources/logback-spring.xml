@@ -2,7 +2,7 @@
 <configuration>
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
 
-    <!-- ==================== LOCAL/DEV 환경: 텍스트 로그 ==================== -->
+    <!-- ==================== LOCAL/DEV 환경: 텍스트 로그! ==================== -->
     <springProfile name="local,default,dev">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
