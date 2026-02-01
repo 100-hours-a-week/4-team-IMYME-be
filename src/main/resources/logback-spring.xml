@@ -34,7 +34,7 @@
                 <!-- 스택트레이스 포함 -->
                 <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
                     <maxDepthPerThrowable>30</maxDepthPerThrowable>
-                    <maxLength>4096</maxLength>
+                    <maxLength>8192</maxLength>
                     <shortenedClassNameLength>30</shortenedClassNameLength>
                     <exclude>^sun\.reflect\..*\.invoke</exclude>
                     <exclude>^net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
@@ -57,8 +57,31 @@
             <appender-ref ref="JSON_CONSOLE"/>
         </root>
 
+        <!-- 애플리케이션 로그 -->
         <logger name="com.imyme.mine" level="INFO"/>
-        <logger name="org.springframework.security" level="WARN"/>
+        
+        <!-- Hibernate/JPA 로그 숨기기 -->
         <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.type" level="WARN"/>
+        <logger name="org.hibernate.orm" level="WARN"/>
+        <logger name="org.hibernate.jpa" level="WARN"/>
+        <logger name="org.hibernate.engine" level="WARN"/>
+        <logger name="org.hibernate.cache" level="WARN"/>
+        
+        <!-- Spring 프레임워크 로그 줄이기 -->
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="org.springframework.data" level="WARN"/>
+        <logger name="org.springframework.boot" level="WARN"/>
+        <logger name="org.springframework.orm" level="WARN"/>
+        
+        <!-- Database 관련 -->
+        <logger name="com.zaxxer.hikari" level="WARN"/>
+        <logger name="org.flywaydb" level="WARN"/>
+        
+        <!-- 서버 관련 -->
+        <logger name="org.apache.catalina" level="WARN"/>
+        <logger name="org.apache.coyote" level="WARN"/>
     </springProfile>
 </configuration>
