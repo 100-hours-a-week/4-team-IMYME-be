@@ -30,7 +30,7 @@
                 <includeMdcKeyName>status</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
                 <includeMdcKeyName>requestId</includeMdcKeyName>
-                
+
                 <!-- 스택트레이스 포함 -->
                 <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
                     <maxDepthPerThrowable>30</maxDepthPerThrowable>
@@ -39,7 +39,7 @@
                     <exclude>^sun\.reflect\..*\.invoke</exclude>
                     <exclude>^net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
                 </throwableConverter>
-                
+
                 <timeZone>Asia/Seoul</timeZone>
                 <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</timestampPattern>
                 <fieldNames>
@@ -59,15 +59,15 @@
 
         <!-- 애플리케이션 로그 -->
         <logger name="com.imyme.mine" level="INFO"/>
-        
-        <!-- Hibernate/JPA 로그 숨기기 -->
-        <logger name="org.hibernate.SQL" level="WARN"/>
-        <logger name="org.hibernate.type" level="WARN"/>
+
+        <!-- Hibernate/JPA 로그 완전히 끄기 -->
+        <logger name="org.hibernate.SQL" level="OFF"/>
+        <logger name="org.hibernate.type" level="OFF"/>
         <logger name="org.hibernate.orm" level="WARN"/>
         <logger name="org.hibernate.jpa" level="WARN"/>
         <logger name="org.hibernate.engine" level="WARN"/>
         <logger name="org.hibernate.cache" level="WARN"/>
-        
+
         <!-- Spring 프레임워크 로그 줄이기 -->
         <logger name="org.springframework" level="WARN"/>
         <logger name="org.springframework.web" level="WARN"/>
@@ -75,11 +75,11 @@
         <logger name="org.springframework.data" level="WARN"/>
         <logger name="org.springframework.boot" level="WARN"/>
         <logger name="org.springframework.orm" level="WARN"/>
-        
+
         <!-- Database 관련 -->
         <logger name="com.zaxxer.hikari" level="WARN"/>
         <logger name="org.flywaydb" level="WARN"/>
-        
+
         <!-- 서버 관련 -->
         <logger name="org.apache.catalina" level="WARN"/>
         <logger name="org.apache.coyote" level="WARN"/>
