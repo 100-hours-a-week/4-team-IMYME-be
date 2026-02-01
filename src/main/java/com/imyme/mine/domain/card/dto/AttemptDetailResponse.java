@@ -18,6 +18,7 @@ public record AttemptDetailResponse(
     Short attemptNo,
     Long cardId,
     String status,
+    AttemptProcessingStep step,
     String audioUrl,
     Integer durationSeconds,
     String sttText,
@@ -56,6 +57,7 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
+            null,
             attempt.getCreatedAt(),
             null,
             null,
@@ -85,6 +87,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             null,
             null,
@@ -110,14 +113,18 @@ public record AttemptDetailResponse(
      * - estimated_completion_at: 예상 완료 시간
      * - retry_after_seconds: 폴링 간격 (3초)
      */
-    public static AttemptDetailResponse fromProcessing(CardAttempt attempt) {
+    public static AttemptDetailResponse fromProcessing(CardAttempt attempt, AttemptProcessingStep step) {
         LocalDateTime estimatedCompletion = attempt.getSubmittedAt().plusMinutes(3);
+        String message = (step == AttemptProcessingStep.AUDIO_ANALYSIS)
+            ? "AI 음성 분석 중입니다."
+            : "AI 피드백 분석 중입니다.";
 
         return new AttemptDetailResponse(
             attempt.getId(),
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            step,
             attempt.getAudioUrl(),
             null,
             null,
@@ -133,7 +140,7 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
-            "AI 피드백 분석 중입니다."
+            message
         );
     }
 
@@ -149,6 +156,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             attempt.getDurationSeconds(),
             attempt.getSttText(),
@@ -180,6 +188,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             null,
             null,
@@ -193,7 +202,7 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
-            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "알 수 없는 오류가 발생했습니다.",
+            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "UNKNOWN_ERROR",
             true,
             "오류가 발생했습니다. 다시 시도해주세요."
         );
@@ -213,6 +222,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             null,
             null,
             null,
