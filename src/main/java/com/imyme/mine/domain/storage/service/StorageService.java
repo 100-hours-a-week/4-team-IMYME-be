@@ -1,10 +1,8 @@
 package com.imyme.mine.domain.storage.service;
 
 import com.imyme.mine.domain.card.entity.AttemptStatus;
-import com.imyme.mine.domain.card.entity.Card;
 import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
-import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.domain.storage.dto.PresignedUrlRequest;
 import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
 import com.imyme.mine.global.config.S3Properties;
@@ -29,53 +27,46 @@ public class StorageService {
 
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
-    private final CardRepository cardRepository;
     private final CardAttemptRepository cardAttemptRepository;
 
-    private static final int MAX_ATTEMPTS_PER_CARD = 5;
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
+    private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
 
     @Transactional
     public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
-        log.debug("Presigned URL 생성 시작 - userId: {}, cardId: {}", userId, request.cardId());
+        log.debug("Presigned URL 생성 시작 - userId: {}, attemptId: {}", userId, request.attemptId());
 
-        Card card = cardRepository.findByIdAndUserId(request.cardId(), userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+        CardAttempt attempt = cardAttemptRepository.findById(request.attemptId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
 
-        long attemptCount = cardAttemptRepository.countByCardId(card.getId());
-        if (attemptCount >= MAX_ATTEMPTS_PER_CARD) {
-            throw new BusinessException(ErrorCode.MAX_ATTEMPTS_EXCEEDED);
+        if (!attempt.getCard().getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
-        Short nextAttemptNo = calculateNextAttemptNo(card.getId());
+        if (attempt.getStatus() != AttemptStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS);
+        }
 
-        CardAttempt attempt = CardAttempt.builder()
-            .card(card)
-            .attemptNo(nextAttemptNo)
-            .status(AttemptStatus.PENDING)
-            .build();
+        LocalDateTime expiresAt = attempt.getCreatedAt().plus(UPLOAD_EXPIRATION);
+        if (LocalDateTime.now().isAfter(expiresAt)) {
+            throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
+        }
 
-        CardAttempt savedAttempt = cardAttemptRepository.save(attempt);
-
-        String objectKey = generateObjectKey(userId, card.getId(), savedAttempt.getId(), request.fileExtension());
+        Long cardId = attempt.getCard().getId();
+        String objectKey = generateObjectKey(userId, cardId, attempt.getId(), request.fileExtension());
 
         PresignedPutObjectRequest presignedRequest = generatePresignedPutRequest(objectKey, request.fileExtension());
 
-        LocalDateTime expiresAt = LocalDateTime.now().plus(PRESIGNED_URL_EXPIRATION);
+        LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(PRESIGNED_URL_EXPIRATION);
 
-        log.info("Presigned URL 생성 완료 - attemptId: {}, objectKey: {}", savedAttempt.getId(), objectKey);
+        log.info("Presigned URL 생성 완료 - attemptId: {}, objectKey: {}", attempt.getId(), objectKey);
 
         return PresignedUrlResponse.of(
-            savedAttempt.getId(),
+            attempt.getId(),
             presignedRequest.url().toString(),
             objectKey,
-            expiresAt
+            presignedExpiresAt
         );
-    }
-
-    private Short calculateNextAttemptNo(Long cardId) {
-        Short maxAttemptNo = cardAttemptRepository.findMaxAttemptNoByCardId(cardId);
-        return (maxAttemptNo == null) ? 1 : (short) (maxAttemptNo + 1);
     }
 
     private String generateObjectKey(Long userId, Long cardId, Long attemptId, String fileExtension) {
