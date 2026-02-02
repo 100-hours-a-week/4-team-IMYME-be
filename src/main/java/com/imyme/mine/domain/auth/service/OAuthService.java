@@ -77,14 +77,26 @@ public class OAuthService {
 
         String hashedRefreshToken = TokenHasher.hash(refreshToken);
 
-        UserSession userSession = UserSession.builder()
+        // 기존 세션 재사용 (같은 User + Device 조합이면 UPDATE)
+        UserSession userSession = userSessionRepository
+            .findByUserIdAndDeviceUuid(user.getId(), deviceUuid)
+            .orElse(null);
+
+        if (userSession != null) {
+            // 기존 세션이 있으면 Refresh Token만 갱신 (UPDATE)
+            log.info("기존 세션 재사용 - sessionId: {}", userSession.getId());
+            userSession.rotateRefreshToken(hashedRefreshToken, expiresAt);
+        } else {
+            // 기존 세션이 없으면 새로 생성 (INSERT)
+            log.info("새 세션 생성 - userId: {}, deviceUuid: {}", user.getId(), deviceUuid);
+            userSession = UserSession.builder()
                 .user(user)
                 .device(device)
                 .refreshToken(hashedRefreshToken)  // 해싱된 값 저장
                 .expiresAt(expiresAt)
                 .build();
-
-        userSessionRepository.save(userSession);
+            userSessionRepository.save(userSession);
+        }
 
         return OAuthLoginResponse.builder()
             .accessToken(accessToken)
