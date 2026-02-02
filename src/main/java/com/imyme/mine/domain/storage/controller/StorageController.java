@@ -29,7 +29,7 @@ public class StorageController {
 
     @Operation(
         summary = "학습 오디오 Presigned URL 발급",
-        description = "학습 오디오를 S3에 직접 업로드하기 위한 서명된 URL을 발급합니다. URL 유효기간은 5분입니다.",
+        description = "학습 오디오를 S3에 직접 업로드하기 위한 서명된 URL을 발급합니다. 시도 ID를 입력받아 해당 시도에 업로드합니다.",
         security = @SecurityRequirement(name = "JWT")
     )
     @ApiResponses({
@@ -43,13 +43,23 @@ public class StorageController {
             content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403",
+            description = "접근 권한 없음 - FORBIDDEN",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "401",
             description = "인증 실패 - UNAUTHORIZED, TOKEN_EXPIRED",
             content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "404",
-            description = "카드를 찾을 수 없음 - CARD_NOT_FOUND",
+            description = "시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "410",
+            description = "업로드 제한 시간 초과 - UPLOAD_EXPIRED",
             content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
         )
     })
@@ -60,7 +70,7 @@ public class StorageController {
         @Valid @RequestBody PresignedUrlRequest request
     ) {
         Long userId = userPrincipal.getId();
-        log.info("POST /learning/presigned-url - userId: {}, cardId: {}", userId, request.cardId());
+        log.info("POST /learning/presigned-url - userId: {}, attemptId: {}", userId, request.attemptId());
 
         PresignedUrlResponse response = storageService.generatePresignedUrl(userId, request);
 

@@ -14,6 +14,13 @@ spring:
                 format_sql: true
                 dialect: org.hibernate.dialect.H2Dialect
 
+    # Flyway 비활성화 (테스트 환경에서는 JPA DDL auto 사용)
+    # - 이유: H2는 PostgreSQL의 CREATE EXTENSION, VECTOR 타입 미지원
+    # - JPA가 Entity 기반으로 테이블 자동 생성 (create-drop)
+    # - 프로덕션: Flyway로 스키마 관리 / 테스트: JPA DDL로 스키마 생성
+    flyway:
+        enabled: false
+
 # --------------------------------------------------------
 # JWT 설정 (Base64 인코딩된 긴 문자열 권장)
 # --------------------------------------------------------

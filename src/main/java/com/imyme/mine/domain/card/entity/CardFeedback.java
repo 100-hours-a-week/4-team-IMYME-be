@@ -36,4 +36,7 @@ public class CardFeedback {
     @Column(name = "feedback_json", nullable = false, columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private String feedbackJson;
+
+    @Column(name = "model_version", nullable = false, length = 20)
+    private String modelVersion;
 }

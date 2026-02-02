@@ -13,7 +13,12 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
     name = "forbidden_words",
-    indexes = @Index(name = "idx_forbidden_type", columnList = "type")
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_forbidden_word",
+            columnNames = {"word"}
+        )
+    }
 )
 @Getter
 @Builder

@@ -6,16 +6,20 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+@Entity
+@Table(
+    name = "keywords",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_keywords_category_name",
+            columnNames = {"category_id", "name"}
+        )
+    }
+)
 @Getter
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
-@Entity
-@Table(name = "keywords",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_keywords_category_name",
-        columnNames = {"category_id", "name"}
-    ))
 public class Keyword {
 
     @Id

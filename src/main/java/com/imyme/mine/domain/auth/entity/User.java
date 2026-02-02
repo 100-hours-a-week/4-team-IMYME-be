@@ -16,13 +16,10 @@ import java.time.LocalDateTime;
 @Table(
     name = "users",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_users_oauth_id_provider", columnNames = {"oauth_id", "oauth_provider"}),
-        // 닉네임 유니크 제약조건(@UniqueConstraint) 삭제 후 DB에 직접 Partial Index 생성 완료
-        // @UniqueConstraint(name = "uk_users_nickname", columnNames = {"nickname"})
-    },
-    indexes = {
-        // JPA로는 Partial Index 생성이 불가능하여 주석 처리함. DB에서 직접 생성 필요.
-        // @Index(name = "idx_users_email", columnList = "email")
+        @UniqueConstraint(
+            name = "uk_users_oauth_id_provider",
+            columnNames = {"oauth_id", "oauth_provider"}
+        )
     }
 )
 @Getter

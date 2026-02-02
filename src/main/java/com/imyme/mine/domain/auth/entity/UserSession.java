@@ -17,12 +17,10 @@ import java.time.LocalDateTime;
 @Table(
     name = "user_sessions",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_sessions_refresh_token", columnNames = {"refresh_token"})
-    },
-    indexes = {
-        @Index(name = "idx_sessions_user", columnList = "user_id, last_used_at DESC"),
-        @Index(name = "idx_sessions_device", columnList = "device_id"),
-        @Index(name = "idx_sessions_expires", columnList = "expires_at")
+        @UniqueConstraint(
+            name = "uk_sessions_refresh_token",
+            columnNames = {"refresh_token"}
+        )
     }
 )
 @Getter

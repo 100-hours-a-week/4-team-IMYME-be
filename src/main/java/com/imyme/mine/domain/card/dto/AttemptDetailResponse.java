@@ -18,6 +18,7 @@ public record AttemptDetailResponse(
     Short attemptNo,
     Long cardId,
     String status,
+    AttemptProcessingStep step,
     String audioUrl,
     Integer durationSeconds,
     String sttText,
@@ -35,6 +36,8 @@ public record AttemptDetailResponse(
     Boolean retryAvailable,
     String message
 ) {
+    // 업로드 제한 시간 (10분)
+    private static final long UPLOAD_LIMIT_MINUTES = 10;
 
     /**
      * PENDING 상태 응답
@@ -50,6 +53,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             null,
             null,
             null,
@@ -83,6 +87,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             null,
             null,
@@ -108,14 +113,18 @@ public record AttemptDetailResponse(
      * - estimated_completion_at: 예상 완료 시간
      * - retry_after_seconds: 폴링 간격 (3초)
      */
-    public static AttemptDetailResponse fromProcessing(CardAttempt attempt) {
+    public static AttemptDetailResponse fromProcessing(CardAttempt attempt, AttemptProcessingStep step) {
         LocalDateTime estimatedCompletion = attempt.getSubmittedAt().plusMinutes(3);
+        String message = (step == AttemptProcessingStep.AUDIO_ANALYSIS)
+            ? "AI 음성 분석 중입니다."
+            : "AI 피드백 분석 중입니다.";
 
         return new AttemptDetailResponse(
             attempt.getId(),
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            step,
             attempt.getAudioUrl(),
             null,
             null,
@@ -131,7 +140,7 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
-            "AI 피드백 분석 중입니다."
+            message
         );
     }
 
@@ -147,10 +156,11 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             attempt.getDurationSeconds(),
             attempt.getSttText(),
-            FeedbackDto.from(feedback),
+            feedback != null ? FeedbackDto.from(feedback) : null,
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
             attempt.getFinishedAt(),
@@ -178,6 +188,7 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
+            null,
             attempt.getAudioUrl(),
             null,
             null,
@@ -185,15 +196,15 @@ public record AttemptDetailResponse(
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
             null,
-            attempt.getFinishedAt(),
+            attempt.getFinishedAt(), // 실패 시각
             null,
             null,
             null,
             null,
             null,
-            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "STT 변환에 실패했습니다. 다시 시도해주세요.",
+            attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "UNKNOWN_ERROR",
             true,
-            null
+            "오류가 발생했습니다. 다시 시도해주세요."
         );
     }
 
@@ -204,6 +215,8 @@ public record AttemptDetailResponse(
      * - retry_available: 재시도 불가 (처음부터 다시)
      */
     public static AttemptDetailResponse fromExpired(CardAttempt attempt) {
+        LocalDateTime calculatedExpiredAt = attempt.getCreatedAt().plusMinutes(UPLOAD_LIMIT_MINUTES);
+
         return new AttemptDetailResponse(
             attempt.getId(),
             attempt.getAttemptNo(),
@@ -213,12 +226,13 @@ public record AttemptDetailResponse(
             null,
             null,
             null,
+            null,
             attempt.getCreatedAt(),
             null,
             null,
             null,
             null,
-            attempt.getExpiredAt(),
+            calculatedExpiredAt, // 계산된 만료 시간 반환
             null,
             null,
             null,
