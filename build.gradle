@@ -68,6 +68,10 @@ dependencies {
 
     // JSON 로깅 (Loki 연동)
     implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+
+    // Prometheus 메트릭 수집
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 }
 
 tasks.named('test') {
