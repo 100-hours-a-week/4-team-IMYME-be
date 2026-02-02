@@ -223,7 +223,7 @@ jobs:
 
           # nohup 실행 (spring.config.location 제거)
           nohup java -jar "$CURRENT_LINK/backend.jar" \
-                --spring.profiles.active=dev \
+                --spring.profiles.active=prod \
                 >> "$LOG_FILE" 2>&1 </dev/null &
 
 
