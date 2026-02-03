@@ -1,7 +1,6 @@
 package com.imyme.mine.domain.auth.entity;
 
 import jakarta.persistence.*;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.*;
 import org.hibernate.annotations.*;
@@ -43,7 +42,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     private OAuthProviderType oauthProvider;
 
-    // 이메일 (선택)
+    // 이메일
     @Column(name = "email", length = 255)
     private String email;
 
@@ -99,17 +98,20 @@ public class User {
     // 마지막 로그인 일시
     @Column(name = "last_login_at", nullable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private LocalDateTime lastLoginAt;
+    @Builder.Default
+    private LocalDateTime lastLoginAt = LocalDateTime.now();
 
     // 가입 일시
     @Column(name = "created_at", nullable = false, updatable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private LocalDateTime createdAt;
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     // 수정 일시
     @Column(name = "updated_at", nullable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private LocalDateTime updatedAt;
+    @Builder.Default
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     // 탈퇴 일시 (Soft Delete)
     @Column(name = "deleted_at")
@@ -121,9 +123,7 @@ public class User {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (this.lastLoginAt == null) {
-            this.lastLoginAt = now;
-        }
+        this.lastLoginAt = now;
     }
 
     // 수정 시점에 자동으로 updated_at 갱신
@@ -132,28 +132,30 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
+    private static final int LEVEL_INCREMENT_UNIT = 5; // 레벨당 증가하는 카드 요구량
+    private static final int INITIAL_THRESHOLD = 5;    // 1레벨 -> 2레벨 구간 기본 요구량
+    private static final int MAX_PROGRESS_PERCENT = 100;
+
     // 로그인 시 마지막 접속일 갱신 및 연속 접속일 계산
     public void updateLastLogin() {
         LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
+        LocalDate lastLoginDate = this.lastLoginAt.toLocalDate();
 
-        if (this.lastLoginAt != null) {
-            LocalDate lastDate = this.lastLoginAt.toLocalDate();
-            LocalDate today = now.toLocalDate();
+        // 이미 오늘 로그인 기록이 있다면 로직 종료 (업데이트 불필요)
+        if (today.isEqual(lastLoginDate)) {
+            return;
+        }
 
-            // 마지막 로그인이 어제라면 -> 연속 접속 +1
-            if (lastDate.equals(today.minusDays(1))) {
-                this.consecutiveDays++;
-            }
-            // 마지막 로그인이 어제보다 더 과거라면 (오늘도 아니고 어제도 아님) -> 1로 초기화
-            else if (lastDate.isBefore(today.minusDays(1))) {
-                this.consecutiveDays = 1;
-            }
-            // 오늘 이미 로그인했다면(lastDate equals today) -> 변경 없음
+        // 마지막 로그인이 '어제'라면 연속 접속일 증가
+        if (lastLoginDate.isEqual(today.minusDays(1))) {
+            this.consecutiveDays++;
         } else {
-            // 최초 로그인 시
+            // 이틀 이상 지난 경우, 연속 접속 초기화
             this.consecutiveDays = 1;
         }
 
+        // 마지막 로그인 시간 갱신
         this.lastLoginAt = now;
     }
 
@@ -209,11 +211,11 @@ public class User {
         if (targetLevel <= 0) return 0;
 
         int threshold = 0;
-        int increment = 5;
+        int increment = INITIAL_THRESHOLD;
 
         for (int i = 1; i <= targetLevel; i++) {
             threshold += increment;
-            increment += 5;
+            increment += LEVEL_INCREMENT_UNIT;
         }
         return threshold;
     }

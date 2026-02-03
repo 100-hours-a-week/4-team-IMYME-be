@@ -30,10 +30,12 @@ public class LogoutService {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
         }
 
+        // UserSession만 삭제 (Refresh Token 무효화)
         userSessionRepository.deleteByUserIdAndDeviceUuid(userId, deviceUuid);
 
-        deviceRepository.softDeleteByUserIdAndDeviceUuid(userId, deviceUuid);
+        // Device는 삭제하지 않음 (재로그인 시 재사용)
+        // deviceRepository.softDeleteByUserIdAndDeviceUuid(userId, deviceUuid);
 
-        log.info("로그아웃 완료");
+        log.info("로그아웃 완료 - UserSession 삭제, Device 유지");
     }
 }
