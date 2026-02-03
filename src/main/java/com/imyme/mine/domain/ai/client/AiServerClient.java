@@ -59,10 +59,9 @@ public class AiServerClient {
         try {
             // AI 서버 호출
             ResponseEntity<TranscriptionResponse> response = restTemplate.postForEntity(
-                url,
-                entity,
-                TranscriptionResponse.class
-            );
+                    url,
+                    entity,
+                    TranscriptionResponse.class);
 
             // 응답 검증
             TranscriptionResponse body = response.getBody();
@@ -140,11 +139,13 @@ public class AiServerClient {
      * POST /api/v1/knowledge/candidates/batch
      *
      * <h3>사용 시나리오</h3>
-     * <p>AI 피드백 텍스트를 정제하고 벡터 임베딩을 생성합니다.</p>
+     * <p>
+     * AI 피드백 텍스트를 정제하고 벡터 임베딩을 생성합니다.
+     * </p>
      * <ul>
-     *   <li>피드백 텍스트 정제 (불필요한 내용 제거)</li>
-     *   <li>OpenAI 임베딩 생성 (1024차원)</li>
-     *   <li>배치 처리로 효율성 향상 (최대 100개)</li>
+     * <li>피드백 텍스트 정제 (불필요한 내용 제거)</li>
+     * <li>OpenAI 임베딩 생성 (1024차원)</li>
+     * <li>배치 처리로 효율성 향상 (최대 100개)</li>
      * </ul>
      *
      * @param request 피드백 배치 요청 (items 배열)
@@ -168,8 +169,7 @@ public class AiServerClient {
             ResponseEntity<KnowledgeCandidateBatchResponse> response = restTemplate.postForEntity(
                     url,
                     entity,
-                    KnowledgeCandidateBatchResponse.class
-            );
+                    KnowledgeCandidateBatchResponse.class);
 
             // 응답 검증
             KnowledgeCandidateBatchResponse body = response.getBody();
@@ -216,10 +216,12 @@ public class AiServerClient {
      * POST /api/v1/knowledge/evaluations
      *
      * <h3>사용 시나리오</h3>
-     * <p>새로운 지식 후보와 기존 유사 지식을 LLM이 비교하여 업데이트 여부를 결정합니다.</p>
+     * <p>
+     * 새로운 지식 후보와 기존 유사 지식을 LLM이 비교하여 업데이트 여부를 결정합니다.
+     * </p>
      * <ul>
-     *   <li>UPDATE: 기존 지식을 개선 (finalContent, finalVector 반환)</li>
-     *   <li>IGNORE: 중복이므로 무시</li>
+     * <li>UPDATE: 기존 지식을 개선 (finalContent, finalVector 반환)</li>
+     * <li>IGNORE: 중복이므로 무시</li>
      * </ul>
      *
      * @param request 지식 평가 요청 (candidate + similars)
@@ -231,8 +233,8 @@ public class AiServerClient {
 
         String url = properties.getBaseUrl() + "/api/v1/knowledge/evaluations";
 
-        log.debug("Knowledge Evaluation API 호출 시작 - url: {}, candidateSourceId: {}, similarsCount: {}",
-                url, request.candidate().sourceId(), request.similars().size());
+        log.debug("Knowledge Evaluation API 호출 시작 - url: {}, similarsCount: {}",
+                url, request.similars().size());
 
         // 헤더 설정
         HttpHeaders headers = createHeaders();
@@ -243,8 +245,7 @@ public class AiServerClient {
             ResponseEntity<KnowledgeEvaluationResponse> response = restTemplate.postForEntity(
                     url,
                     entity,
-                    KnowledgeEvaluationResponse.class
-            );
+                    KnowledgeEvaluationResponse.class);
 
             // 응답 검증
             KnowledgeEvaluationResponse body = response.getBody();
@@ -258,8 +259,8 @@ public class AiServerClient {
                 handleKnowledgeApiError(body.error());
             }
 
-            log.info("Knowledge Evaluation API 호출 성공 - decision: {}, reasoning: {}",
-                    body.data().decision(), body.data().reasoning());
+            log.info("Knowledge Evaluation API 호출 성공 - resultsCount: {}",
+                    body.data().results().size());
 
             return body.data();
 
@@ -306,11 +307,11 @@ public class AiServerClient {
         try {
             // AI 서버 호출
             ResponseEntity<AiSoloResponse<SoloSubmissionData>> response = restTemplate.exchange(
-                url,
-                HttpMethod.POST,
-                entity,
-                new ParameterizedTypeReference<AiSoloResponse<SoloSubmissionData>>() {}
-            );
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    new ParameterizedTypeReference<AiSoloResponse<SoloSubmissionData>>() {
+                    });
 
             // 응답 검증
             AiSoloResponse<SoloSubmissionData> body = response.getBody();
@@ -330,12 +331,12 @@ public class AiServerClient {
 
         } catch (HttpClientErrorException e) {
             log.error("Solo 분석 요청 클라이언트 오류 - status: {}, body: {}",
-                e.getStatusCode(), e.getResponseBodyAsString());
+                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
 
         } catch (HttpServerErrorException e) {
             log.error("Solo 분석 요청 서버 오류 - status: {}, body: {}",
-                e.getStatusCode(), e.getResponseBodyAsString());
+                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
 
         } catch (ResourceAccessException e) {
@@ -371,11 +372,11 @@ public class AiServerClient {
         try {
             // AI 서버 호출
             ResponseEntity<AiSoloResponse<SoloResultData>> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                new ParameterizedTypeReference<AiSoloResponse<SoloResultData>>() {}
-            );
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    new ParameterizedTypeReference<AiSoloResponse<SoloResultData>>() {
+                    });
 
             // 응답 검증
             AiSoloResponse<SoloResultData> body = response.getBody();
@@ -390,12 +391,12 @@ public class AiServerClient {
 
         } catch (HttpClientErrorException e) {
             log.error("Solo 분석 결과 조회 클라이언트 오류 - status: {}, body: {}",
-                e.getStatusCode(), e.getResponseBodyAsString());
+                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
 
         } catch (HttpServerErrorException e) {
             log.error("Solo 분석 결과 조회 서버 오류 - status: {}, body: {}",
-                e.getStatusCode(), e.getResponseBodyAsString());
+                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
 
         } catch (ResourceAccessException e) {

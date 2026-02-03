@@ -206,6 +206,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
       SELECT
           kb.id AS id,
           kb.keyword_id AS keywordId,
+          k.name AS keywordName,  -- NEW: Keyword Name 추가
           kb.content AS content,
           kb.embedding AS embedding,
           kb.content_hash AS contentHash,
@@ -214,6 +215,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
           kb.updated_at AS updatedAt,
           COALESCE(sr.similarity, 0.0) AS distance
       FROM knowledge_base kb
+      JOIN keywords k ON kb.keyword_id = k.id  -- NEW: Join keywords table
       LEFT JOIN keyword_ranked kr ON kb.id = kr.id
       LEFT JOIN semantic_ranked sr ON kb.id = sr.id
       WHERE (kr.id IS NOT NULL OR sr.id IS NOT NULL)
