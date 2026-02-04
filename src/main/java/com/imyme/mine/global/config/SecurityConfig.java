@@ -31,6 +31,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+    private final CorsProperties corsProperties;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -77,17 +78,13 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🔥 CORS 설정을 여기서 직접 정의 (가장 안전함)
+    // 🔥 CORS 설정 - .env 파일의 CORS_ALLOWED_ORIGINS 환경변수로 관리
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 1. 허용할 출처 (명시적으로 지정)
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",  // 프론트엔드 로컬
-                "http://localhost:8080",  // 백엔드 로컬 (Swagger 등)
-                "https://imymemine.kr"   // 운영 서버
-        ));
+        // 1. 허용할 출처
+        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
 
         // 2. 허용할 메소드
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
