@@ -9,8 +9,8 @@ import jakarta.validation.constraints.Positive;
  */
 public record UploadCompleteRequest(
 
-    @NotBlank(message = "오디오 URL은 필수입니다.")
-    String audioUrl,
+    @NotBlank(message = "오디오 Object Key는 필수입니다.")
+    String objectKey,
 
     @Positive(message = "재생 시간은 양수여야 합니다.")
     Integer durationSeconds

@@ -25,13 +25,13 @@ public record OAuthLoginResponse(
         Integer winCount,
         Boolean isNewUser
     ) {
-        public static UserInfo from(User user, boolean isNewUser) {
+        public static UserInfo from(User user, boolean isNewUser, String profileImageUrl) {
             return UserInfo.builder()
                 .id(user.getId())
                 .oauthId(user.getOauthId())
                 .oauthProvider(user.getOauthProvider())
                 .nickname(user.getNickname())
-                .profileImageUrl(user.getProfileImageUrl())
+                .profileImageUrl(profileImageUrl)
                 .level(user.getLevel())
                 .totalCardCount(user.getTotalCardCount())
                 .activeCardCount(user.getActiveCardCount())
