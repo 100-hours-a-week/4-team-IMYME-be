@@ -122,20 +122,19 @@ public class AttemptService {
             throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
         }
 
-        if (!request.objectKey().equals(attempt.getAudioKey())) {
-            throw new BusinessException(ErrorCode.INVALID_OBJECT_KEY);
-        }
-
-        attempt.markUploaded(request.durationSeconds());
+        attempt.markUploaded(request.audioUrl(), request.durationSeconds());
         attempt.startProcessing();
 
         // STT (Speech-to-Text) 처리 - 동기 호출
         try {
-            log.debug("STT 처리 시작 - attemptId: {}, objectKey: {}", attemptId, request.objectKey());
+            log.debug("STT 처리 시작 - attemptId: {}, audioUrl: {}", attemptId, request.audioUrl());
+
+            // S3 객체 URL에서 objectKey 추출
+            String objectKey = extractObjectKeyFromUrl(request.audioUrl());
 
             // 읽기용 Presigned URL 생성 (AI 서버가 S3에서 다운로드 가능)
-            String readPresignedUrl = generateReadPresignedUrl(request.objectKey());
-            log.debug("읽기용 Presigned URL 생성 완료 - objectKey: {}", request.objectKey());
+            String readPresignedUrl = generateReadPresignedUrl(objectKey);
+            log.debug("읽기용 Presigned URL 생성 완료 - objectKey: {}", objectKey);
 
             // AI 서버에 읽기용 URL 전달
             String sttText = aiServerClient.transcribe(readPresignedUrl);
@@ -231,6 +230,32 @@ public class AttemptService {
             case FAILED -> AttemptDetailResponse.fromFailed(attempt);
             case EXPIRED -> AttemptDetailResponse.fromExpired(attempt);
         };
+    }
+
+    /**
+     * S3 URL에서 objectKey 추출
+     * 예: https://bucket.s3.region.amazonaws.com/audios/6/17/file.wav -> audios/6/17/file.wav
+     */
+    private String extractObjectKeyFromUrl(String s3Url) {
+        try {
+            // S3 URL 형식: https://{bucket}.s3.{region}.amazonaws.com/{objectKey}
+            String bucketPrefix = s3Properties.getBucket() + ".s3.";
+            int keyStartIndex = s3Url.indexOf(bucketPrefix);
+            if (keyStartIndex == -1) {
+                throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);
+            }
+
+            // .amazonaws.com/ 이후부터가 objectKey
+            int objectKeyStart = s3Url.indexOf(".amazonaws.com/");
+            if (objectKeyStart == -1) {
+                throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);
+            }
+
+            return s3Url.substring(objectKeyStart + ".amazonaws.com/".length());
+        } catch (Exception e) {
+            log.error("S3 URL에서 objectKey 추출 실패 - url: {}", s3Url, e);
+            throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);
+        }
     }
 
     /**

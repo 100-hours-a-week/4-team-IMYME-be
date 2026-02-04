@@ -7,7 +7,6 @@ import com.imyme.mine.domain.auth.entity.*;
 import com.imyme.mine.domain.auth.repository.DeviceRepository;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.auth.repository.UserSessionRepository;
-import com.imyme.mine.domain.user.service.ProfileImageService;
 import com.imyme.mine.global.config.JwtProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -37,7 +36,6 @@ public class OAuthService {
     private final DeviceRepository deviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
-    private final ProfileImageService profileImageService;
 
     // 카카오 로그인 메인 로직
     public OAuthLoginResponse loginWithKakao(OAuthLoginRequest request) {
@@ -120,13 +118,11 @@ public class OAuthService {
             // Transactional이 걸려있으므로 Dirty Checking으로 자동 저장됨
         }
 
-        String profileImageUrl = profileImageService.resolveProfileImageUrl(user.getProfileImageKey(), user.getProfileImageUrl());
-
         return OAuthLoginResponse.builder()
             .accessToken(accessToken)
             .refreshToken(refreshToken)
             .expiresIn(expiresIn)
-            .user(OAuthLoginResponse.UserInfo.from(user, isNewUser, profileImageUrl))
+            .user(OAuthLoginResponse.UserInfo.from(user, isNewUser))
             .build();
     }
 

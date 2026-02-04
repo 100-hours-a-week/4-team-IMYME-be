@@ -23,7 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SoloFeedbackSaveService {
 
-    private static final String SOLO_MODEL_VERSION = "gemini-3-pro-preview";
+    private static final String SOLO_MODEL_VERSION = "solo-v1";
 
     private final CardAttemptRepository attemptRepository;
     private final CardFeedbackRepository feedbackRepository;

@@ -55,8 +55,6 @@ public class StorageService {
         Long cardId = attempt.getCard().getId();
         String objectKey = generateObjectKey(userId, cardId, attempt.getId(), request.fileExtension());
 
-        attempt.reserveAudioKey(objectKey);
-
         PresignedPutObjectRequest presignedRequest = generatePresignedPutRequest(objectKey, request.fileExtension());
 
         LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(PRESIGNED_URL_EXPIRATION);

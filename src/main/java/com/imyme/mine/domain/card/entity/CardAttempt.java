@@ -44,8 +44,8 @@ public class CardAttempt {
     @Column(name = "attempt_no", nullable = false)
     private Short attemptNo;
 
-    @Column(name = "audio_key", length = 500)
-    private String audioKey;
+    @Column(name = "audio_url", length = 500)
+    private String audioUrl;
 
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
@@ -75,11 +75,8 @@ public class CardAttempt {
         this.createdAt = LocalDateTime.now();
     }
 
-    public void reserveAudioKey(String audioKey) {
-        this.audioKey = audioKey;
-    }
-
-    public void markUploaded(Integer durationSeconds) {
+    public void markUploaded(String audioUrl, Integer durationSeconds) {
+        this.audioUrl = audioUrl;
         this.durationSeconds = durationSeconds;
         this.status = AttemptStatus.UPLOADED;
         this.submittedAt = LocalDateTime.now();
