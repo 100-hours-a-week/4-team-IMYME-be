@@ -86,6 +86,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",  // 프론트엔드 로컬
                 "http://localhost:8080",  // 백엔드 로컬 (Swagger 등)
+                "http://43.200.120.211/",
                 "https://imymemine.kr"   // 운영 서버
         ));
 
