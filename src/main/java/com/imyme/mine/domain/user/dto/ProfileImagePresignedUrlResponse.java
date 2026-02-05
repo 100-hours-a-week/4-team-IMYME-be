@@ -14,9 +14,6 @@ public record ProfileImagePresignedUrlResponse(
     @Schema(description = "S3 업로드용 서명된 URL (PUT 메서드 사용)", example = "https://...")
     String uploadUrl,
 
-    @Schema(description = "업로드 완료 후 사용할 공개 URL (CDN 또는 S3 URL)", example = "https://...")
-    String profileImageUrl,
-
     @Schema(description = "S3 Object Key", example = "profiles/1/550e8400-e29b-41d4-a716-446655440000.jpg")
     String profileImageKey,
 
@@ -30,7 +27,6 @@ public record ProfileImagePresignedUrlResponse(
 
     public static ProfileImagePresignedUrlResponse of(
         String uploadUrl,
-        String profileImageUrl,
         String profileImageKey,
         Integer expiresIn,
         Long maxSizeBytes,
@@ -39,7 +35,6 @@ public record ProfileImagePresignedUrlResponse(
         Constraints constraints = new Constraints(maxSizeBytes, allowedContentTypes);
         return new ProfileImagePresignedUrlResponse(
             uploadUrl,
-            profileImageUrl,
             profileImageKey,
             expiresIn,
             constraints

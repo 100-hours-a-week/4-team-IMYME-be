@@ -24,13 +24,13 @@ public record UserProfileResponse(
     Integer consecutiveDays,
     Integer winCount
 ) {
-    public static UserProfileResponse from(User user) {
+    public static UserProfileResponse from(User user, String profileImageUrl) {
         return new UserProfileResponse(
             user.getId(),
             user.getEmail(),
             user.getOauthProvider() != null ? user.getOauthProvider().name() : null,
             user.getNickname(),
-            user.getProfileImageUrl(),
+            profileImageUrl,
 
             user.getLevel(),
             user.getRemainingCardsForNextLevel(),
