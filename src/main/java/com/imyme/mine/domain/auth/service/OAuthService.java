@@ -38,6 +38,7 @@ public class OAuthService {
     private final JwtProperties jwtProperties;
 
     // 카카오 로그인 메인 로직
+    @Transactional
     public OAuthLoginResponse loginWithKakao(OAuthLoginRequest request) {
         KakaoOAuthClient.KakaoUserInfo userInfo = fetchKakaoUserInfo(request);
         String oauthId = "kakao_" + userInfo.getId();
@@ -53,7 +54,6 @@ public class OAuthService {
     }
 
     // 로그인 처리 (회원가입 포함)
-    @Transactional
     protected OAuthLoginResponse processLogin(String oauthId, String deviceUuid, KakaoOAuthClient.KakaoUserInfo userInfo) {
 
         User user = userRepository.findByOauthId(oauthId)
