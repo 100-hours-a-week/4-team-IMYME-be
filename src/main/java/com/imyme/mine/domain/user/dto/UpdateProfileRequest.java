@@ -13,9 +13,6 @@ public record UpdateProfileRequest(
     @Pattern(regexp = "^[가-힣a-zA-Z0-9]+$", message = "닉네임은 한글, 영문, 숫자만 사용 가능합니다.")
     String nickname,
 
-    @Size(max = 500, message = "프로필 이미지 URL은 500자 이하여야 합니다.")
-    String profileImageUrl,
-
     @Size(max = 200, message = "프로필 이미지 키는 200자 이하여야 합니다.")
     String profileImageKey
 ) {
