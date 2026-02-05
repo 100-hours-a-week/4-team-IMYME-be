@@ -7,6 +7,7 @@ import org.hibernate.annotations.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * 회원 엔티티
@@ -138,25 +139,26 @@ public class User {
 
     // 로그인 시 마지막 접속일 갱신 및 연속 접속일 계산
     public void updateLastLogin() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDate today = now.toLocalDate();
-        LocalDate lastLoginDate = this.lastLoginAt.toLocalDate();
+        LocalDate todayKst = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalDate lastLoginDateKst = this.lastLoginAt
+            .atZone(ZoneId.systemDefault())
+            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
+            .toLocalDate();
 
         // 이미 오늘 로그인 기록이 있다면 로직 종료 (업데이트 불필요)
-        if (today.isEqual(lastLoginDate)) {
-            return;
+        if (todayKst.isEqual(lastLoginDateKst)) {
+            return; // 이미 오늘 출석함
         }
 
         // 마지막 로그인이 '어제'라면 연속 접속일 증가
-        if (lastLoginDate.isEqual(today.minusDays(1))) {
+        if (lastLoginDateKst.isEqual(todayKst.minusDays(1))) {
             this.consecutiveDays++;
         } else {
-            // 이틀 이상 지난 경우, 연속 접속 초기화
             this.consecutiveDays = 1;
         }
 
         // 마지막 로그인 시간 갱신
-        this.lastLoginAt = now;
+        this.lastLoginAt = LocalDateTime.now();
     }
 
     // 닉네임 변경
