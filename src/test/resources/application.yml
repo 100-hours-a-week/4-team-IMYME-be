@@ -1,5 +1,14 @@
 spring:
-    # H2 DB 설정
+    application:
+        name: mine-test
+
+    # JSON 날짜 포맷 설정
+    jackson:
+        serialization:
+            write-dates-as-timestamps: false
+        time-zone: Asia/Seoul
+
+    # H2 DB 설정 (테스트용 인메모리 DB)
     datasource:
         url: jdbc:h2:mem:testdb;MODE=PostgreSQL
         driver-class-name: org.h2.Driver
@@ -9,10 +18,12 @@ spring:
     jpa:
         hibernate:
             ddl-auto: create-drop
+        show-sql: false
         properties:
             hibernate:
                 format_sql: true
                 dialect: org.hibernate.dialect.H2Dialect
+        open-in-view: false
 
     # Flyway 비활성화 (테스트 환경에서는 JPA DDL auto 사용)
     # - 이유: H2는 PostgreSQL의 CREATE EXTENSION, VECTOR 타입 미지원
@@ -21,34 +32,88 @@ spring:
     flyway:
         enabled: false
 
-# --------------------------------------------------------
-# JWT 설정 (Base64 인코딩된 긴 문자열 권장)
-# --------------------------------------------------------
-jwt:
-    # 혹시 모를 에러 방지를 위해 Base64 포맷의 긴 키를 넣어주는 게 안전합니다.
-    secret: dGVzdF9zZWNyZXRfa2V5X2Zvcl90ZXN0aW5nX3B1cnBvc2VzX29ubHlfbXVzdF9iZV9sb25nX2Vub3VnaA==
-    access-token-expiration: 3600000
-    refresh-token-expiration: 604800000
+    # OAuth 설정 (테스트용 가짜값)
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        client-id: test-client-id
+                        client-secret: test-client-secret
+                        redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+                        authorization-grant-type: authorization_code
+                        client-authentication-method: client_secret_post
+                        scope:
+                            - profile_nickname
+                            - profile_image
+                            - account_email
+                provider:
+                    kakao:
+                        authorization-uri: https://kauth.kakao.com/oauth/authorize
+                        token-uri: https://kauth.kakao.com/oauth/token
+                        user-info-uri: https://kapi.kakao.com/v2/user/me
+                        user-name-attribute: id
 
-# 클라우드 설정 가짜값
+# ==================================================
+# AWS S3 설정 (테스트용 가짜값)
+# ==================================================
 cloud:
     aws:
         credentials:
-            access-key: test-key
-            secret-key: test-secret
+            access-key: test-access-key
+            secret-key: test-secret-key
         region:
             static: ap-northeast-2
         s3:
             bucket: test-bucket
 
-# OAuth 설정 가짜값
-security:
-    oauth2:
-        client:
-            registration:
-                kakao:
-                    client-id: test-client-id
-                    client-secret: test-client-secret
-                    redirect-uri: http://localhost:8080/login/oauth2/code/kakao
-                    authorization-grant-type: authorization_code
-                    scope: profile
+# ==================================================
+# AI 서버 설정 (테스트용 가짜값)
+# ==================================================
+ai-server:
+    base-url: http://localhost:9999
+    secret: test-ai-server-secret
+    timeout-seconds: 30
+
+# ==================================================
+# Knowledge 배치 작업 설정 (테스트에서는 비활성화)
+# ==================================================
+knowledge:
+    batch:
+        enabled: false
+        batch-size: 50
+        keyword-delay-ms: 1000
+        batch-delay-ms: 2000
+        enabled-keywords: []
+        max-similar-count: 5
+        similarity-threshold: 0.7
+
+# ==================================================
+# JWT 설정 (테스트용)
+# ==================================================
+jwt:
+    secret: dGVzdF9zZWNyZXRfa2V5X2Zvcl90ZXN0aW5nX3B1cnBvc2VzX29ubHlfbXVzdF9iZV9sb25nX2Vub3VnaF90ZXN0X3NlY3JldF9rZXk=
+    access-token-expiration: 3600000    # 1시간
+    refresh-token-expiration: 604800000 # 7일
+
+# ==================================================
+# CORS 설정 (테스트용)
+# ==================================================
+cors:
+    allowed-origins: http://localhost:3000,http://localhost:8080
+
+# ==================================================
+# Swagger 설정 (테스트용)
+# ==================================================
+swagger:
+    dev-server-url: http://localhost:8080
+
+# ==================================================
+# 로그 설정 (테스트용 - 간소화)
+# ==================================================
+logging:
+    level:
+        com.imyme.mine: INFO
+        org.springframework.security: WARN
+        org.hibernate.SQL: WARN
+        org.springframework.test: INFO

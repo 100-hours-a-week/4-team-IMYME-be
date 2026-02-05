@@ -159,6 +159,9 @@ cors:
 # ==================================================
 # Swagger 설정
 # ==================================================
+swagger:
+    dev-server-url: ${SWAGGER_DEV_SERVER_URL}
+
 springdoc:
     swagger-ui:
         path: /swagger-ui.html
