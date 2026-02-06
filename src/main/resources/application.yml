@@ -97,6 +97,8 @@ ai-server:
     base-url: ${AI_SERVER_URL}
     secret: ${AI_SERVER_SECRET}
     timeout-seconds: 30
+    # 100초(AI서버수명) - 60초(최대녹음) - 5초(여유) = 35초
+    warmup-cooldown-seconds: 35
 
 # ==================================================
 # Knowledge 배치 작업 설정

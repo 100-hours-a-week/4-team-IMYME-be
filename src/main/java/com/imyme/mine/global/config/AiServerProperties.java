@@ -29,4 +29,11 @@ public class AiServerProperties {
      * API 호출 타임아웃 (초 단위)
      */
     private Integer timeoutSeconds;
+
+    /**
+     * Warm-up 쿨다운 시간 (초 단위)
+     * - 이 시간 내에 Warm-up 요청이 들어오면 AI 서버 호출을 생략
+     * - 사용자에게는 항상 성공 응답 반환 (불필요한 AI 서버 부하 방지)
+     */
+    private Integer warmupCooldownSeconds = 30; // 기본값 30초
 }

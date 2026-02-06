@@ -82,6 +82,12 @@ public class AiServerClient {
             return sttText;
 
         } catch (HttpClientErrorException e) {
+            // 429 Rate Limit 에러 처리
+            if (e.getStatusCode() == org.springframework.http.HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("STT API Rate Limit 초과 - status: 429, 잠시 후 다시 시도해주세요");
+                throw new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED);
+            }
+
             // 422 Validation Error
             log.error("STT API 클라이언트 오류 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);

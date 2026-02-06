@@ -74,6 +74,7 @@ ai-server:
     base-url: http://localhost:9999
     secret: test-ai-server-secret
     timeout-seconds: 30
+    warmup-cooldown-seconds: 30
 
 # ==================================================
 # Knowledge 배치 작업 설정 (테스트에서는 비활성화)
