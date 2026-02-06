@@ -7,7 +7,6 @@ public record AttemptResponse(
     Long id,
     Short attemptNo,
     String status,
-    String audioUrl,
     Integer durationSeconds,
     LocalDateTime createdAt,
     LocalDateTime finishedAt
@@ -17,7 +16,6 @@ public record AttemptResponse(
             attempt.getId(),
             attempt.getAttemptNo(),
             attempt.getStatus().name(),
-            attempt.getAudioUrl(),
             attempt.getDurationSeconds(),
             attempt.getCreatedAt(),
             attempt.getFinishedAt()

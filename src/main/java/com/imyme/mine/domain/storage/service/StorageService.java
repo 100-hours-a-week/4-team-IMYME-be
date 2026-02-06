@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -32,9 +33,18 @@ public class StorageService {
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
     private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
 
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+        "audio/mpeg",
+        "audio/wav",
+        "audio/mp4",
+        "audio/m4a",
+        "audio/webm"
+    );
+
     @Transactional
     public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
-        log.debug("Presigned URL 생성 시작 - userId: {}, attemptId: {}", userId, request.attemptId());
+        log.debug("Presigned URL 생성 시작 - userId: {}, attemptId: {}, contentType: {}",
+            userId, request.attemptId(), request.contentType());
 
         CardAttempt attempt = cardAttemptRepository.findById(request.attemptId())
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
@@ -52,10 +62,15 @@ public class StorageService {
             throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
         }
 
-        Long cardId = attempt.getCard().getId();
-        String objectKey = generateObjectKey(userId, cardId, attempt.getId(), request.fileExtension());
+        String contentType = normalizeContentType(request.contentType());
+        String extension = getExtensionFromContentType(contentType);
 
-        PresignedPutObjectRequest presignedRequest = generatePresignedPutRequest(objectKey, request.fileExtension());
+        Long cardId = attempt.getCard().getId();
+        String objectKey = generateObjectKey(userId, cardId, attempt.getId(), extension);
+
+        attempt.reserveAudioKey(objectKey);
+
+        PresignedPutObjectRequest presignedRequest = generatePresignedPutRequest(objectKey, contentType);
 
         LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(PRESIGNED_URL_EXPIRATION);
 
@@ -64,6 +79,7 @@ public class StorageService {
         return PresignedUrlResponse.of(
             attempt.getId(),
             presignedRequest.url().toString(),
+            contentType,
             objectKey,
             presignedExpiresAt
         );
@@ -74,9 +90,7 @@ public class StorageService {
         return String.format("audios/%d/%d/%d_%s.%s", userId, cardId, attemptId, uuid, fileExtension);
     }
 
-    private PresignedPutObjectRequest generatePresignedPutRequest(String objectKey, String fileExtension) {
-        String contentType = getContentType(fileExtension);
-
+    private PresignedPutObjectRequest generatePresignedPutRequest(String objectKey, String contentType) {
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
             .signatureDuration(PRESIGNED_URL_EXPIRATION)
             .putObjectRequest(builder -> builder
@@ -89,13 +103,27 @@ public class StorageService {
         return s3Presigner.presignPutObject(presignRequest);
     }
 
-    private String getContentType(String fileExtension) {
-        return switch (fileExtension.toLowerCase()) {
-            case "mp3" -> "audio/mpeg";
-            case "wav" -> "audio/wav";
-            case "m4a" -> "audio/mp4";
-            case "webm" -> "audio/webm";
-            default -> "application/octet-stream";
+    private String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        }
+
+        String normalized = contentType.split(";")[0].trim().toLowerCase();
+        if (!ALLOWED_CONTENT_TYPES.contains(normalized)) {
+            throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        }
+
+        // alias 처리: audio/m4a는 audio/mp4로 서명
+        return "audio/m4a".equals(normalized) ? "audio/mp4" : normalized;
+    }
+
+    private String getExtensionFromContentType(String contentType) {
+        return switch (contentType) {
+            case "audio/mpeg" -> "mp3";
+            case "audio/wav" -> "wav";
+            case "audio/mp4" -> "m4a";
+            case "audio/webm" -> "webm";
+            default -> throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
         };
     }
 }

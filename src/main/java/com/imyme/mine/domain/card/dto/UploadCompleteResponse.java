@@ -6,7 +6,6 @@ public record UploadCompleteResponse(
 
     Long attemptId,
     String status,
-    String audioUrl,
     Integer durationSeconds,
     String message
 
@@ -16,7 +15,6 @@ public record UploadCompleteResponse(
         return new UploadCompleteResponse(
             attempt.getId(),
             attempt.getStatus().name(),
-            attempt.getAudioUrl(),
             attempt.getDurationSeconds(),
             "업로드가 완료되었습니다. AI 분석 대기 중입니다."
         );

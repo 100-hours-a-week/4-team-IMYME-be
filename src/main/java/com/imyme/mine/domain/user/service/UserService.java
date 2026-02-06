@@ -30,6 +30,7 @@ public class UserService {
     private final UserSessionRepository userSessionRepository;
     private final DeviceRepository deviceRepository;
     private final ForbiddenWordService forbiddenWordService;
+    private final ProfileImageService profileImageService;
 
     /**
      * 회원 탈퇴 처리
@@ -64,7 +65,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        return UserProfileResponse.from(user);
+        String profileImageUrl = profileImageService.resolveProfileImageUrl(user.getProfileImageKey(), user.getProfileImageUrl());
+        return UserProfileResponse.from(user, profileImageUrl);
     }
 
     // 프로필 수정 - Dirty Checking 활용
@@ -79,12 +81,12 @@ public class UserService {
             user.updateNickname(request.nickname());
         }
 
-        // 프로필 이미지 변경 (URL과 Key가 세트로 왔을 때만 처리)
-        if (request.profileImageUrl() != null && request.profileImageKey() != null) {
-            user.updateProfileImage(request.profileImageUrl(), request.profileImageKey());
+        if (request.profileImageKey() != null) {
+            user.updateProfileImage(null, request.profileImageKey());
         }
 
-        return UserProfileResponse.from(user);
+        String profileImageUrl = profileImageService.resolveProfileImageUrl(user.getProfileImageKey(), user.getProfileImageUrl());
+        return UserProfileResponse.from(user, profileImageUrl);
     }
 
     // 닉네임 중복 확인
