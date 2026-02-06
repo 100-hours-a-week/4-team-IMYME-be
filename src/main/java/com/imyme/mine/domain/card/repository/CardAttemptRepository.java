@@ -22,6 +22,12 @@ public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> 
     long countByCardId(Long cardId);
 
     /**
+     * 특정 상태를 제외한 카드 시도 개수 조회
+     * - MAX_ATTEMPTS 체크 시 FAILED/EXPIRED는 제외해야 함
+     */
+    long countByCardIdAndStatusNotIn(Long cardId, List<AttemptStatus> excludedStatuses);
+
+    /**
      * 특정 상태이고 생성 시간이 특정 시간 이전인 시도 조회
      * - 스케줄러에서 만료 처리용
      */
