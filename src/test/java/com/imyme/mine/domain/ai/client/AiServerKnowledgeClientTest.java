@@ -1,5 +1,6 @@
 package com.imyme.mine.domain.ai.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.imyme.mine.domain.ai.dto.knowledge.*;
 import com.imyme.mine.global.config.AiServerProperties;
 import com.imyme.mine.global.error.BusinessException;
@@ -38,6 +39,9 @@ class AiServerKnowledgeClientTest {
     @Mock
     private AiServerProperties properties;
 
+    @Mock
+    private ObjectMapper objectMapper;
+
     private AiServerClient aiServerClient;
 
     @BeforeEach
@@ -45,7 +49,7 @@ class AiServerKnowledgeClientTest {
         when(properties.getBaseUrl()).thenReturn("https://test-ai-server.com");
         when(properties.getSecret()).thenReturn("test-secret");
 
-        aiServerClient = new AiServerClient(properties, restTemplate);
+        aiServerClient = new AiServerClient(properties, restTemplate, objectMapper);
     }
 
     // ==================== Knowledge Candidate Batch API ====================
