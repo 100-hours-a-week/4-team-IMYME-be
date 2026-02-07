@@ -66,9 +66,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/actuator/prometheus",  // Prometheus 메트릭 수집 엔드포인트
-                                "/actuator/health",      // 헬스체크
-                                "/actuator/**"         // 애플리케이션 정보
+                                "/actuator/health",      // 헬스체크 (화이트리스트)
+                                "/actuator/prometheus"   // Prometheus 메트릭 (화이트리스트)
                         ).permitAll()
                         .anyRequest().authenticated())
 
