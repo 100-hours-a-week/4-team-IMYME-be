@@ -137,8 +137,12 @@ public class OAuthService {
                     profileImage = userInfo.getKakaoAccount().getProfile().getProfileImageUrl();
                 }
             }
+        } catch (NullPointerException e) {
+            // 카카오 API 응답 구조 변경 또는 필드 누락 시 기본값 사용
+            log.warn("카카오 정보 파싱 실패 (기본값 사용) - NullPointerException", e);
         } catch (Exception e) {
-            log.warn("카카오 정보 파싱 실패 (기본값 사용): {}", e.getMessage());
+            // 예상치 못한 예외 (stack trace 포함)
+            log.error("카카오 정보 파싱 중 예상치 못한 오류 발생", e);
         }
 
         // 닉네임 중복 방지 로직 적용

@@ -109,10 +109,10 @@ public class SoloService {
                 Thread.sleep(POLL_INTERVAL_MS);
 
             } catch (InterruptedException e) {
-                log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
                 Thread.currentThread().interrupt();
-                markAttemptFailed(attemptId, "UNKNOWN_ERROR");
-                return;
+                log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
+                markAttemptFailed(attemptId, "POLLING_INTERRUPTED");
+                throw new RuntimeException("Solo polling interrupted", e);
 
             } catch (BusinessException e) {
                 if (e.getErrorCode() == ErrorCode.AI_ANALYSIS_FAILED || e.getErrorCode() == ErrorCode.AI_POLLING_TIMEOUT) {
