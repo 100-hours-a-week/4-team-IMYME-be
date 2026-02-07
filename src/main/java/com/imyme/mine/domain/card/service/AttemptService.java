@@ -133,11 +133,11 @@ public class AttemptService {
 
         // STT (Speech-to-Text) 처리 - 동기 호출
         try {
-            log.debug("STT 처리 시작 - attemptId: {}, objectKey: {}", attemptId, request.objectKey());
+            log.debug("STT 처리 시작 - attemptId: {}", attemptId);
 
             // 읽기용 Presigned URL 생성 (AI 서버가 S3에서 다운로드 가능)
             String readPresignedUrl = generateReadPresignedUrl(request.objectKey());
-            log.debug("읽기용 Presigned URL 생성 완료 - objectKey: {}", request.objectKey());
+            log.debug("읽기용 Presigned URL 생성 완료 - attemptId: {}", attemptId);
 
             // AI 서버에 읽기용 URL 전달
             String sttText = aiServerClient.transcribe(readPresignedUrl);
