@@ -92,14 +92,22 @@ BEGIN
 END;
 $$;
 
--- 2-4. 임시(PENDING) 학습 데이터 정리 (Daily 03:00)
--- 설명: 학습을 시도하다가 중단하여 PENDING 상태로 24시간 이상 남은 더미 데이터를 정리합니다.
+-- 2-4. 중단된 학습 시도(Zombie Data) 정리 (Daily 03:00)
+-- 설명: 'PENDING' 상태로 24시간이 지난 시도는 사용자가 이탈한 것으로 간주하고 영구 삭제합니다.
+--      (시도 횟수 0인 상태로 남은 쓰레기 데이터 정리)
 CREATE OR REPLACE PROCEDURE batch_cleanup_pending_attempts()
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- [주의] 실제 운영 환경에서는 DELETE 전에 'audio_key'를 조회해서
+    --       S3에서도 파일을 지우는 로직이 애플리케이션 레벨에 필요할 수 있습니다.
+    --       (DB에서만 지우면 S3에 고아 파일이 남음)
+
     DELETE FROM card_attempts
     WHERE status = 'PENDING'
       AND created_at < NOW() - INTERVAL '24 hours';
+
+    -- 결과 로깅
+    RAISE NOTICE 'Abandoned pending attempts older than 24 hours have been cleaned up.';
 END;
 $$;
