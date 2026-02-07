@@ -142,6 +142,7 @@ public class KnowledgeBatchService {
      * [핵심 로직 통합] 특정 키워드에 대해 Knowledge 배치 실행
      * - startDate, endDate가 있으면 해당 기간만 조회 (일일 배치용)
      * - 날짜가 null이면 전체 조회 (Admin 수동 실행용)
+     * - 리팩토링: 174줄 God Method를 8개 메서드로 분리하여 가독성 향상
      */
     public KnowledgeBatchResult processKeyword(Long keywordId, LocalDateTime startDate, LocalDateTime endDate) {
         LocalDateTime batchStartTime = LocalDateTime.now();
@@ -149,20 +150,11 @@ public class KnowledgeBatchService {
             .startTime(batchStartTime)
             .totalKeywords(1);
 
-        // 1. 키워드 존재 확인
-        Keyword keyword = keywordRepository.findById(keywordId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+        // 1. 키워드 로드
+        Keyword keyword = loadKeyword(keywordId);
 
-        // 2. 피드백 조회 (날짜 조건 분기 처리)
-        List<CardFeedback> feedbacks;
-        if (startDate != null && endDate != null) {
-            feedbacks = feedbackRepository.findByKeywordIdAndCreatedAtBetween(keywordId, startDate, endDate);
-            log.info("키워드 '{}' 기간 조회 ({} ~ {}): {}개", keyword.getName(), startDate, endDate, feedbacks.size());
-        } else {
-            feedbacks = feedbackRepository.findByKeywordId(keywordId);
-            log.info("키워드 '{}' 전체 기간 조회: {}개", keyword.getName(), feedbacks.size());
-        }
-
+        // 2. 피드백 로드
+        List<CardFeedback> feedbacks = loadFeedbacks(keywordId, startDate, endDate, keyword.getName());
         resultBuilder.totalFeedbacks(feedbacks.size());
 
         if (feedbacks.isEmpty()) {
@@ -172,14 +164,66 @@ public class KnowledgeBatchService {
                 .build();
         }
 
-        // 3. 중복 제거 및 해시 계산
+        // 3. 피드백 아이템 추출 (중복 제거 및 해시 계산)
+        List<FeedbackItem> feedbackItems = extractFeedbackItems(feedbacks, keyword.getName());
+        log.info("중복 제거 후 처리 대상: {}개", feedbackItems.size());
+
+        if (feedbackItems.isEmpty()) {
+            return resultBuilder
+                .endTime(LocalDateTime.now())
+                .successKeywords(1)
+                .build();
+        }
+
+        // 4. 배치 생성
+        List<List<FeedbackItem>> batches = createBatches(feedbackItems);
+
+        // 5. 배치 처리 및 지식 저장
+        BatchProcessingResult processingResult = processBatches(batches, keyword, resultBuilder);
+
+        return resultBuilder
+            .endTime(LocalDateTime.now())
+            .successKeywords(1)
+            .createdKnowledge(processingResult.createdCount())
+            .updatedKnowledge(processingResult.updatedCount())
+            .ignoredCandidates(processingResult.ignoredCount())
+            .build();
+    }
+
+    /**
+     * 1단계: 키워드 로드
+     */
+    private Keyword loadKeyword(Long keywordId) {
+        return keywordRepository.findById(keywordId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+    }
+
+    /**
+     * 2단계: 피드백 로드 (날짜 조건 분기 처리)
+     */
+    private List<CardFeedback> loadFeedbacks(Long keywordId, LocalDateTime startDate, LocalDateTime endDate, String keywordName) {
+        List<CardFeedback> feedbacks;
+        if (startDate != null && endDate != null) {
+            feedbacks = feedbackRepository.findByKeywordIdAndCreatedAtBetween(keywordId, startDate, endDate);
+            log.info("키워드 '{}' 기간 조회 ({} ~ {}): {}개", keywordName, startDate, endDate, feedbacks.size());
+        } else {
+            feedbacks = feedbackRepository.findByKeywordId(keywordId);
+            log.info("키워드 '{}' 전체 기간 조회: {}개", keywordName, feedbacks.size());
+        }
+        return feedbacks;
+    }
+
+    /**
+     * 3단계: 피드백 아이템 추출 (중복 제거 및 해시 계산)
+     */
+    private List<FeedbackItem> extractFeedbackItems(List<CardFeedback> feedbacks, String keywordName) {
         List<FeedbackItem> feedbackItems = new ArrayList<>();
+
         for (CardFeedback feedback : feedbacks) {
             try {
                 String personalizedFeedback = extractPersonalizedFeedback(feedback.getFeedbackJson());
 
-                // [디버깅] 추출 결과 확인
-                log.info("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), personalizedFeedback);
+                log.debug("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), personalizedFeedback);
 
                 if (personalizedFeedback != null && !personalizedFeedback.isBlank()) {
                     String contentHash = calculateSHA256(personalizedFeedback);
@@ -188,7 +232,7 @@ public class KnowledgeBatchService {
                     if (!knowledgeRepository.existsByContentHash(contentHash)) {
                         feedbackItems.add(new FeedbackItem(
                             String.valueOf(feedback.getAttemptId()),
-                            keyword.getName(),
+                            keywordName,
                             personalizedFeedback
                         ));
                     } else {
@@ -202,102 +246,48 @@ public class KnowledgeBatchService {
             }
         }
 
-        log.info("중복 제거 후 처리 대상: {}개", feedbackItems.size());
+        return feedbackItems;
+    }
 
-        if (feedbackItems.isEmpty()) {
-            return resultBuilder
-                .endTime(LocalDateTime.now())
-                .successKeywords(1)
-                .build();
-        }
+    /**
+     * 4단계: 배치 생성
+     */
+    private List<List<FeedbackItem>> createBatches(List<FeedbackItem> feedbackItems) {
+        List<List<FeedbackItem>> batches = partitionList(feedbackItems, properties.getBatchSize());
+        log.info("배치 개수: {} (배치 크기: {})", batches.size(), properties.getBatchSize());
+        return batches;
+    }
 
+    /**
+     * 5단계: 배치 처리 (AI 서버 호출 및 지식 저장)
+     */
+    private BatchProcessingResult processBatches(
+        List<List<FeedbackItem>> batches,
+        Keyword keyword,
+        KnowledgeBatchResult.Builder resultBuilder
+    ) {
         int createdCount = 0;
         int updatedCount = 0;
         int ignoredCount = 0;
-
-        // 4. 배치 처리 (AI 서버 호출)
-        List<List<FeedbackItem>> batches = partitionList(feedbackItems, properties.getBatchSize());
-        log.info("배치 개수: {} (배치 크기: {})", batches.size(), properties.getBatchSize());
 
         for (int i = 0; i < batches.size(); i++) {
             try {
                 List<FeedbackItem> batch = batches.get(i);
                 log.info("배치 {}/{} 처리 중 - 항목 수: {}", i + 1, batches.size(), batch.size());
 
-                // AI 서버 요청 객체 생성
-                KnowledgeCandidateBatchRequest request = new KnowledgeCandidateBatchRequest(batch);
+                // 배치를 AI 서버로 전송하여 후보 생성
+                List<KnowledgeCandidate> candidates = submitBatchForCandidates(batch, i + 1);
 
-                // [추가됨] AI 서버로 보내는 실제 JSON 데이터 로깅
-                try {
-                    String requestBodyJson = objectMapper.writeValueAsString(request);
-                    log.info(">>> [AI Request Body] Batch {}: {}", i + 1, requestBodyJson);
-                } catch (Exception e) {
-                    log.warn("요청 데이터 로깅 실패", e);
-                }
-
-                // AI 서버 요청
-                List<KnowledgeCandidate> candidates = aiServerClient.createKnowledgeCandidatesBatch(request);
-
-                log.info("AI 서버 응답: {} 개 후보 생성", candidates.size());
-
+                // 후보가 생성되면 2분 대기 (AI 서버 과부하 방지)
                 if (!candidates.isEmpty()) {
-                    long sleepTime = 120_000; // 2분 (ms 단위)
-                    log.info("🔥 서버 과부하 방지를 위해 {}분간 대기합니다... (현재 시간: {})",
-                        sleepTime / 60000, LocalDateTime.now());
-
-                    try {
-                        Thread.sleep(sleepTime);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-
-                    log.info("💤 휴식 끝! 평가 작업을 시작합니다.");
+                    waitForServerCooldown();
                 }
 
                 // 각 후보 평가 및 저장
-                for (KnowledgeCandidate candidate : candidates) {
-                    try {
-                        String embeddingVector = convertEmbeddingToString(candidate.embedding());
-
-                        List<KnowledgeSearchResult> similars = knowledgeRepository
-                            .findSimilarKnowledgeByKeyword(
-                                embeddingVector,
-                                keywordId,
-                                properties.getMaxSimilarCount()
-                            );
-
-                        double threshold = 1.0 - properties.getSimilarityThreshold();
-                        List<KnowledgeSearchResult> filteredSimilars = similars.stream()
-                            .filter(s -> s.getDistance() <= threshold)
-                            .collect(Collectors.toList());
-
-                        log.debug("유사 지식 검색 결과: {} -> 필터링 후 {}",
-                            similars.size(), filteredSimilars.size());
-
-                        KnowledgeEvaluationRequest evalRequest = buildEvaluationRequest(candidate, filteredSimilars);
-                        KnowledgeEvaluationResponse.Data evalResult = aiServerClient.evaluateKnowledge(evalRequest);
-
-                        log.debug("평가 결과: {} - {}", evalResult.decision(), evalResult.reasoning());
-
-                        if ("UPDATE".equalsIgnoreCase(evalResult.decision())) {
-                            if (filteredSimilars.isEmpty()) {
-                                createKnowledge(keyword, candidate);
-                                createdCount++;
-                                log.info("새 지식 생성 완료 - feedbackId: {}", candidate.id());
-                            } else {
-                                updateKnowledge(filteredSimilars.get(0).getId(), candidate);
-                                updatedCount++;
-                                log.info("기존 지식 업데이트 완료 - knowledgeId: {}", filteredSimilars.get(0).getId());
-                            }
-                        } else {
-                            ignoredCount++;
-                            log.debug("지식 후보 무시 - feedbackId: {}", candidate.id());
-                        }
-                    } catch (Exception e) {
-                        log.error("후보 처리 실패 - feedbackId: {}", candidate.id(), e);
-                        resultBuilder.addError("후보 처리 실패: " + e.getMessage());
-                    }
-                }
+                CandidateProcessingResult candidateResult = processCandidates(candidates, keyword, resultBuilder);
+                createdCount += candidateResult.created();
+                updatedCount += candidateResult.updated();
+                ignoredCount += candidateResult.ignored();
 
                 // 배치 간 지연
                 if (i < batches.size() - 1 && properties.getBatchDelayMs() > 0) {
@@ -310,14 +300,132 @@ public class KnowledgeBatchService {
             }
         }
 
-        return resultBuilder
-            .endTime(LocalDateTime.now())
-            .successKeywords(1)
-            .createdKnowledge(createdCount)
-            .updatedKnowledge(updatedCount)
-            .ignoredCandidates(ignoredCount)
-            .build();
+        return new BatchProcessingResult(createdCount, updatedCount, ignoredCount);
     }
+
+    /**
+     * 5-1단계: 배치를 AI 서버로 전송하여 후보 생성
+     */
+    private List<KnowledgeCandidate> submitBatchForCandidates(List<FeedbackItem> batch, int batchNumber) {
+        KnowledgeCandidateBatchRequest request = new KnowledgeCandidateBatchRequest(batch);
+
+        // AI 서버로 보내는 실제 JSON 데이터 로깅
+        try {
+            String requestBodyJson = objectMapper.writeValueAsString(request);
+            log.info(">>> [AI Request Body] Batch {}: {}", batchNumber, requestBodyJson);
+        } catch (Exception e) {
+            log.warn("요청 데이터 로깅 실패", e);
+        }
+
+        // AI 서버 요청
+        List<KnowledgeCandidate> candidates = aiServerClient.createKnowledgeCandidatesBatch(request);
+        log.info("AI 서버 응답: {} 개 후보 생성", candidates.size());
+
+        return candidates;
+    }
+
+    /**
+     * 5-2단계: AI 서버 과부하 방지를 위한 대기
+     */
+    private void waitForServerCooldown() {
+        long sleepTime = 120_000; // 2분 (ms 단위)
+        log.info("🔥 서버 과부하 방지를 위해 {}분간 대기합니다... (현재 시간: {})",
+            sleepTime / 60000, LocalDateTime.now());
+
+        try {
+            Thread.sleep(sleepTime);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        log.info("💤 휴식 끝! 평가 작업을 시작합니다.");
+    }
+
+    /**
+     * 5-3단계: 후보 평가 및 저장
+     */
+    private CandidateProcessingResult processCandidates(
+        List<KnowledgeCandidate> candidates,
+        Keyword keyword,
+        KnowledgeBatchResult.Builder resultBuilder
+    ) {
+        int created = 0;
+        int updated = 0;
+        int ignored = 0;
+
+        for (KnowledgeCandidate candidate : candidates) {
+            try {
+                CandidateDecision decision = evaluateCandidate(candidate, keyword.getId());
+
+                if ("UPDATE".equalsIgnoreCase(decision.decision())) {
+                    if (decision.targetKnowledgeId() == null) {
+                        createKnowledge(keyword, candidate);
+                        created++;
+                        log.info("새 지식 생성 완료 - feedbackId: {}", candidate.id());
+                    } else {
+                        updateKnowledge(decision.targetKnowledgeId(), candidate);
+                        updated++;
+                        log.info("기존 지식 업데이트 완료 - knowledgeId: {}", decision.targetKnowledgeId());
+                    }
+                } else {
+                    ignored++;
+                    log.debug("지식 후보 무시 - feedbackId: {}", candidate.id());
+                }
+            } catch (Exception e) {
+                log.error("후보 처리 실패 - feedbackId: {}", candidate.id(), e);
+                resultBuilder.addError("후보 처리 실패: " + e.getMessage());
+            }
+        }
+
+        return new CandidateProcessingResult(created, updated, ignored);
+    }
+
+    /**
+     * 5-3-1단계: 후보 평가 (유사도 검색 + AI 평가)
+     */
+    private CandidateDecision evaluateCandidate(KnowledgeCandidate candidate, Long keywordId) {
+        String embeddingVector = convertEmbeddingToString(candidate.embedding());
+
+        // 유사 지식 검색
+        List<KnowledgeSearchResult> similars = knowledgeRepository
+            .findSimilarKnowledgeByKeyword(
+                embeddingVector,
+                keywordId,
+                properties.getMaxSimilarCount()
+            );
+
+        // 유사도 임계값 필터링
+        double threshold = 1.0 - properties.getSimilarityThreshold();
+        List<KnowledgeSearchResult> filteredSimilars = similars.stream()
+            .filter(s -> s.getDistance() <= threshold)
+            .collect(Collectors.toList());
+
+        log.debug("유사 지식 검색 결과: {} -> 필터링 후 {}", similars.size(), filteredSimilars.size());
+
+        // AI 평가 요청
+        KnowledgeEvaluationRequest evalRequest = buildEvaluationRequest(candidate, filteredSimilars);
+        KnowledgeEvaluationResponse.Data evalResult = aiServerClient.evaluateKnowledge(evalRequest);
+
+        log.debug("평가 결과: {} - {}", evalResult.decision(), evalResult.reasoning());
+
+        Long targetKnowledgeId = filteredSimilars.isEmpty() ? null : filteredSimilars.get(0).getId();
+        return new CandidateDecision(evalResult.decision(), targetKnowledgeId);
+    }
+
+    /**
+     * 배치 처리 결과 DTO
+     */
+    private record BatchProcessingResult(int createdCount, int updatedCount, int ignoredCount) {}
+
+    /**
+     * 후보 처리 결과 DTO
+     */
+    private record CandidateProcessingResult(int created, int updated, int ignored) {}
+
+    /**
+     * 후보 평가 결과 DTO
+     */
+    private record CandidateDecision(String decision, Long targetKnowledgeId) {}
 
     /**
      * 새 지식 생성 (트랜잭션 적용)
