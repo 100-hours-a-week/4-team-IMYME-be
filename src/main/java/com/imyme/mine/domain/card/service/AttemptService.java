@@ -7,7 +7,9 @@ import com.imyme.mine.domain.card.dto.AttemptDetailResponse;
 import com.imyme.mine.domain.card.dto.AttemptProcessingStep;
 import com.imyme.mine.domain.card.dto.UploadCompleteRequest;
 import com.imyme.mine.domain.card.dto.UploadCompleteResponse;
+import com.imyme.mine.domain.card.dto.ValidatedAttempt;
 import com.imyme.mine.domain.card.entity.AttemptStatus;
+import com.imyme.mine.domain.card.event.AttemptUploadedEvent;
 import com.imyme.mine.domain.card.entity.Card;
 import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.entity.CardFeedback;
@@ -16,12 +18,12 @@ import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
-import com.imyme.mine.domain.learning.service.SoloService;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -44,7 +46,7 @@ public class AttemptService {
     private final CardFeedbackRepository cardFeedbackRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final AiServerClient aiServerClient;
-    private final SoloService soloService;
+    private final ApplicationEventPublisher eventPublisher;
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
 
@@ -88,32 +90,38 @@ public class AttemptService {
     public AttemptDetailResponse getAttemptDetail(Long userId, Long cardId, Long attemptId) {
         log.debug("시도 상세 조회 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
 
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+        ValidatedAttempt validated = validateAttemptOwnership(userId, cardId, attemptId);
 
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
-
-        if (!attempt.getCard().getId().equals(card.getId())) {
-            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
-        }
-
-        return buildAttemptDetailResponse(attempt);
+        return buildAttemptDetailResponse(validated.attempt());
     }
 
-    @Transactional
     public UploadCompleteResponse uploadComplete(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
         log.debug("업로드 완료 처리 시작 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
 
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+        // 1단계: 트랜잭션 내에서 검증 및 상태 업데이트만 수행
+        ValidatedAttempt validated = markAttemptAsUploaded(userId, cardId, attemptId, request);
+        Card card = validated.card();
 
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+        // 2단계: 트랜잭션 외부에서 외부 HTTP 호출 수행
+        processAfterUpload(attemptId, card, request.objectKey());
+
+        // 3단계: 최종 상태 조회 및 응답 반환
+        CardAttempt finalAttempt = cardAttemptRepository.findById(attemptId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
 
-        if (!attempt.getCard().getId().equals(card.getId())) {
-            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
-        }
+        log.info("업로드 완료 처리 완료 - attemptId: {}, status: {}", attemptId, finalAttempt.getStatus());
+
+        return UploadCompleteResponse.from(finalAttempt);
+    }
+
+    /**
+     * 1단계: 트랜잭션 내에서 검증 및 상태 업데이트
+     * - DB 커넥션을 빠르게 반환하기 위해 외부 HTTP 호출 전에 트랜잭션 종료
+     */
+    @Transactional
+    protected ValidatedAttempt markAttemptAsUploaded(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
+        ValidatedAttempt validated = validateAttemptOwnership(userId, cardId, attemptId);
+        CardAttempt attempt = validated.attempt();
 
         if (attempt.getStatus() != AttemptStatus.PENDING) {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
@@ -131,48 +139,93 @@ public class AttemptService {
         attempt.markUploaded(request.durationSeconds());
         attempt.startProcessing();
 
-        // STT (Speech-to-Text) 처리 - 동기 호출
+        log.info("시도 업로드 상태로 변경 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
+
+        return validated;
+    }
+
+    /**
+     * 2단계: 트랜잭션 외부에서 STT 처리 및 이벤트 발행
+     * - 외부 HTTP 호출이므로 트랜잭션 외부에서 실행
+     * - DB 커넥션을 장기간 점유하지 않음
+     */
+    private void processAfterUpload(Long attemptId, Card card, String objectKey) {
         try {
             log.debug("STT 처리 시작 - attemptId: {}", attemptId);
 
             // 읽기용 Presigned URL 생성 (AI 서버가 S3에서 다운로드 가능)
-            String readPresignedUrl = generateReadPresignedUrl(request.objectKey());
+            String readPresignedUrl = generateReadPresignedUrl(objectKey);
             log.debug("읽기용 Presigned URL 생성 완료 - attemptId: {}", attemptId);
 
-            // AI 서버에 읽기용 URL 전달
+            // AI 서버에 읽기용 URL 전달 (외부 HTTP 호출)
             String sttText = aiServerClient.transcribe(readPresignedUrl);
-            attempt.recordSttResult(sttText);
-            log.info("STT 처리 성공 - attemptId: {}, status: PROCESSING, 텍스트 길이: {}", attemptId, sttText.length());
 
-            // Solo 모드 분석 시작 (Virtual Thread 백그라운드 처리)
-            try {
-                log.info("Solo 분석 시작 - attemptId: {}", attemptId);
-                String userText = sttText;
-                Map<String, Object> criteria = resolveCriteria(card);
-                List<Map<String, Object>> history = List.of();
-                soloService.startSoloAnalysisAsync(
-                    attemptId,
-                    userText,
-                    criteria,
-                    history
-                );
-                log.info("Solo 분석 백그라운드 실행 시작 - attemptId: {}", attemptId);
-            } catch (Exception soloException) {
-                // Solo 분석 실패해도 STT는 성공했으므로 COMPLETED 유지
-                log.error("Solo 분석 시작 실패 - attemptId: {}", attemptId, soloException);
-                attempt.fail("AI_FEEDBACK_FAILED");
-            }
+            // STT 결과 저장 (새 트랜잭션)
+            recordSttSuccess(attemptId, sttText);
+            log.info("STT 처리 성공 - attemptId: {}, 텍스트 길이: {}", attemptId, sttText.length());
+
+            // Solo 모드 분석 이벤트 발행 (비동기 처리)
+            publishSoloAnalysisEvent(attemptId, card, sttText);
 
         } catch (BusinessException e) {
-            // STT 오류 시 FAILED 상태로 변경 (에러 코드 저장)
+            // STT 오류 시 FAILED 상태로 변경 (새 트랜잭션)
             String errorCode = mapSttErrorCode(e);
-            attempt.fail(errorCode);
-            log.error("STT 처리 실패 - attemptId: {}, status: FAILED, errorCode: {}", attemptId, errorCode);
+            recordSttFailure(attemptId, errorCode);
+            log.error("STT 처리 실패 - attemptId: {}, errorCode: {}", attemptId, errorCode);
+        } catch (Exception e) {
+            // 예상치 못한 오류
+            recordSttFailure(attemptId, "UNKNOWN_ERROR");
+            log.error("STT 처리 중 예상치 못한 오류 - attemptId: {}", attemptId, e);
         }
+    }
 
-        log.info("업로드 완료 처리 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
+    /**
+     * STT 성공 결과 저장 (새 트랜잭션)
+     */
+    @Transactional
+    protected void recordSttSuccess(Long attemptId, String sttText) {
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+        attempt.recordSttResult(sttText);
+    }
 
-        return UploadCompleteResponse.from(attempt);
+    /**
+     * STT 실패 기록 (새 트랜잭션)
+     */
+    @Transactional
+    protected void recordSttFailure(Long attemptId, String errorCode) {
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+        attempt.fail(errorCode);
+    }
+
+    /**
+     * Solo 분석 이벤트 발행
+     * - Event 기반으로 SoloService와 결합도 감소
+     */
+    private void publishSoloAnalysisEvent(Long attemptId, Card card, String sttText) {
+        try {
+            log.info("Solo 분석 이벤트 발행 - attemptId: {}", attemptId);
+            Map<String, Object> criteria = resolveCriteria(card);
+            List<Map<String, Object>> history = List.of();
+
+            AttemptUploadedEvent event = new AttemptUploadedEvent(
+                attemptId,
+                card.getUser().getId(),
+                card.getId(),
+                sttText,
+                criteria,
+                history
+            );
+
+            eventPublisher.publishEvent(event);
+            log.info("Solo 분석 이벤트 발행 완료 - attemptId: {}", attemptId);
+
+        } catch (Exception e) {
+            // 이벤트 발행 실패해도 STT는 성공했으므로 계속 진행
+            log.error("Solo 분석 이벤트 발행 실패 - attemptId: {}", attemptId, e);
+            recordSttFailure(attemptId, "AI_FEEDBACK_FAILED");
+        }
     }
 
     @Transactional
@@ -204,6 +257,25 @@ public class AttemptService {
         return attempt;
     }
 
+    /**
+     * 학습 시도의 소유권 및 관계 검증
+     * - 중복 검증 로직 제거를 위한 공통 메서드
+     * - Card와 CardAttempt의 일치 여부 확인
+     */
+    private ValidatedAttempt validateAttemptOwnership(Long userId, Long cardId, Long attemptId) {
+        Card card = cardRepository.findByIdAndUserId(cardId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
+
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+
+        if (!attempt.getCard().getId().equals(card.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
+        }
+
+        return new ValidatedAttempt(card, attempt);
+    }
+
     private Short calculateNextAttemptNo(Long cardId) {
         Short maxAttemptNo = cardAttemptRepository.findMaxAttemptNoByCardId(cardId);
         return (maxAttemptNo == null) ? 1 : (short) (maxAttemptNo + 1);
@@ -216,6 +288,7 @@ public class AttemptService {
             status == AttemptStatus.COMPLETED;
     }
 
+    @Transactional(readOnly = true)
     private AttemptDetailResponse buildAttemptDetailResponse(CardAttempt attempt) {
         return switch (attempt.getStatus()) {
             case PENDING -> {
