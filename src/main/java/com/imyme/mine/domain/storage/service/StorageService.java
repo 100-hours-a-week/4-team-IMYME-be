@@ -5,6 +5,7 @@ import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.domain.storage.dto.PresignedUrlRequest;
 import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
+import com.imyme.mine.global.config.AttemptProperties;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -29,9 +30,7 @@ public class StorageService {
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
     private final CardAttemptRepository cardAttemptRepository;
-
-    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
-    private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
+    private final AttemptProperties attemptProperties;
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
         "audio/mpeg",
@@ -57,7 +56,7 @@ public class StorageService {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
 
-        LocalDateTime expiresAt = attempt.getCreatedAt().plus(UPLOAD_EXPIRATION);
+        LocalDateTime expiresAt = attempt.getCreatedAt().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
         if (LocalDateTime.now().isAfter(expiresAt)) {
             throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
         }
@@ -72,7 +71,7 @@ public class StorageService {
 
         PresignedPutObjectRequest presignedRequest = generatePresignedPutRequest(objectKey, contentType);
 
-        LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(PRESIGNED_URL_EXPIRATION);
+        LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
 
         log.info("Presigned URL 생성 완료 - attemptId: {}, objectKey: {}", attempt.getId(), objectKey);
 
@@ -92,7 +91,7 @@ public class StorageService {
 
     private PresignedPutObjectRequest generatePresignedPutRequest(String objectKey, String contentType) {
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-            .signatureDuration(PRESIGNED_URL_EXPIRATION)
+            .signatureDuration(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()))
             .putObjectRequest(builder -> builder
                 .bucket(s3Properties.getBucket())
                 .key(objectKey)

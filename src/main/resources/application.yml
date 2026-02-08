@@ -119,6 +119,26 @@ knowledge:
         max-similar-count: 5
         # 유사도 임계값 (0.0 ~ 1.0) - 이 값보다 높은 유사도를 가진 지식만 가져옴
         similarity-threshold: 0.7
+        # 처리할 피드백이 없을 때 대기 시간 (밀리초)
+        idle-sleep-ms: 120000
+
+# ==================================================
+# 학습 시도 설정
+# ==================================================
+attempt:
+    # 업로드 만료 시간 (분)
+    upload-expiration-minutes: 10
+    # Presigned URL 만료 시간 (시간)
+    presigned-url-expiration-hours: 1
+
+# ==================================================
+# 프로필 이미지 설정
+# ==================================================
+profile-image:
+    # Presigned URL 생성 시간 (분)
+    presigned-url-expiration-minutes: 5
+    # 이미지 조회 URL 만료 시간 (시간)
+    get-url-expiration-hours: 1
 
 # ==================================================
 # 서버 설정

@@ -3,6 +3,7 @@ package com.imyme.mine.domain.card.scheduler;
 import com.imyme.mine.domain.card.entity.AttemptStatus;
 import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
+import com.imyme.mine.global.config.AttemptProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,7 +25,7 @@ import java.util.List;
 public class AttemptExpirationScheduler {
 
     private final CardAttemptRepository cardAttemptRepository;
-    private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
+    private final AttemptProperties attemptProperties;
 
     /**
      * PENDING 상태 만료 처리
@@ -34,7 +35,7 @@ public class AttemptExpirationScheduler {
     @Scheduled(fixedRate = 60000)
     @Transactional
     public void expirePendingAttempts() {
-        LocalDateTime expirationThreshold = LocalDateTime.now().minus(UPLOAD_EXPIRATION);
+        LocalDateTime expirationThreshold = LocalDateTime.now().minus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
 
         List<CardAttempt> expiredAttempts = cardAttemptRepository
             .findByStatusAndCreatedAtBefore(AttemptStatus.PENDING, expirationThreshold);

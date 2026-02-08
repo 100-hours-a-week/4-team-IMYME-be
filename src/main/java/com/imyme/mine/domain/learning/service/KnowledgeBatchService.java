@@ -328,7 +328,7 @@ public class KnowledgeBatchService {
      * 5-2단계: AI 서버 과부하 방지를 위한 대기
      */
     private void waitForServerCooldown() {
-        long sleepTime = 120_000; // 2분 (ms 단위)
+        long sleepTime = properties.getIdleSleepMs();
         log.info("🔥 서버 과부하 방지를 위해 {}분간 대기합니다... (현재 시간: {})",
             sleepTime / 60000, LocalDateTime.now());
 

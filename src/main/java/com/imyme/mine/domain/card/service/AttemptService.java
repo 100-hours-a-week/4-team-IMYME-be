@@ -18,6 +18,7 @@ import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
+import com.imyme.mine.global.config.AttemptProperties;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -49,10 +50,9 @@ public class AttemptService {
     private final ApplicationEventPublisher eventPublisher;
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
+    private final AttemptProperties attemptProperties;
 
     private static final int MAX_ATTEMPTS_PER_CARD = 5;
-    private static final Duration UPLOAD_EXPIRATION = Duration.ofMinutes(10);
-    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofHours(1);
 
     @Transactional
     public AttemptCreateResponse createAttempt(Long userId, Long cardId, AttemptCreateRequest request) {
@@ -79,7 +79,7 @@ public class AttemptService {
 
         CardAttempt savedAttempt = cardAttemptRepository.save(attempt);
 
-        LocalDateTime expiresAt = LocalDateTime.now().plus(UPLOAD_EXPIRATION);
+        LocalDateTime expiresAt = LocalDateTime.now().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
 
         log.info("시도 생성 완료 - attemptId: {}, attemptNo: {}", savedAttempt.getId(), savedAttempt.getAttemptNo());
 
@@ -127,7 +127,7 @@ public class AttemptService {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
 
-        LocalDateTime expiresAt = attempt.getCreatedAt().plus(UPLOAD_EXPIRATION);
+        LocalDateTime expiresAt = attempt.getCreatedAt().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
         if (LocalDateTime.now().isAfter(expiresAt)) {
             throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
         }
@@ -292,7 +292,7 @@ public class AttemptService {
     private AttemptDetailResponse buildAttemptDetailResponse(CardAttempt attempt) {
         return switch (attempt.getStatus()) {
             case PENDING -> {
-                LocalDateTime expiresAt = attempt.getCreatedAt().plus(UPLOAD_EXPIRATION);
+                LocalDateTime expiresAt = attempt.getCreatedAt().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
                 yield AttemptDetailResponse.fromPending(attempt, expiresAt);
             }
             case UPLOADED -> AttemptDetailResponse.fromUploaded(attempt);
@@ -314,7 +314,7 @@ public class AttemptService {
     private String generateReadPresignedUrl(String objectKey) {
         try {
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(PRESIGNED_URL_EXPIRATION)
+                .signatureDuration(Duration.ofHours(attemptProperties.getPresignedUrlExpirationHours()))
                 .getObjectRequest(builder -> builder
                     .bucket(s3Properties.getBucket())
                     .key(objectKey)

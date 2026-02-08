@@ -2,6 +2,7 @@ package com.imyme.mine.domain.user.service;
 
 import com.imyme.mine.domain.user.dto.ProfileImagePresignedUrlRequest;
 import com.imyme.mine.domain.user.dto.ProfileImagePresignedUrlResponse;
+import com.imyme.mine.global.config.ProfileImageProperties;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -30,8 +31,8 @@ public class ProfileImageService {
 
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
+    private final ProfileImageProperties profileImageProperties;
 
-    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(5); // 300초
     private static final int EXPIRES_IN_SECONDS = 300;
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -106,7 +107,7 @@ public class ProfileImageService {
         String contentType
     ) {
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-            .signatureDuration(PRESIGNED_URL_EXPIRATION)
+            .signatureDuration(Duration.ofMinutes(profileImageProperties.getPresignedUrlExpirationMinutes()))
             .putObjectRequest(builder -> builder
                 .bucket(s3Properties.getBucket())
                 .key(objectKey)
@@ -131,7 +132,7 @@ public class ProfileImageService {
 
     private String generatePresignedGetUrl(String objectKey) {
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-            .signatureDuration(Duration.ofHours(1))
+            .signatureDuration(Duration.ofHours(profileImageProperties.getGetUrlExpirationHours()))
             .getObjectRequest(builder -> builder
                 .bucket(s3Properties.getBucket())
                 .key(objectKey)
