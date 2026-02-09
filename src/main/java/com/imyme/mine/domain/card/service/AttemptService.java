@@ -51,6 +51,7 @@ public class AttemptService {
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
     private final AttemptProperties attemptProperties;
+    private final AttemptUploadService attemptUploadService;
 
     private static final int MAX_ATTEMPTS_PER_CARD = 5;
 
@@ -98,8 +99,8 @@ public class AttemptService {
     public UploadCompleteResponse uploadComplete(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
         log.debug("업로드 완료 처리 시작 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);
 
-        // 1단계: 트랜잭션 내에서 검증 및 상태 업데이트만 수행
-        ValidatedAttempt validated = markAttemptAsUploaded(userId, cardId, attemptId, request);
+        // 1단계: 트랜잭션 내에서 검증 및 상태 업데이트만 수행 (프록시 호출로 @Transactional 보장)
+        ValidatedAttempt validated = attemptUploadService.markAttemptAsUploaded(userId, cardId, attemptId, request);
         Card card = validated.card();
 
         // 2단계: 트랜잭션 외부에서 외부 HTTP 호출 수행
@@ -112,36 +113,6 @@ public class AttemptService {
         log.info("업로드 완료 처리 완료 - attemptId: {}, status: {}", attemptId, finalAttempt.getStatus());
 
         return UploadCompleteResponse.from(finalAttempt);
-    }
-
-    /**
-     * 1단계: 트랜잭션 내에서 검증 및 상태 업데이트
-     * - DB 커넥션을 빠르게 반환하기 위해 외부 HTTP 호출 전에 트랜잭션 종료
-     */
-    @Transactional
-    protected ValidatedAttempt markAttemptAsUploaded(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
-        ValidatedAttempt validated = validateAttemptOwnership(userId, cardId, attemptId);
-        CardAttempt attempt = validated.attempt();
-
-        if (attempt.getStatus() != AttemptStatus.PENDING) {
-            throw new BusinessException(ErrorCode.INVALID_STATUS);
-        }
-
-        LocalDateTime expiresAt = attempt.getCreatedAt().plus(Duration.ofMinutes(attemptProperties.getUploadExpirationMinutes()));
-        if (LocalDateTime.now().isAfter(expiresAt)) {
-            throw new BusinessException(ErrorCode.UPLOAD_EXPIRED);
-        }
-
-        if (!request.objectKey().equals(attempt.getAudioKey())) {
-            throw new BusinessException(ErrorCode.INVALID_OBJECT_KEY);
-        }
-
-        attempt.markUploaded(request.durationSeconds());
-        attempt.startProcessing();
-
-        log.info("시도 업로드 상태로 변경 완료 - attemptId: {}, status: {}", attemptId, attempt.getStatus());
-
-        return validated;
     }
 
     /**
