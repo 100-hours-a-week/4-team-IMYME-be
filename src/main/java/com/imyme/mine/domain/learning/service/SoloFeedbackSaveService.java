@@ -23,7 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SoloFeedbackSaveService {
 
-    private static final String SOLO_MODEL_VERSION = "solo-v1";
+    private static final String SOLO_MODEL_VERSION = "gemini-3-pro-preview";
 
     private final CardAttemptRepository attemptRepository;
     private final CardFeedbackRepository feedbackRepository;
@@ -45,8 +45,9 @@ public class SoloFeedbackSaveService {
             return;
         }
 
-        // CardAttempt 조회 (존재 확인 + @MapsId 연관관계 설정용)
-        CardAttempt attempt = attemptRepository.findById(attemptId)
+        // CardAttempt 조회 (Card 및 User와 함께 fetch join)
+        // Virtual Thread에서 실행되므로 lazy loading 방지 필수
+        CardAttempt attempt = attemptRepository.findByIdWithCardAndUser(attemptId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
 
         String feedbackJson = convertSoloFeedbackToJson(result.feedback());

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> {
@@ -32,4 +33,17 @@ public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> 
      * - 스케줄러에서 만료 처리용
      */
     List<CardAttempt> findByStatusAndCreatedAtBefore(AttemptStatus status, LocalDateTime createdAt);
+
+    /**
+     * CardAttempt를 Card 및 User와 함께 조회 (Lazy Loading 방지)
+     * - SoloFeedbackSaveService에서 사용
+     * - Virtual Thread에서 실행되므로 fetch join 필수
+     */
+    @Query("""
+        SELECT ca FROM CardAttempt ca
+        JOIN FETCH ca.card c
+        JOIN FETCH c.user
+        WHERE ca.id = :attemptId
+        """)
+    Optional<CardAttempt> findByIdWithCardAndUser(@Param("attemptId") Long attemptId);
 }

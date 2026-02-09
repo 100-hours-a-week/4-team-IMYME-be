@@ -32,7 +32,7 @@ public class AttemptUploadService {
      */
     @Transactional
     public ValidatedAttempt markAttemptAsUploaded(Long userId, Long cardId, Long attemptId, UploadCompleteRequest request) {
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
+        Card card = cardRepository.findByIdAndUserIdWithKeyword(cardId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
 
         CardAttempt attempt = cardAttemptRepository.findById(attemptId)

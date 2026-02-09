@@ -52,6 +52,7 @@ public class AttemptService {
     private final S3Properties s3Properties;
     private final AttemptProperties attemptProperties;
     private final AttemptUploadService attemptUploadService;
+    private final AttemptSttService attemptSttService;
 
     private static final int MAX_ATTEMPTS_PER_CARD = 5;
 
@@ -132,8 +133,7 @@ public class AttemptService {
             String sttText = aiServerClient.transcribe(readPresignedUrl);
 
             // STT 결과 저장 (새 트랜잭션)
-            recordSttSuccess(attemptId, sttText);
-            log.info("STT 처리 성공 - attemptId: {}, 텍스트 길이: {}", attemptId, sttText.length());
+            attemptSttService.recordSttSuccess(attemptId, sttText);
 
             // Solo 모드 분석 이벤트 발행 (비동기 처리)
             publishSoloAnalysisEvent(attemptId, card, sttText);
@@ -141,33 +141,13 @@ public class AttemptService {
         } catch (BusinessException e) {
             // STT 오류 시 FAILED 상태로 변경 (새 트랜잭션)
             String errorCode = mapSttErrorCode(e);
-            recordSttFailure(attemptId, errorCode);
+            attemptSttService.recordSttFailure(attemptId, errorCode);
             log.error("STT 처리 실패 - attemptId: {}, errorCode: {}", attemptId, errorCode);
         } catch (Exception e) {
             // 예상치 못한 오류
-            recordSttFailure(attemptId, "UNKNOWN_ERROR");
+            attemptSttService.recordSttFailure(attemptId, "UNKNOWN_ERROR");
             log.error("STT 처리 중 예상치 못한 오류 - attemptId: {}", attemptId, e);
         }
-    }
-
-    /**
-     * STT 성공 결과 저장 (새 트랜잭션)
-     */
-    @Transactional
-    protected void recordSttSuccess(Long attemptId, String sttText) {
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
-        attempt.recordSttResult(sttText);
-    }
-
-    /**
-     * STT 실패 기록 (새 트랜잭션)
-     */
-    @Transactional
-    protected void recordSttFailure(Long attemptId, String errorCode) {
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
-        attempt.fail(errorCode);
     }
 
     /**
@@ -195,7 +175,7 @@ public class AttemptService {
         } catch (Exception e) {
             // 이벤트 발행 실패해도 STT는 성공했으므로 계속 진행
             log.error("Solo 분석 이벤트 발행 실패 - attemptId: {}", attemptId, e);
-            recordSttFailure(attemptId, "AI_FEEDBACK_FAILED");
+            attemptSttService.recordSttFailure(attemptId, "AI_FEEDBACK_FAILED");
         }
     }
 

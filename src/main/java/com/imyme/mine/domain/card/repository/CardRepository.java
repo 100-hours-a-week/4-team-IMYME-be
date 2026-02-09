@@ -18,6 +18,19 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     @Query("""
         SELECT c FROM Card c
+        JOIN FETCH c.keyword
+        JOIN FETCH c.user
+        WHERE c.id = :cardId
+        AND c.user.id = :userId
+        AND c.deletedAt IS NULL
+        """)
+    Optional<Card> findByIdAndUserIdWithKeyword(
+        @Param("cardId") Long cardId,
+        @Param("userId") Long userId
+    );
+
+    @Query("""
+        SELECT c FROM Card c
         JOIN FETCH c.category
         JOIN FETCH c.keyword
         WHERE c.user.id = :userId
