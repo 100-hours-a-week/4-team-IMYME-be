@@ -76,7 +76,7 @@ class E2EAuthControllerTest {
             .orElseThrow(() -> new AssertionError("E2E test user not found in database"));
 
         // when & then
-        mockMvc.perform(post("/api/v1/e2e/login")
+        mockMvc.perform(post("/e2e/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
@@ -101,7 +101,7 @@ class E2EAuthControllerTest {
 
         // when & then
         // DTO validation 실패는 HTTP 422 (Unprocessable Entity)를 반환
-        mockMvc.perform(post("/api/v1/e2e/login")
+        mockMvc.perform(post("/e2e/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
@@ -119,7 +119,7 @@ class E2EAuthControllerTest {
 
         // when & then
         // DTO validation 실패는 HTTP 422 (Unprocessable Entity)를 반환
-        mockMvc.perform(post("/api/v1/e2e/login")
+        mockMvc.perform(post("/e2e/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(emptyJson))
             .andDo(print())
@@ -137,7 +137,7 @@ class E2EAuthControllerTest {
         E2ELoginRequest request = new E2ELoginRequest(deviceUuid);
 
         // when - 첫 번째 로그인
-        String firstAccessToken = mockMvc.perform(post("/api/v1/e2e/login")
+        String firstAccessToken = mockMvc.perform(post("/e2e/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
@@ -147,7 +147,7 @@ class E2EAuthControllerTest {
             .getContentAsString();
 
         // when - 두 번째 로그인 (동일한 디바이스)
-        String secondAccessToken = mockMvc.perform(post("/api/v1/e2e/login")
+        String secondAccessToken = mockMvc.perform(post("/e2e/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
