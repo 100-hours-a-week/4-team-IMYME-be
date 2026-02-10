@@ -2,12 +2,16 @@ package com.imyme.mine.domain.learning.service;
 
 import com.imyme.mine.domain.ai.client.AiServerClient;
 import com.imyme.mine.domain.ai.dto.solo.*;
+import com.imyme.mine.domain.card.event.AttemptUploadedEvent;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -30,13 +34,26 @@ public class SoloService {
     private static final long POLL_INTERVAL_MS = 3000;  // 3초 간격
 
     /**
+     * 학습 시도 업로드 완료 이벤트 리스너
+     * - Event 기반으로 AttemptService와 결합도 감소
+     * - @Async로 비동기 처리 (별도 스레드에서 실행)
+     */
+    @EventListener
+    @Async
+    public void handleAttemptUploaded(AttemptUploadedEvent event) {
+        log.info("AttemptUploadedEvent 수신 - attemptId: {}", event.getAttemptId());
+
+        startSoloAnalysisAsync(
+            event.getAttemptId(),
+            event.getUserText(),
+            event.getCriteria(),
+            event.getHistory()
+        );
+    }
+
+    /**
      * Solo 분석을 비동기로 시작
      * - AI 서버에 분석 요청 후 Virtual Thread로 백그라운드 폴링
-     *
-     * @param attemptId 시도 ID
-     * @param userText  사용자 텍스트
-     * @param criteria  채점 기준
-     * @param history   이전 기록 (선택)
      */
     public void startSoloAnalysisAsync(
         Long attemptId,
@@ -47,7 +64,7 @@ public class SoloService {
         log.info("Solo 분석 시작 - attemptId: {}", attemptId);
 
         try {
-            // 1. AI 서버에 Solo 분석 요청
+            // AI 서버에 Solo 분석 요청
             SoloSubmissionRequest request = new SoloSubmissionRequest(
                 attemptId,
                 userText,
@@ -60,7 +77,7 @@ public class SoloService {
             log.info("Solo 분석 요청 완료 - attemptId: {}, status: {}",
                 attemptId, submission.status());
 
-            // 2. Virtual Thread로 백그라운드 폴링 시작
+            // Virtual Thread로 백그라운드 폴링 시작
             Thread.startVirtualThread(() -> {
                 pollAndSaveSoloResult(attemptId);
             });
@@ -78,8 +95,6 @@ public class SoloService {
      * - 3초마다 AI 서버에 결과 조회
      * - 완료되면 DB에 저장
      * - 최대 3분(60회) 대기
-     *
-     * @param attemptId 시도 ID
      */
     private void pollAndSaveSoloResult(Long attemptId) {
         log.debug("Solo 폴링 시작 - attemptId: {}", attemptId);
@@ -115,10 +130,10 @@ public class SoloService {
                 Thread.sleep(POLL_INTERVAL_MS);
 
             } catch (InterruptedException e) {
-                log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
                 Thread.currentThread().interrupt();
-                markAttemptFailed(attemptId, "UNKNOWN_ERROR");
-                return;
+                log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
+                markAttemptFailed(attemptId, "POLLING_INTERRUPTED");
+                throw new RuntimeException("Solo polling interrupted", e);
 
             } catch (BusinessException e) {
                 if (e.getErrorCode() == ErrorCode.AI_ANALYSIS_FAILED || e.getErrorCode() == ErrorCode.AI_POLLING_TIMEOUT) {
@@ -138,6 +153,7 @@ public class SoloService {
         markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
     }
 
+    @Transactional
     private void markAttemptFailed(Long attemptId, String errorCode) {
         attemptRepository.findById(attemptId).ifPresent(attempt -> {
             attempt.fail(errorCode);

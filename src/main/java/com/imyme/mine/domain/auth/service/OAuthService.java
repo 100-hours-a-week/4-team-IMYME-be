@@ -37,7 +37,11 @@ public class OAuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
 
+    private static final int MAX_RETRIES = 100;
+    private final SecureRandom secureRandom = new SecureRandom();
+
     // 카카오 로그인 메인 로직
+    @Transactional
     public OAuthLoginResponse loginWithKakao(OAuthLoginRequest request) {
         KakaoOAuthClient.KakaoUserInfo userInfo = fetchKakaoUserInfo(request);
         String oauthId = "kakao_" + userInfo.getId();
@@ -53,13 +57,18 @@ public class OAuthService {
     }
 
     // 로그인 처리 (회원가입 포함)
-    @Transactional
     protected OAuthLoginResponse processLogin(String oauthId, String deviceUuid, KakaoOAuthClient.KakaoUserInfo userInfo) {
 
         User user = userRepository.findByOauthId(oauthId)
             .orElseGet(() -> createNewUser(oauthId, userInfo));
 
         boolean isNewUser = user.getCreatedAt().isEqual(user.getUpdatedAt());
+
+        return login(user, deviceUuid, isNewUser);
+    }
+
+    // 공통 로그인 로직 (토큰 발급)
+    public OAuthLoginResponse login(User user, String deviceUuid, boolean isNewUser) {
         user.updateLastLogin();
 
         Device device = deviceRepository.findByDeviceUuid(deviceUuid)
@@ -88,11 +97,11 @@ public class OAuthService {
                 .orElse(null);
 
             if (userSession != null) {
-                // A. 이미 있으면 업데이트 (기존 로직 동일)
+                // 이미 있으면 업데이트 (기존 로직 동일)
                 log.info("기존 세션 재사용 - sessionId: {}", userSession.getId());
                 userSession.rotateRefreshToken(hashedRefreshToken, expiresAt);
             } else {
-                // B. 없으면 생성 (INSERT)
+                // 없으면 생성 (INSERT)
                 log.info("새 세션 생성 시도 - userId: {}, deviceUuid: {}", user.getId(), deviceUuid);
                 UserSession newSession = UserSession.builder()
                     .user(user)
@@ -104,18 +113,12 @@ public class OAuthService {
                 userSessionRepository.save(newSession); // 여기서 중복 발생 시 예외 터짐
             }
         } catch (DataIntegrityViolationException e) {
-            // [방어 로직 작동]
-            // "분명 아까는 없었는데 저장하려니까 중복이래!" -> 그 사이에 누가 만든 것임.
-            // 에러 내지 말고, 다시 조회해서 업데이트 해줌.
             log.warn("세션 생성 중 동시성 경합 발생! 업데이트로 전환합니다. userId={}", user.getId());
-
-            // 다시 조회 (이때는 무조건 있어야 함)
             UserSession existingSession = userSessionRepository
                 .findByUserIdAndDeviceUuid(user.getId(), deviceUuid)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR)); // 진짜 없으면 DB 에러임
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_CREATION_FAILED));
 
             existingSession.rotateRefreshToken(hashedRefreshToken, expiresAt);
-            // Transactional이 걸려있으므로 Dirty Checking으로 자동 저장됨
         }
 
         return OAuthLoginResponse.builder()
@@ -140,8 +143,12 @@ public class OAuthService {
                     profileImage = userInfo.getKakaoAccount().getProfile().getProfileImageUrl();
                 }
             }
+        } catch (NullPointerException e) {
+            // 카카오 API 응답 구조 변경 또는 필드 누락 시 기본값 사용
+            log.warn("카카오 정보 파싱 실패 (기본값 사용) - NullPointerException", e);
         } catch (Exception e) {
-            log.warn("카카오 정보 파싱 실패 (기본값 사용): {}", e.getMessage());
+            // 예상치 못한 예외 (stack trace 포함)
+            log.error("카카오 정보 파싱 중 예상치 못한 오류 발생", e);
         }
 
         // 닉네임 중복 방지 로직 적용
@@ -166,20 +173,23 @@ public class OAuthService {
 
     // 닉네임 중복 방지 (기본닉네임 + 랜덤숫자)
     private String generateUniqueNickname(String nickname) {
-        SecureRandom random = new SecureRandom();
-
-        // 1. 일단 닉네임만으로 존재 여부 확인
+        // 닉네임만으로 존재 여부 확인
         if (!userRepository.existsByNickname(nickname)) {
             return nickname;
         }
 
-        // 2. 중복되면 뒤에 랜덤 숫자 붙여서 시도
-        while (true) {
-            int suffix = random.nextInt(9999);
+        // 중복되면 뒤에 랜덤 숫자 붙여서 시도 (최대 100회)
+        int attempts = 0;
+        while (attempts++ < MAX_RETRIES) {
+            long suffix = Math.abs(secureRandom.nextLong() % 1_000_000);
             String candidate = nickname + "#" + suffix;
             if (!userRepository.existsByNickname(candidate)) {
                 return candidate;
             }
         }
+
+        // 최대 재시도 횟수 초과 시 예외 발생
+        log.error("닉네임 생성 실패 - 최대 재시도 횟수({}) 초과 - baseNickname: {}", MAX_RETRIES, nickname);
+        throw new BusinessException(ErrorCode.NICKNAME_GENERATION_FAILED);
     }
 }

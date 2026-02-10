@@ -30,22 +30,19 @@ public class WarmupController {
 
     @Operation(
         summary = "STT 서버 워밍업",
-        description = "GPU 콜드 스타트 방지를 위한 워밍업 요청. 비동기로 처리되며 즉시 응답합니다. Rate Limit: 1분당 1회",
+        description = "GPU 콜드 스타트 방지를 위한 워밍업 요청. " +
+                      "비동기로 처리되며 즉시 응답합니다. " +
+                      "쿨다운 기간(30초) 내 중복 호출 시 AI 서버 호출을 생략하여 불필요한 부하를 방지합니다.",
         security = @SecurityRequirement(name = "JWT")
     )
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "202",
-            description = "워밍업 시작 (Accepted)"
+            description = "워밍업 시작 (Accepted) - 쿨다운 기간 내면 AI 서버 호출 생략"
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "401",
             description = "인증 실패 - UNAUTHORIZED",
-            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
-        ),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "429",
-            description = "Rate Limit 초과 - RATE_LIMIT_EXCEEDED",
             content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
         )
     })

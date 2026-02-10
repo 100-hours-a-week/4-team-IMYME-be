@@ -1,0 +1,26 @@
+spring:
+    config:
+        activate:
+            on-profile: prod
+
+    flyway:
+        locations: classpath:db/migration
+
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false      # 운영에선 쿼리 로그 끔
+        open-in-view: false
+
+logging:
+    level:
+        root: INFO
+        com.imyme.mine: INFO
+        org.springframework.security: INFO
+        # 운영에선 쿼리 로그 끄거나 에러만 봄
+        org.hibernate.SQL: WARN
+
+# (선택) 운영 환경에서 배치 작업을 켜려면 여기서 설정
+knowledge:
+    batch:
+        enabled: false

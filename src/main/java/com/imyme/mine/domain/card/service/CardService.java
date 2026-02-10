@@ -25,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Slf4j
@@ -40,6 +42,7 @@ public class CardService {
     private final KeywordRepository keywordRepository;
 
     private static final int DEFAULT_LIMIT = 20;
+    private static final int MAX_LIMIT = 100;
 
     @Transactional
     public CardResponse createCard(Long userId, CardCreateRequest request) {
@@ -92,13 +95,10 @@ public class CardService {
         Card card = cardRepository.findByIdAndUserId(cardId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
 
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
         cardRepository.delete(card);
 
-        if (card.getAttemptCount() != null && card.getAttemptCount() > 0) {
-            user.decrementActiveCardCount();
+        if (card.getAttemptCount() > 0) {
+            card.getUser().decrementActiveCardCount();
         }
 
         log.info("카드 삭제 완료 - cardId: {}, userId: {}", cardId, userId);
@@ -116,7 +116,8 @@ public class CardService {
         log.debug("카드 목록 조회 - userId: {}, categoryId: {}, keywordIds: {}, excludeGhost: {}, sort: {}, cursor: {}",
             userId, categoryId, keywordIds, excludeGhost, sort, cursor);
 
-        int pageSize = (limit != null && limit > 0) ? limit : DEFAULT_LIMIT;
+        // Pagination 공격 방지: 최대값 제한
+        int pageSize = (limit != null && limit > 0) ? Math.min(limit, MAX_LIMIT) : DEFAULT_LIMIT;
         boolean isRecentFirst = !"oldest".equalsIgnoreCase(sort);
         PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
 
@@ -163,18 +164,33 @@ public class CardService {
 
             int lastUnderscore = decoded.lastIndexOf('_');
             if (lastUnderscore == -1) {
+                log.warn("Invalid cursor format: missing underscore - cursor: {}", cursor);
                 throw new BusinessException(ErrorCode.INVALID_REQUEST);
             }
 
             String createdAtStr = decoded.substring(0, lastUnderscore);
             String idStr = decoded.substring(lastUnderscore + 1);
 
-            LocalDateTime createdAt = LocalDateTime.parse(createdAtStr);
+            // DateTimeFormatter를 명시적으로 사용하여 파싱
+            LocalDateTime createdAt = LocalDateTime.parse(
+                createdAtStr,
+                DateTimeFormatter.ISO_LOCAL_DATE_TIME
+            );
             Long id = Long.parseLong(idStr);
 
             return new CursorInfo(createdAt, id);
+
+        } catch (DateTimeParseException e) {
+            log.warn("Invalid cursor format: invalid datetime - cursor: {}", cursor, e);
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        } catch (NumberFormatException e) {
+            log.warn("Invalid cursor format: invalid id - cursor: {}", cursor, e);
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid cursor format: invalid base64 - cursor: {}", cursor, e);
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
         } catch (Exception e) {
-            log.warn("커서 디코딩 실패 - cursor: {}", cursor, e);
+            log.warn("Cursor decoding failed - cursor: {}", cursor, e);
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
     }

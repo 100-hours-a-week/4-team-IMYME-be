@@ -61,4 +61,10 @@ public class KnowledgeProperties {
      * - 이 값보다 높은 유사도를 가진 지식만 가져옴
      */
     private double similarityThreshold = 0.7;
+
+    /**
+     * 처리할 피드백이 없을 때 대기 시간 (밀리초)
+     * - 기본값: 120000ms (2분)
+     */
+    private long idleSleepMs = 120000;
 }

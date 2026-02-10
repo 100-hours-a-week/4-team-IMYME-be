@@ -18,6 +18,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -175,7 +177,9 @@ public class CardController {
         @Parameter(description = "고스트 카드 포함 여부 (기본값: true)") @RequestParam(name = "ghost", required = false, defaultValue = "true") Boolean ghost,
         @Parameter(description = "정렬 방식 (recent, oldest)") @RequestParam(name = "sort", required = false, defaultValue = "recent") String sort,
         @Parameter(description = "커서 (페이지네이션용)") @RequestParam(name = "cursor", required = false) String cursor,
-        @Parameter(description = "한 번에 가져올 카드 수 (기본값: 20)") @RequestParam(name = "limit", required = false, defaultValue = "20") Integer limit
+        @Parameter(description = "한 번에 가져올 카드 수 (1-100, 기본값: 20)")
+        @RequestParam(name = "limit", required = false, defaultValue = "20")
+        @Min(1) @Max(100) Integer limit
     ) {
         Long userId = userPrincipal.getId();
         log.info("GET /cards - userId: {}, categoryId: {}, keywordIds: {}, ghost: {}, sort: {}",

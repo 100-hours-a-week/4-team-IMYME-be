@@ -13,9 +13,8 @@ import java.time.LocalDateTime;
 /**
  * 지식 베이스 엔티티
  * - 사용자 업로드 지식 콘텐츠 저장
- * - OpenAI 임베딩 벡터 저장
+ * - RAG용 벡터 임베딩 저장 (1024차원)
  * - SHA-256 콘텐츠 해시로 중복 방지
- * - 활성화 여부로 검색 노출 제어
  */
 @Entity
 @Table(
@@ -25,6 +24,10 @@ import java.time.LocalDateTime;
             name = "uk_kb_content_hash",
             columnNames = {"content_hash"}
         )
+    },
+    indexes = {
+        @Index(name = "idx_kb_keyword_active", columnList = "keyword_id"), // Partial Index 조건은 JPA로 표현 불가하므로 이름만 명시
+        @Index(name = "idx_kb_created_at", columnList = "created_at DESC")
     }
 )
 @Getter
@@ -37,7 +40,7 @@ public class KnowledgeBase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 연관 키워드
+    // 연관 키워드 (삭제 시 SET NULL 정책은 DB 레벨에서 처리됨)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "keyword_id")
     private Keyword keyword;
@@ -46,21 +49,18 @@ public class KnowledgeBase {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    // 벡터 임베딩: OpenAI text-embedding-3-small 모델 기준 1024차원
-    // 의미적 유사도 검색용 벡터 데이터
+    // 벡터 임베딩: qwen3-embedding-0.6b 모델 기준 1024차원
     // PostgreSQL vector 타입으로 명시적 형변환(Casting) 추가
     @Column(name = "embedding", columnDefinition = "vector")
     @ColumnTransformer(write = "?::vector")
     private String embedding;
 
     // 콘텐츠 해시: SHA-256 해시값 (64자)
-    // 중복 지식 저장 방지 및 OpenAI 임베딩 API 호출 최소화
-    // 동일 내용이 이미 존재하면 임베딩 재생성 없이 기존 데이터 재사용
     @Column(name = "content_hash", nullable = false, length = 64)
     @JdbcTypeCode(SqlTypes.CHAR)
     private String contentHash;
 
-    // 활성화 여부: 검색 노출 제어
+    // 활성화 여부
     @Column(name = "is_active", nullable = false)
     @ColumnDefault("TRUE")
     @Builder.Default
@@ -75,7 +75,6 @@ public class KnowledgeBase {
     @ColumnDefault("CURRENT_TIMESTAMP")
     private LocalDateTime updatedAt;
 
-    // JPA 생명주기 콜백
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
@@ -88,36 +87,23 @@ public class KnowledgeBase {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 비즈니스 로직 메서드
+    // --- 비즈니스 로직 ---
 
-    // 콘텐츠 및 해시 업데이트 : 콘텐츠 변경 시 임베딩 재생성 필요
+    // 콘텐츠 업데이트 (임베딩 초기화)
     public void updateContent(String newContent, String newContentHash) {
         this.content = newContent;
         this.contentHash = newContentHash;
-        this.embedding = null;  // 임베딩 재생성 필요 표시
+        this.embedding = null; // 재발급 필요 상태로 변경
     }
 
-    // 임베딩 업데이트 : OpenAI API 호출 후 임베딩 저장
     public void updateEmbedding(String embeddingVector) {
         this.embedding = embeddingVector;
     }
 
-    // 활성화 상태 토글
     public void toggleActive() {
         this.isActive = !this.isActive;
     }
 
-    // 비활성화
-    public void deactivate() {
-        this.isActive = false;
-    }
-
-    // 활성화
-    public void activate() {
-        this.isActive = true;
-    }
-
-    // 임베딩 존재 여부 확인
     public boolean hasEmbedding() {
         return this.embedding != null && !this.embedding.isBlank();
     }

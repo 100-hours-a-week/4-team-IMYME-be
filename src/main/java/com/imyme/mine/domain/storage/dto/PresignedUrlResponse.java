@@ -6,6 +6,7 @@ public record PresignedUrlResponse(
 
     Long attemptId,
     String uploadUrl,
+    String contentType,
     String objectKey,
     LocalDateTime expiresAt
 
@@ -14,9 +15,10 @@ public record PresignedUrlResponse(
     public static PresignedUrlResponse of(
         Long attemptId,
         String uploadUrl,
+        String contentType,
         String objectKey,
         LocalDateTime expiresAt
     ) {
-        return new PresignedUrlResponse(attemptId, uploadUrl, objectKey, expiresAt);
+        return new PresignedUrlResponse(attemptId, uploadUrl, contentType, objectKey, expiresAt);
     }
 }

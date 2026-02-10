@@ -157,7 +157,7 @@ public class AttemptController {
 
     @Operation(
         summary = "학습 시도 삭제",
-        description = "학습 시도를 삭제합니다. (Soft Delete)",
+        description = "학습 시도를 삭제합니다.",
         security = @SecurityRequirement(name = "JWT")
     )
     @ApiResponses({

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import io.swagger.v3.oas.models.tags.Tag;
@@ -23,6 +24,9 @@ import java.util.List;
  */
 @Configuration
 public class OpenApiConfig {
+
+    @Value("${swagger.dev-server-url}")
+    private String devServerUrl;
 
     @Bean
     public OpenAPI openAPI() {
@@ -66,6 +70,10 @@ public class OpenApiConfig {
             .url("https://imymemine.kr/server")
             .description("운영 서버 (Production)");
 
+        Server devServer = new Server()
+            .url(devServerUrl)  // 환경변수에서 읽어옴
+            .description("개발 서버 (Development)");
+
         Server localServer = new Server()
             .url("http://localhost:8080")
             .description("로컬 서버 (Local)");
@@ -74,7 +82,7 @@ public class OpenApiConfig {
             .info(apiInfo())
             .addSecurityItem(securityRequirement)
             .components(components)
-            .servers(List.of(prodServer, localServer))
+            .servers(List.of(prodServer, devServer, localServer))
             .addTagsItem(new Tag().name("1. Health").description("서버 상태 확인 API"))
             .addTagsItem(new Tag().name("2. Auth").description("OAuth 로그인, 토큰 관리, 로그아웃 API"))
             .addTagsItem(new Tag().name("3. User").description("프로필 조회/수정, 닉네임 검증, 프로필 이미지 업로드, 회원 탈퇴 API"))

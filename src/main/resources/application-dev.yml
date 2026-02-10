@@ -1,0 +1,21 @@
+spring:
+    config:
+        activate:
+            on-profile: dev # 'dev' 프로필일 때 활성화
+
+    # [핵심] 개발 환경에서는 테스트 데이터도 같이 실행!
+    flyway:
+        locations: classpath:db/migration, classpath:db/testdata
+
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: true        # 쿼리 보여주기
+        properties:
+            hibernate:
+                format_sql: true  # 쿼리 예쁘게 정렬
+
+logging:
+    level:
+        com.imyme.mine: DEBUG
+        org.flywaydb: INFO

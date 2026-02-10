@@ -19,7 +19,6 @@ public record AttemptDetailResponse(
     Long cardId,
     String status,
     AttemptProcessingStep step,
-    String audioUrl,
     Integer durationSeconds,
     String sttText,
     FeedbackDto feedback,
@@ -53,22 +52,21 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
-            null,
-            null,
-            null,
-            null,
-            null,
+            null,                          // step
+            null,                          // durationSeconds
+            null,                          // sttText
+            null,                          // feedback
             attempt.getCreatedAt(),
-            null,
-            null,
-            null,
+            null,                          // uploadedAt
+            null,                          // finishedAt
+            null,                          // failedAt
             expiresAt,
-            null,
-            null,
-            null,
+            null,                          // expiredAt
+            null,                          // estimatedCompletionAt
+            null,                          // retryAfterSeconds
             Math.max(0, remainingSeconds),
-            null,
-            null,
+            null,                          // errorMessage
+            null,                          // retryAvailable
             "S3 업로드를 완료한 후 upload-complete API를 호출해주세요."
         );
     }
@@ -87,22 +85,21 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
-            null,
-            attempt.getAudioUrl(),
-            null,
-            null,
-            null,
+            null,                          // step
+            null,                          // durationSeconds
+            null,                          // sttText
+            null,                          // feedback
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
-            null,
-            null,
-            null,
-            null,
+            null,                          // finishedAt
+            null,                          // failedAt
+            null,                          // expiresAt
+            null,                          // expiredAt
             estimatedCompletion,
-            3,
-            null,
-            null,
-            null,
+            3,                             // retryAfterSeconds
+            null,                          // remainingSeconds
+            null,                          // errorMessage
+            null,                          // retryAvailable
             "AI 음성 분석 대기 중입니다."
         );
     }
@@ -125,21 +122,20 @@ public record AttemptDetailResponse(
             attempt.getCard().getId(),
             attempt.getStatus().name(),
             step,
-            attempt.getAudioUrl(),
-            null,
-            null,
-            null,
+            null,                          // durationSeconds
+            null,                          // sttText
+            null,                          // feedback
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
-            null,
-            null,
-            null,
-            null,
+            null,                          // finishedAt
+            null,                          // failedAt
+            null,                          // expiresAt
+            null,                          // expiredAt
             estimatedCompletion,
-            3,
-            null,
-            null,
-            null,
+            3,                             // retryAfterSeconds
+            null,                          // remainingSeconds
+            null,                          // errorMessage
+            null,                          // retryAvailable
             message
         );
     }
@@ -156,23 +152,22 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
-            null,
-            attempt.getAudioUrl(),
+            null,                          // step
             attempt.getDurationSeconds(),
             attempt.getSttText(),
             feedback != null ? FeedbackDto.from(feedback) : null,
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
             attempt.getFinishedAt(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
+            null,                          // failedAt
+            null,                          // expiresAt
+            null,                          // expiredAt
+            null,                          // estimatedCompletionAt
+            null,                          // retryAfterSeconds
+            null,                          // remainingSeconds
+            null,                          // errorMessage
+            null,                          // retryAvailable
+            null                           // message
         );
     }
 
@@ -188,22 +183,21 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
-            null,
-            attempt.getAudioUrl(),
-            null,
-            null,
-            null,
+            null,                          // step
+            null,                          // durationSeconds
+            null,                          // sttText
+            null,                          // feedback
             attempt.getCreatedAt(),
             attempt.getSubmittedAt(),
-            null,
-            attempt.getFinishedAt(), // 실패 시각
-            null,
-            null,
-            null,
-            null,
-            null,
+            null,                          // finishedAt
+            attempt.getFinishedAt(),       // failedAt
+            null,                          // expiresAt
+            null,                          // expiredAt
+            null,                          // estimatedCompletionAt
+            null,                          // retryAfterSeconds
+            null,                          // remainingSeconds
             attempt.getErrorMessage() != null ? attempt.getErrorMessage() : "UNKNOWN_ERROR",
-            true,
+            true,                          // retryAvailable
             "오류가 발생했습니다. 다시 시도해주세요."
         );
     }
@@ -222,22 +216,21 @@ public record AttemptDetailResponse(
             attempt.getAttemptNo(),
             attempt.getCard().getId(),
             attempt.getStatus().name(),
-            null,
-            null,
-            null,
-            null,
-            null,
+            null,                          // step
+            null,                          // durationSeconds
+            null,                          // sttText
+            null,                          // feedback
             attempt.getCreatedAt(),
-            null,
-            null,
-            null,
-            null,
-            calculatedExpiredAt, // 계산된 만료 시간 반환
-            null,
-            null,
-            null,
+            null,                          // uploadedAt
+            null,                          // finishedAt
+            null,                          // failedAt
+            null,                          // expiresAt
+            calculatedExpiredAt,           // expiredAt
+            null,                          // estimatedCompletionAt
+            null,                          // retryAfterSeconds
+            null,                          // remainingSeconds
             "업로드 제한 시간이 초과되었습니다.",
-            false,
+            false,                         // retryAvailable
             "처음부터 다시 시도해주세요."
         );
     }

@@ -1,5 +1,8 @@
 package com.imyme.mine.domain.ai.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.imyme.mine.domain.ai.dto.AiServerErrorResponse;
 import com.imyme.mine.domain.ai.dto.TranscriptionRequest;
 import com.imyme.mine.domain.ai.dto.TranscriptionResponse;
 import com.imyme.mine.domain.ai.dto.knowledge.*;
@@ -36,6 +39,7 @@ public class AiServerClient {
 
     private final AiServerProperties properties;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * 음성 파일을 텍스트로 변환 (STT)
@@ -82,6 +86,12 @@ public class AiServerClient {
             return sttText;
 
         } catch (HttpClientErrorException e) {
+            // 429 Rate Limit 에러 처리
+            if (e.getStatusCode() == org.springframework.http.HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("STT API Rate Limit 초과 - status: 429, 잠시 후 다시 시도해주세요");
+                throw new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED);
+            }
+
             // 422 Validation Error
             log.error("STT API 클라이언트 오류 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);
@@ -425,26 +435,55 @@ public class AiServerClient {
 
     /**
      * Knowledge API 에러 메시지를 파싱하여 적절한 예외 발생
+     * - 구조화된 ErrorResponse로 파싱 시도
+     * - 파싱 실패 시 String contains로 폴백
      */
     private void handleKnowledgeApiError(String errorMessage) {
         if (errorMessage == null) {
             throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
         }
 
-        if (errorMessage.contains("INVALID_FEEDBACK")) {
-            throw new BusinessException(ErrorCode.INVALID_FEEDBACK);
-        } else if (errorMessage.contains("TOO_MANY_ITEMS")) {
-            throw new BusinessException(ErrorCode.TOO_MANY_ITEMS);
-        } else if (errorMessage.contains("INVALID_CANDIDATE")) {
-            throw new BusinessException(ErrorCode.INVALID_CANDIDATE);
-        } else if (errorMessage.contains("TOO_MANY_SIMILARS")) {
-            throw new BusinessException(ErrorCode.TOO_MANY_SIMILARS);
-        } else if (errorMessage.contains("EMBEDDING_ERROR")) {
-            throw new BusinessException(ErrorCode.EMBEDDING_ERROR);
-        } else if (errorMessage.contains("LLM_ERROR") || errorMessage.contains("LLM_TIMEOUT")) {
-            throw new BusinessException(ErrorCode.LLM_ERROR);
-        } else {
-            throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+        // 1. 구조화된 JSON 응답 파싱 시도
+        try {
+            AiServerErrorResponse errorResponse = objectMapper.readValue(errorMessage, AiServerErrorResponse.class);
+            String errorCode = errorResponse.errorCode();
+
+            ErrorCode businessErrorCode = switch (errorCode) {
+                case "INVALID_FEEDBACK" -> ErrorCode.INVALID_FEEDBACK;
+                case "TOO_MANY_ITEMS" -> ErrorCode.TOO_MANY_ITEMS;
+                case "INVALID_CANDIDATE" -> ErrorCode.INVALID_CANDIDATE;
+                case "TOO_MANY_SIMILARS" -> ErrorCode.TOO_MANY_SIMILARS;
+                case "EMBEDDING_ERROR" -> ErrorCode.EMBEDDING_ERROR;
+                case "LLM_ERROR", "LLM_TIMEOUT" -> ErrorCode.LLM_ERROR;
+                case "TIMEOUT" -> ErrorCode.AI_POLLING_TIMEOUT;
+                case "SERVICE_UNAVAILABLE" -> ErrorCode.AI_SERVICE_UNAVAILABLE;
+                default -> {
+                    log.warn("알 수 없는 AI 서버 에러 코드: {}", errorCode);
+                    yield ErrorCode.AI_SERVICE_UNAVAILABLE;
+                }
+            };
+
+            throw new BusinessException(businessErrorCode);
+
+        } catch (JsonProcessingException e) {
+            // 2. JSON 파싱 실패 시 String contains로 폴백
+            log.debug("AI 서버 에러 응답 JSON 파싱 실패, String 매칭으로 폴백 - error: {}", e.getMessage());
+
+            if (errorMessage.contains("INVALID_FEEDBACK")) {
+                throw new BusinessException(ErrorCode.INVALID_FEEDBACK);
+            } else if (errorMessage.contains("TOO_MANY_ITEMS")) {
+                throw new BusinessException(ErrorCode.TOO_MANY_ITEMS);
+            } else if (errorMessage.contains("INVALID_CANDIDATE")) {
+                throw new BusinessException(ErrorCode.INVALID_CANDIDATE);
+            } else if (errorMessage.contains("TOO_MANY_SIMILARS")) {
+                throw new BusinessException(ErrorCode.TOO_MANY_SIMILARS);
+            } else if (errorMessage.contains("EMBEDDING_ERROR")) {
+                throw new BusinessException(ErrorCode.EMBEDDING_ERROR);
+            } else if (errorMessage.contains("LLM_ERROR") || errorMessage.contains("LLM_TIMEOUT")) {
+                throw new BusinessException(ErrorCode.LLM_ERROR);
+            } else {
+                throw new BusinessException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+            }
         }
     }
 

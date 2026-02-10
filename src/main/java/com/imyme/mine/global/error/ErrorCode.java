@@ -28,6 +28,8 @@ public enum ErrorCode {
     INVALID_OAUTH_CODE(HttpStatus.BAD_REQUEST, "유효하지 않은 OAuth 인증 코드입니다."),
     INVALID_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 OAuth 제공자입니다."),
     OAUTH_PROVIDER_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "OAuth 제공자 서버에 일시적인 문제가 발생했습니다."),
+    NICKNAME_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "닉네임 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    SESSION_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "세션 생성에 실패했습니다. 다시 로그인해주세요."),
 
     // ========== 리소스 없음 (404) ==========
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
@@ -53,6 +55,7 @@ public enum ErrorCode {
     INVALID_PLATFORM_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 Platform Type입니다."),
     INVALID_CONTENT_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     CHECKSUM_MISMATCH(HttpStatus.BAD_REQUEST, "파일 체크섬이 일치하지 않습니다."),
+    INVALID_OBJECT_KEY(HttpStatus.BAD_REQUEST, "요청된 objectKey가 발급된 것과 일치하지 않습니다."),
 
     // ========== 충돌 (409) ==========
     NICKNAME_DUPLICATE(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),

@@ -60,15 +60,15 @@ public class SecurityConfig {
                                 "/keywords/**",
                                 "/auth/**",
                                 "/oauth2/**",     // 혹시 모를 OAuth 기본 경로
+                                "/e2e/**", // E2E 테스트 전용 (test 프로파일에서만 활성화)
                                 "/error",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/actuator/prometheus",  // Prometheus 메트릭 수집 엔드포인트
-                                "/actuator/health",      // 헬스체크
-                                "/actuator/**"         // 애플리케이션 정보
+                                "/actuator/health",      // 헬스체크 (화이트리스트)
+                                "/actuator/prometheus"   // Prometheus 메트릭 (화이트리스트)
                         ).permitAll()
                         .anyRequest().authenticated())
 

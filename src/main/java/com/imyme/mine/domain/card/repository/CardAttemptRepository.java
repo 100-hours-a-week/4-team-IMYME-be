@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> {
@@ -22,8 +23,27 @@ public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> 
     long countByCardId(Long cardId);
 
     /**
+     * 특정 상태를 제외한 카드 시도 개수 조회
+     * - MAX_ATTEMPTS 체크 시 FAILED/EXPIRED는 제외해야 함
+     */
+    long countByCardIdAndStatusNotIn(Long cardId, List<AttemptStatus> excludedStatuses);
+
+    /**
      * 특정 상태이고 생성 시간이 특정 시간 이전인 시도 조회
      * - 스케줄러에서 만료 처리용
      */
     List<CardAttempt> findByStatusAndCreatedAtBefore(AttemptStatus status, LocalDateTime createdAt);
+
+    /**
+     * CardAttempt를 Card 및 User와 함께 조회 (Lazy Loading 방지)
+     * - SoloFeedbackSaveService에서 사용
+     * - Virtual Thread에서 실행되므로 fetch join 필수
+     */
+    @Query("""
+        SELECT ca FROM CardAttempt ca
+        JOIN FETCH ca.card c
+        JOIN FETCH c.user
+        WHERE ca.id = :attemptId
+        """)
+    Optional<CardAttempt> findByIdWithCardAndUser(@Param("attemptId") Long attemptId);
 }
