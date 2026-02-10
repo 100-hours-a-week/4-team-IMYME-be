@@ -57,3 +57,13 @@ CLAUDE.md
 
 # AGENTS.md
 AGENTS.md
+
+# k6 test results
+k6-tests/results.json
+k6-tests/*.json
+/monitoring/HOW-TO-RUN.md
+/monitoring/CHEATSHEET.md
+/monitoring/METRICS-GUIDE.md
+/monitoring/QUICKSTART.md
+/k6-tests/README.md
+/monitoring/README.md

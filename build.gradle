@@ -124,3 +124,15 @@ checkstyleMain {
         xml.required = false
     }
 }
+
+tasks.named('bootRun') {
+    // 각자 컴퓨터에 있는 에이전트 경로
+    def pinpointPath = "/Users/nj.nam/pinpoint-agent-3.0.4/pinpoint-bootstrap-3.0.4.jar"
+
+    jvmArgs = [
+            "-javaagent:${pinpointPath}",
+            "-Dpinpoint.agentId=local-mine-01",    // 핀포인트에서 보일 내 ID (유니크해야 함)
+            "-Dpinpoint.applicationName=MINE-LOCAL", // 프로젝트 그룹 이름
+            "-Dpinpoint.profiler.profiles.active=local"
+    ]
+}
