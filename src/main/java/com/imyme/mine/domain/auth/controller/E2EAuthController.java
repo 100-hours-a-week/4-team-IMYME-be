@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("test")
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/e2e")
+@RequestMapping("/e2e")
 @RequiredArgsConstructor
 public class E2EAuthController {
 
