@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Spring Boot Actuator 메트릭 수집
+  - job_name: 'imyme-spring-boot'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['YOUR_LOCAL_IP:8080']
+        labels:
+          application: 'imyme-backend'
+          environment: 'local'
