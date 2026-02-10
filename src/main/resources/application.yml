@@ -1,18 +1,18 @@
 spring:
     config:
-        # .env 파일을 불러오는 설정
+        # .env 파일을 불러오는 설정 (로컬 개발 시 유용)
         import: optional:file:.env[.yaml]
 
     application:
         name: mine
 
-    # JSON 날짜 포맷 설정 (배열 대신 문자열로 반환)
+    # JSON 날짜 포맷 설정
     jackson:
         serialization:
             write-dates-as-timestamps: false
         time-zone: Asia/Seoul
 
-    # 파일 업로드 용량 설정 (기본 1MB -> 20MB)
+    # 파일 업로드 용량 설정
     servlet:
         multipart:
             max-file-size: 20MB
@@ -20,41 +20,28 @@ spring:
 
     mvc:
         throw-exception-if-no-handler-found: true
-        path match:
+        pathmatch:
             matching-strategy: ant_path_matcher
     web:
         resources:
             add-mappings: false
 
     # ==================================================
-    # DB (PostgreSQL)
+    # DB / JPA 공통 (구체적 설정은 프로필별로 다를 수 있음)
     # ==================================================
     datasource:
         url: ${DB_URL}
         username: ${DB_USERNAME}
         password: ${DB_PASSWORD}
         driver-class-name: org.postgresql.Driver
+
     flyway:
         enabled: true
-        # 기존에 Flyway 없이 만든 테이블이 있어도 에러 내지 않고 히스토리 테이블 생성
         baseline-on-migrate: true
-        # 마이그레이션 스크립트 위치 (기본값이라 생략 가능하지만 명시함)
-        locations: classpath:db/migration
+        locations: classpath:db/migration # 기본값
 
     # ==================================================
-    # JPA / Hibernate
-    # ==================================================
-    jpa:
-        hibernate:
-            ddl-auto: validate
-        show-sql: false
-        properties:
-            hibernate:
-                format_sql: true
-        open-in-view: false
-
-    # ==================================================
-    # Security OAuth2 (카카오 로그인)
+    # Security / OAuth2 공통
     # ==================================================
     security:
         oauth2:
@@ -78,7 +65,7 @@ spring:
                         user-name-attribute: id
 
 # ==================================================
-# AWS S3 설정
+# AWS / AI / JWT / Swagger 공통 변수 매핑
 # ==================================================
 cloud:
     aws:
@@ -90,58 +77,47 @@ cloud:
         s3:
             bucket: ${BUCKET_NAME}
 
-# ==================================================
-# AI 서버 설정
-# ==================================================
 ai-server:
     base-url: ${AI_SERVER_URL}
     secret: ${AI_SERVER_SECRET}
     timeout-seconds: 30
-    # 100초(AI서버수명) - 60초(최대녹음) - 5초(여유) = 35초
     warmup-cooldown-seconds: 35
 
+jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 3600000    # 1시간
+    refresh-token-expiration: 604800000 # 7일
+
+cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+swagger:
+    dev-server-url: ${SWAGGER_DEV_SERVER_URL}
+
 # ==================================================
-# Knowledge 배치 작업 설정
+# 비즈니스 로직 설정 (Attempt, Profile, Knowledge)
 # ==================================================
+attempt:
+    upload-expiration-minutes: 10
+    presigned-url-expiration-hours: 1
+
+profile-image:
+    presigned-url-expiration-minutes: 5
+    get-url-expiration-hours: 1
+
 knowledge:
     batch:
-        # 배치 작업 활성화 여부 (false로 설정하면 스케줄러 실행 안 됨)
-        enabled: false
-        # 한 번에 처리할 피드백 배치 크기 (AI 서버 제한: 최대 100개)
+        enabled: false # 기본은 꺼둠 (Prod나 별도 Worker에서만 켜는 것을 권장)
         batch-size: 50
-        # 키워드 간 처리 지연 시간 (밀리초) - AI 서버 부하 방지
         keyword-delay-ms: 1000
-        # 배치 간 처리 지연 시간 (밀리초) - OpenAI API rate limit 방지
         batch-delay-ms: 2000
-        # 활성화된 키워드 ID 목록 (빈 리스트면 모든 키워드 처리)
         enabled-keywords: []
-        # 유사도 검색 시 가져올 최대 개수 (AI 서버 제한: 최대 10개)
         max-similar-count: 5
-        # 유사도 임계값 (0.0 ~ 1.0) - 이 값보다 높은 유사도를 가진 지식만 가져옴
         similarity-threshold: 0.7
-        # 처리할 피드백이 없을 때 대기 시간 (밀리초)
         idle-sleep-ms: 120000
 
 # ==================================================
-# 학습 시도 설정
-# ==================================================
-attempt:
-    # 업로드 만료 시간 (분)
-    upload-expiration-minutes: 10
-    # Presigned URL 만료 시간 (시간)
-    presigned-url-expiration-hours: 1
-
-# ==================================================
-# 프로필 이미지 설정
-# ==================================================
-profile-image:
-    # Presigned URL 생성 시간 (분)
-    presigned-url-expiration-minutes: 5
-    # 이미지 조회 URL 만료 시간 (시간)
-    get-url-expiration-hours: 1
-
-# ==================================================
-# 서버 설정
+# Actuator / Swagger UI
 # ==================================================
 server:
     port: 8080
@@ -150,63 +126,26 @@ server:
             charset: UTF-8
             force: true
 
-# ==================================================
-# 로그 설정
-# ==================================================
-logging:
-    level:
-        com.imyme.mine: DEBUG
-        org.springframework.security: INFO
-        org.hibernate.SQL: DEBUG
-        org.hibernate.type.descriptor.sql.BasicBinder: TRACE # 바인딩 변수 보려면 TRACE 권장
-        org.hibernate.type: INFO # 너무 시끄러운 로그 방지
-        org.flywaydb: INFO
-    pattern:
-        console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-
-# ==================================================
-# JWT 설정
-# ==================================================
-jwt:
-    secret: ${JWT_SECRET}
-    access-token-expiration: 3600000    # 1시간
-    refresh-token-expiration: 604800000 # 7일
-
-# ==================================================
-# CORS 설정
-# ==================================================
-cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS}
-
-# ==================================================
-# Swagger 설정
-# ==================================================
-swagger:
-    dev-server-url: ${SWAGGER_DEV_SERVER_URL}
-
 springdoc:
     swagger-ui:
         path: /swagger-ui.html
         tags-sorter: alpha
         groups-order: DESC
-        operations-sorter: method # 메소드 순 정렬 (GET -> POST -> PUT)
+        operations-sorter: method
         disable-swagger-default-url: true
-        display-request-duration: true # 요청 소요 시간 표시
+        display-request-duration: true
     api-docs:
         path: /v3/api-docs
     show-actuator: true
     default-consumes-media-type: application/json
     default-produces-media-type: application/json
 
-# ==================================================
-# Actuator & Prometheus 설정
-# ==================================================
 management:
     endpoints:
         web:
             exposure:
                 include: health,info,prometheus,metrics
-            base-path: /actuator
+        base-path: /actuator
     endpoint:
         health:
             show-details: always

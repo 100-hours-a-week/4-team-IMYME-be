@@ -1,3 +1,6 @@
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.Confidence
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.12'
@@ -81,8 +84,8 @@ tasks.named('test') {
 // Spotbugs
 spotbugs {
     toolVersion = '4.8.3'
-    effort = 'max'
-    reportLevel = 'low'
+    effort = Effort.valueOf('MAX')
+    reportLevel = Confidence.valueOf('LOW')
     ignoreFailures = true  // MVP 단계에서는 경고만
 }
 
