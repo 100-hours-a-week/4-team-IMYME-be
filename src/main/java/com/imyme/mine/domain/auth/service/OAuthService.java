@@ -63,6 +63,12 @@ public class OAuthService {
             .orElseGet(() -> createNewUser(oauthId, userInfo));
 
         boolean isNewUser = user.getCreatedAt().isEqual(user.getUpdatedAt());
+
+        return login(user, deviceUuid, isNewUser);
+    }
+
+    // 공통 로그인 로직 (토큰 발급)
+    public OAuthLoginResponse login(User user, String deviceUuid, boolean isNewUser) {
         user.updateLastLogin();
 
         Device device = deviceRepository.findByDeviceUuid(deviceUuid)
