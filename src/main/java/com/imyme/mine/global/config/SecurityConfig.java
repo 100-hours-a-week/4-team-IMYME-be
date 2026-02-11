@@ -61,6 +61,7 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/oauth2/**",     // 혹시 모를 OAuth 기본 경로
                                 "/e2e/**", // E2E 테스트 전용 (test 프로파일에서만 활성화)
+                                "/ws/**",  // WebSocket 엔드포인트 (핸드셰이크에서 JWT 검증)
                                 "/error",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
