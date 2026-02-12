@@ -157,3 +157,15 @@ management:
                 enabled: true
         tags:
             application: ${spring.application.name}
+
+# ==================================================
+# Sentry (에러 추적 & 성능 모니터링)
+# ==================================================
+sentry:
+    dsn: ${SENTRY_DSN}
+    environment: local
+    traces-sample-rate: 0.1
+    send-default-pii: false
+    logging:
+        minimum-event-level: error
+        minimum-breadcrumb-level: info
