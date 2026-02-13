@@ -75,6 +75,10 @@ dependencies {
     // Prometheus 메트릭 수집
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Sentry (에러 추적 & 성능 모니터링)
+    implementation 'io.sentry:sentry-spring-boot-starter:8.1.0'
+    implementation 'io.sentry:sentry-logback:8.1.0'
 }
 
 tasks.named('test') {
@@ -123,16 +127,4 @@ checkstyleMain {
         html.required = true
         xml.required = false
     }
-}
-
-tasks.named('bootRun') {
-    // 각자 컴퓨터에 있는 에이전트 경로
-    def pinpointPath = "/Users/nj.nam/pinpoint-agent-3.0.4/pinpoint-bootstrap-3.0.4.jar"
-
-    jvmArgs = [
-            "-javaagent:${pinpointPath}",
-            "-Dpinpoint.agentId=local-mine-01",    // 핀포인트에서 보일 내 ID (유니크해야 함)
-            "-Dpinpoint.applicationName=MINE-LOCAL", // 프로젝트 그룹 이름
-            "-Dpinpoint.profiler.profiles.active=local"
-    ]
 }
