@@ -129,5 +129,3 @@ checkstyleMain {
         xml.required = false
     }
 }
-
-// Pinpoint 설정 제거 (Sentry 사용)

@@ -27,6 +27,8 @@ public enum ErrorCode {
     // ========== OAuth (400, 500) ==========
     INVALID_OAUTH_CODE(HttpStatus.BAD_REQUEST, "유효하지 않은 OAuth 인증 코드입니다."),
     INVALID_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 OAuth 제공자입니다."),
+    INVALID_ORIGIN(HttpStatus.BAD_REQUEST, "등록되지 않은 Origin입니다."),
+    INVALID_ENVIRONMENT(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 환경입니다."),
     OAUTH_PROVIDER_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "OAuth 제공자 서버에 일시적인 문제가 발생했습니다."),
     NICKNAME_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "닉네임 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
     SESSION_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "세션 생성에 실패했습니다. 다시 로그인해주세요."),
