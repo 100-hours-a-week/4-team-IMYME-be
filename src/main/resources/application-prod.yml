@@ -12,6 +12,14 @@ spring:
         show-sql: false      # 운영에선 쿼리 로그 끔
         open-in-view: false
 
+    # Prod 환경 카카오 OAuth 설정
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        redirect-uri: ${FRONTEND_URL_PROD}/auth/callback/kakao
+
 logging:
     level:
         root: INFO

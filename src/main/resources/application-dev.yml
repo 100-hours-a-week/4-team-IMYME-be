@@ -15,6 +15,14 @@ spring:
             hibernate:
                 format_sql: true  # 쿼리 예쁘게 정렬
 
+    # Dev 환경 카카오 OAuth 설정
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        redirect-uri: ${FRONTEND_URL_DEV}/auth/callback/kakao
+
 logging:
     level:
         com.imyme.mine: DEBUG
