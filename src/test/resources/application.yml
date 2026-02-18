@@ -154,4 +154,4 @@ logging:
         com.imyme.mine: INFO
         org.springframework.security: WARN
         org.hibernate.SQL: WARN
-        org.springframework.test: INF1O
+        org.springframework.test: INFO
