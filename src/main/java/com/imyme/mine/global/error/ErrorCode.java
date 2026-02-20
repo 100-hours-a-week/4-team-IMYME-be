@@ -66,6 +66,7 @@ public enum ErrorCode {
     CANNOT_DELETE_UPLOADED(HttpStatus.CONFLICT, "AI 분석 대기 중인 시도는 삭제할 수 없습니다."),
     ROOM_FULL(HttpStatus.CONFLICT, "방이 가득 찼습니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 방입니다."),
+    DUPLICATE_ROOM(HttpStatus.CONFLICT, "이미 생성한 대기 중인 방이 있습니다."),
     MAX_ATTEMPTS_EXCEEDED(HttpStatus.CONFLICT, "최대 시도 횟수(5회)를 초과했습니다."),
 
     // ========== 검증 실패 (400, 422) ==========
