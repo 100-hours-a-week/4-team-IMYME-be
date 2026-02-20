@@ -22,6 +22,7 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Refresh Token이 만료되었습니다. 다시 로그인해주세요."),
     SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "세션이 만료되었거나 로그아웃되었습니다. 다시 로그인해주세요."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    NOT_PARTICIPANT(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
 
     // ========== OAuth (400, 500) ==========

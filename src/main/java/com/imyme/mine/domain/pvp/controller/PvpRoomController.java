@@ -57,4 +57,17 @@ public class PvpRoomController {
         RoomResponse response = pvpRoomService.createRoom(principal.getId(), request);
         return ApiResponse.success(response, "방이 생성되었습니다.");
     }
+
+    /**
+     * 4.4 방 상태 조회
+     */
+    @Operation(summary = "방 상태 조회", description = "PvP 대결 방의 현재 상태를 조회합니다.")
+    @GetMapping("/{roomId}")
+    public ApiResponse<RoomResponse> getRoom(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable Long roomId) {
+
+        log.info("방 상태 조회: userId={}, roomId={}", principal.getId(), roomId);
+        return ApiResponse.success(pvpRoomService.getRoom(principal.getId(), roomId));
+    }
 }

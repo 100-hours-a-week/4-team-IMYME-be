@@ -110,6 +110,20 @@ public class PvpRoomService {
         return toRoomResponse(room, "방이 생성되었습니다.");
     }
 
+    /**
+     * 4.4 방 상태 조회
+     */
+    public RoomResponse getRoom(Long userId, Long roomId) {
+        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        if (!room.isParticipant(userId)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+        }
+
+        return toRoomResponse(room, null);
+    }
+
     // ===== 내부 변환 메서드 =====
 
     RoomResponse toRoomResponse(PvpRoom room, String message) {
