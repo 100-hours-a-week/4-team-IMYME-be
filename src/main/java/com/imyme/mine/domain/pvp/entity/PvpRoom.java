@@ -34,8 +34,12 @@ public class PvpRoom {
     @JoinColumn(name = "keyword_id")
     private Keyword keyword;
 
-    @Column(name = "room_name", nullable = false, length = 10)
+    @Column(name = "room_name", nullable = false, length = 30)
     private String roomName;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

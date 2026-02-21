@@ -36,8 +36,8 @@ public class PvpSubmission {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "audio_key", length = 500)
-    private String audioKey;
+    @Column(name = "audio_url", length = 500)
+    private String audioUrl;
 
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
@@ -64,17 +64,17 @@ public class PvpSubmission {
             createdAt = LocalDateTime.now();
         }
         if (status == null) {
-            status = PvpSubmissionStatus.PENDING;
+            status = PvpSubmissionStatus.UPLOADED;
         }
     }
 
     // ===== 비즈니스 메서드 =====
 
     /**
-     * 오디오 Key 설정 (S3 업로드 완료)
+     * 오디오 URL 설정 (S3 업로드 완료)
      */
-    public void setAudioKey(String audioKey) {
-        this.audioKey = audioKey;
+    public void setAudioUrl(String audioUrl) {
+        this.audioUrl = audioUrl;
     }
 
     /**
