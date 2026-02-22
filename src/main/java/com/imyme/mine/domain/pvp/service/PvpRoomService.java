@@ -50,12 +50,20 @@ public class PvpRoomService {
         Pageable pageable = PageRequest.of(0, size + 1);
         List<PvpRoom> rooms;
 
-        if (categoryId != null) {
-            rooms = pvpRoomRepository.findRoomsByCategoryAndStatus(
+        boolean hasCursor = cursorTime != null && lastId != null;
+
+        if (categoryId != null && hasCursor) {
+            rooms = pvpRoomRepository.findRoomsByCategoryAndStatusWithCursor(
                     categoryId, status, cursorTime, lastId, pageable);
+        } else if (categoryId != null) {
+            rooms = pvpRoomRepository.findRoomsByCategoryAndStatus(
+                    categoryId, status, pageable);
+        } else if (hasCursor) {
+            rooms = pvpRoomRepository.findRoomsByStatusWithCursor(
+                    status, cursorTime, lastId, pageable);
         } else {
             rooms = pvpRoomRepository.findRoomsByStatus(
-                    status, cursorTime, lastId, pageable);
+                    status, pageable);
         }
 
         boolean hasNext = rooms.size() > size;
