@@ -17,17 +17,31 @@ import java.util.Optional;
 public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
 
     /**
-     * 방 목록 조회 (카테고리 필터, 상태 필터, Cursor 페이징)
-     * 4.1 API용
+     * 방 목록 조회 (카테고리 필터, 첫 페이지)
      */
     @Query("""
             SELECT r FROM PvpRoom r
             WHERE r.category.id = :categoryId
             AND r.status = :status
-            AND (:cursor IS NULL OR r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<PvpRoom> findRoomsByCategoryAndStatus(
+            @Param("categoryId") Long categoryId,
+            @Param("status") PvpRoomStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 방 목록 조회 (카테고리 필터, 커서 페이징)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.category.id = :categoryId
+            AND r.status = :status
+            AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByCategoryAndStatusWithCursor(
             @Param("categoryId") Long categoryId,
             @Param("status") PvpRoomStatus status,
             @Param("cursor") LocalDateTime cursor,
@@ -36,15 +50,28 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
     );
 
     /**
-     * 전체 방 목록 조회 (상태 필터만, Cursor 페이징)
+     * 전체 방 목록 조회 (첫 페이지)
      */
     @Query("""
             SELECT r FROM PvpRoom r
             WHERE r.status = :status
-            AND (:cursor IS NULL OR r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<PvpRoom> findRoomsByStatus(
+            @Param("status") PvpRoomStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 전체 방 목록 조회 (커서 페이징)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.status = :status
+            AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByStatusWithCursor(
             @Param("status") PvpRoomStatus status,
             @Param("cursor") LocalDateTime cursor,
             @Param("lastId") Long lastId,
