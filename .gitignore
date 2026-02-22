@@ -58,6 +58,9 @@ CLAUDE.md
 # AGENTS.md
 AGENTS.md
 
+# Claude Code CLI
+.claude/
+
 # k6 test results
 k6-tests/results.json
 k6-tests/*.json
