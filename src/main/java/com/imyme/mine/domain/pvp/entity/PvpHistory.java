@@ -35,7 +35,7 @@ public class PvpHistory {
     @JoinColumn(name = "room_id", nullable = false)
     private PvpRoom room;
 
-    @Column(name = "room_name", nullable = false, length = 10)
+    @Column(name = "room_name", nullable = false, length = 30)
     private String roomName;
 
     @Enumerated(EnumType.STRING)
@@ -63,14 +63,14 @@ public class PvpHistory {
     private String opponentNickname;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "category_id")
     private Category category;
 
     @Column(name = "category_name", nullable = false, length = 20)
     private String categoryName;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "keyword_id", nullable = false)
+    @JoinColumn(name = "keyword_id")
     private Keyword keyword;
 
     @Column(name = "keyword_name", nullable = false, length = 50)
