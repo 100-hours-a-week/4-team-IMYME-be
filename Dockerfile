@@ -1,25 +1,4 @@
-# Multi-stage build for Spring Boot application
-FROM gradle:8.11-jdk21-alpine AS builder
-
-WORKDIR /app
-
-# Copy gradle wrapper and configuration files first
-COPY gradlew .
-COPY gradle gradle
-COPY build.gradle .
-COPY settings.gradle .
-
-# Download dependencies (cached layer)
-RUN ./gradlew dependencies --no-daemon || true
-
-# Copy source code
-COPY src src
-COPY config config
-
-# Build application
-RUN ./gradlew build -x test --no-daemon
-
-# Runtime stage
+# Runtime stage only (JAR is built in CI)
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
@@ -27,8 +6,8 @@ WORKDIR /app
 # Create non-root user
 RUN addgroup -S spring && adduser -S spring -G spring
 
-# Copy jar from builder stage
-COPY --from=builder /app/build/libs/*.jar app.jar
+# Copy pre-built jar from CI artifact
+COPY build/libs/*.jar app.jar
 
 # Change ownership
 RUN chown spring:spring app.jar
