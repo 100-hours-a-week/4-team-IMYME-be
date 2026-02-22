@@ -209,10 +209,17 @@ jobs:
       # 5️⃣ 배포 후 스모크 테스트
       - name: Post-deploy Smoke Test
         run: |
-            set -e
             BASE_URL="${{ secrets.RELEASE_BASE_URL }}"
-            # Nginx가 물려있는 엔드포인트로 헬스체크
-            curl -fsS "$BASE_URL/server/health" >/dev/null
+            for i in $(seq 1 12); do
+              echo "Attempt $i/12..."
+              if curl -fsS "$BASE_URL/server/health" >/dev/null 2>&1; then
+                echo "Health check passed"
+                exit 0
+              fi
+              sleep 10
+            done
+            echo "Health check failed after 120s"
+            exit 1
 
   cd-notify-success:
     needs: cd
