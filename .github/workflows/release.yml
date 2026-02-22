@@ -1,15 +1,15 @@
 name: Backend CI/CD release mvp2
 
 on:
-#   pull_request:
-#     branches:
-#       - infra/cicd-mvp2
-# #      - infra/cicd
+  pull_request:
+    branches:
+      - release
+#      - infra/cicd
 
   push:
     branches:
 #      - infra/cicd
-      - infra/cicd-mvp2
+      - release
       # - dev   # dev merge 결과 → CD
 
 permissions:
@@ -99,7 +99,7 @@ jobs:
   cd:
     needs: ci
     # if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    if: github.event_name == 'push' && github.ref == 'refs/heads/infra/cicd-mvp2'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
 
 
     runs-on: ubuntu-latest
