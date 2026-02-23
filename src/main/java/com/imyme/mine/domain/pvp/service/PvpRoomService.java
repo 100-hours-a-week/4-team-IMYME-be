@@ -6,6 +6,7 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
 import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
+import com.imyme.mine.domain.pvp.dto.request.CompleteSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
@@ -14,6 +15,7 @@ import com.imyme.mine.domain.pvp.dto.response.SubmissionResponse;
 import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import com.imyme.mine.domain.pvp.entity.PvpSubmission;
+import com.imyme.mine.domain.pvp.entity.PvpSubmissionStatus;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
 import com.imyme.mine.domain.pvp.repository.PvpSubmissionRepository;
 import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
@@ -43,6 +45,8 @@ public class PvpRoomService {
     private final PvpSubmissionRepository pvpSubmissionRepository;
     private final StorageService storageService;
     private final PvpAsyncService pvpAsyncService;
+    // TODO v2: RabbitMQ Producer 주입
+    // private final RabbitTemplate rabbitTemplate;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -296,6 +300,76 @@ public class PvpRoomService {
                 .audioUrl(presignedUrl.objectKey()) // 임시로 objectKey 반환 (업로드 완료 후 CDN URL로 변경)
                 .expiresIn(300) // 5분
                 .status(submission.getStatus())
+                .build();
+    }
+
+    /**
+     * 4.6 녹음 제출 완료 (분석 요청)
+     */
+    @Transactional
+    public SubmissionResponse completeSubmission(Long userId, Long submissionId, CompleteSubmissionRequest request) {
+        // 1. 제출 조회
+        PvpSubmission submission = pvpSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBMISSION_NOT_FOUND));
+
+        // 2. 소유자 확인
+        if (!submission.getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 3. 상태 검증 (이미 제출 완료된 경우)
+        if (submission.getStatus() != PvpSubmissionStatus.PENDING) {
+            throw new BusinessException(ErrorCode.ALREADY_SUBMITTED);
+        }
+
+        // 4. audioUrl(objectKey) 검증 (S3 업로드 완료 확인)
+        String objectKey = submission.getAudioUrl();
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_AUDIO_URL);
+        }
+
+        // 5. 제출 완료 처리 (PENDING → UPLOADED)
+        submission.submit(request.durationSeconds());
+        pvpSubmissionRepository.save(submission);
+
+        // TODO v2: RabbitMQ 큐에 STT 변환 요청 전송
+        // - 메시지: { submissionId, objectKey }
+        // - Worker가 비동기로 STT 변환 처리
+        // - 변환 완료 시 sttText 업데이트 및 상태 전환
+
+        log.info("제출 완료: submissionId={}, userId={}, status=UPLOADED", submissionId, userId);
+
+        // 6. 양쪽 제출 확인 (UPLOADED 상태 카운트)
+        long uploadedCount = pvpSubmissionRepository.countByRoomIdAndStatus(
+                submission.getRoom().getId(), PvpSubmissionStatus.UPLOADED);
+
+        String message;
+        if (uploadedCount == 2) {
+            // 7. 양쪽 모두 제출 완료
+            log.info("양쪽 제출 완료: roomId={}", submission.getRoom().getId());
+
+            // TODO v2: RabbitMQ 큐에 PvP 분석 요청 전송
+            // - 메시지: { roomId, submissionIds: [id1, id2] }
+            // - Worker 처리 순서:
+            //   1. 두 제출의 objectKey로부터 Presigned GET URL 생성
+            //   2. AI 서버 STT 변환 (병렬 처리)
+            //   3. 두 sttText 획득 후 PvP 분석 API 호출
+            //   4. 분석 결과 저장 및 승패 판정
+            //   5. 방 상태 PROCESSING → FINISHED 전환
+
+            message = "제출이 완료되었습니다. AI 분석 준비 중입니다.";
+        } else {
+            // 8. 한쪽만 제출 → 상대방 대기
+            log.info("한쪽만 제출 완료, 상대방 대기: roomId={}, uploadedCount={}", submission.getRoom().getId(), uploadedCount);
+            message = "상대방의 제출을 기다리고 있습니다.";
+        }
+
+        return SubmissionResponse.builder()
+                .submissionId(submission.getId())
+                .roomId(submission.getRoom().getId())
+                .status(submission.getStatus())
+                .submittedAt(submission.getSubmittedAt())
+                .message(message)
                 .build();
     }
 

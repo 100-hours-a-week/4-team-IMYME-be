@@ -1,5 +1,6 @@
 package com.imyme.mine.domain.pvp.controller;
 
+import com.imyme.mine.domain.pvp.dto.request.CompleteSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
@@ -126,6 +127,26 @@ public class PvpRoomController {
                 principal.getId(), roomId, request);
 
         return ApiResponse.success(response, "녹음 제출 URL이 발급되었습니다.");
+    }
+
+    /**
+     * 4.6 녹음 제출 완료 (분석 요청)
+     */
+    @Operation(summary = "녹음 제출 완료", description = "S3 업로드 완료 후 AI 분석을 요청합니다. 양쪽 모두 제출 시 분석이 시작됩니다.")
+    @SecurityRequirement(name = "JWT")
+    @PostMapping("/submissions/{submissionId}/complete")
+    public ApiResponse<SubmissionResponse> completeSubmission(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable Long submissionId,
+            @Valid @RequestBody CompleteSubmissionRequest request) {
+
+        log.info("녹음 제출 완료: userId={}, submissionId={}, durationSeconds={}",
+                principal.getId(), submissionId, request.durationSeconds());
+
+        SubmissionResponse response = pvpRoomService.completeSubmission(
+                principal.getId(), submissionId, request);
+
+        return ApiResponse.success(response);
     }
 
     /**

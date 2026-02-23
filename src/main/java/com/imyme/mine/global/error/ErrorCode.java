@@ -45,6 +45,7 @@ public enum ErrorCode {
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "기기 정보를 찾을 수 없습니다."),
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "PvP 방을 찾을 수 없습니다."),
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "제출 정보를 찾을 수 없습니다."),
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
 

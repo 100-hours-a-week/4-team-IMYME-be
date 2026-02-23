@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -171,5 +173,28 @@ public class StorageService {
             objectKey,
             presignedExpiresAt
         );
+    }
+
+    /**
+     * AI 서버 접근용 Presigned GET URL 생성
+     * - STT 변환을 위해 AI 서버가 S3 파일을 다운로드할 수 있도록 임시 URL 생성
+     * - 1시간 유효
+     */
+    public String generatePresignedGetUrl(String objectKey) {
+        log.debug("Presigned GET URL 생성 시작 - objectKey: {}", objectKey);
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofHours(1)) // AI 서버 처리 시간 고려하여 1시간
+            .getObjectRequest(builder -> builder
+                .bucket(s3Properties.getBucket())
+                .key(objectKey)
+            )
+            .build();
+
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        String url = presignedRequest.url().toString();
+
+        log.info("Presigned GET URL 생성 완료 - objectKey: {}", objectKey);
+        return url;
     }
 }
