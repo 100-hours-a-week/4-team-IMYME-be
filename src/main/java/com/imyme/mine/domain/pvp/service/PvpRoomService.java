@@ -9,11 +9,17 @@ import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
+import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
 import com.imyme.mine.domain.pvp.dto.response.RoomResponse;
+import com.imyme.mine.domain.pvp.dto.response.SubmissionResponse;
 import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
+import com.imyme.mine.domain.pvp.entity.PvpSubmission;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
+import com.imyme.mine.domain.pvp.repository.PvpSubmissionRepository;
+import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
+import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +44,8 @@ public class PvpRoomService {
     private final UserRepository userRepository;
     private final ForbiddenWordService forbiddenWordService;
     private final KeywordRepository keywordRepository;
+    private final PvpSubmissionRepository pvpSubmissionRepository;
+    private final StorageService storageService;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -224,10 +232,65 @@ public class PvpRoomService {
             pvpRoomRepository.save(room);
             log.info("THINKING 전환 완료: roomId={}, keywordId={}", roomId, randomKeyword.getId());
 
+            // 30초 후 RECORDING 자동 전환
+            scheduleRecordingTransition(roomId);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("THINKING 전환 중단: roomId={}", roomId, e);
         }
+    }
+
+    /**
+     * 30초 후 RECORDING 자동 전환
+     */
+    @Async
+    @Transactional
+    public void scheduleRecordingTransition(Long roomId) {
+        try {
+            Thread.sleep(30000); // 30초 대기
+
+            PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                    .orElse(null);
+
+            if (room == null || room.getStatus() != PvpRoomStatus.THINKING) {
+                log.warn("RECORDING 전환 실패: 방 상태 불일치 - roomId={}", roomId);
+                return;
+            }
+
+            room.startRecording();
+            pvpRoomRepository.save(room);
+            log.info("RECORDING 자동 전환 완료: roomId={}", roomId);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("RECORDING 전환 중단: roomId={}", roomId, e);
+        }
+    }
+
+    /**
+     * 녹음 시작 (수동 전환용)
+     */
+    @Transactional
+    public RoomResponse startRecording(Long userId, Long roomId) {
+        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 참여자 확인
+        if (!room.isParticipant(userId)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+        }
+
+        // 방 상태 검증 (THINKING 상태여야 함)
+        if (room.getStatus() != PvpRoomStatus.THINKING) {
+            throw new BusinessException(ErrorCode.INVALID_ROOM_STATUS);
+        }
+
+        room.startRecording();
+        pvpRoomRepository.save(room);
+        log.info("녹음 수동 시작: roomId={}, userId={}", roomId, userId);
+
+        return toRoomResponse(room, "녹음을 시작합니다.");
     }
 
     /**
@@ -242,6 +305,69 @@ public class PvpRoomService {
         }
 
         return toRoomResponse(room, null);
+    }
+
+    /**
+     * 4.5 녹음 제출 (Presigned URL 발급)
+     */
+    @Transactional
+    public SubmissionResponse createSubmission(Long userId, Long roomId, CreateSubmissionRequest request) {
+        // 1. 방 조회
+        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 2. 참여자 검증
+        if (!room.isParticipant(userId)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+        }
+
+        // 3. 방 상태 검증 (RECORDING 상태여야 함)
+        if (room.getStatus() != PvpRoomStatus.RECORDING) {
+            throw new BusinessException(ErrorCode.INVALID_ROOM_STATUS);
+        }
+
+        // 4. 중복 제출 검증
+        if (pvpSubmissionRepository.existsByRoomIdAndUserId(roomId, userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_SUBMITTED);
+        }
+
+        // 5. 유저 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 6. PvpSubmission 엔티티 생성 및 저장 (PENDING 상태)
+        PvpSubmission submission = PvpSubmission.builder()
+                .room(room)
+                .user(user)
+                .build();
+
+        pvpSubmissionRepository.save(submission);
+        log.info("제출 레코드 생성: submissionId={}, roomId={}, userId={}, status=PENDING",
+                submission.getId(), roomId, userId);
+
+        // 7. Presigned URL 발급
+        PresignedUrlResponse presignedUrl = storageService.generatePvpPresignedUrl(
+                submission.getId(),
+                request.fileName(),
+                request.contentType(),
+                request.fileSize()
+        );
+
+        // 8. audioUrl 임시 저장 (objectKey)
+        submission.setAudioUrl(presignedUrl.objectKey());
+        pvpSubmissionRepository.save(submission);
+
+        log.info("Presigned URL 발급 완료: submissionId={}, objectKey={}", submission.getId(), presignedUrl.objectKey());
+
+        // 9. SubmissionResponse 반환
+        return SubmissionResponse.builder()
+                .submissionId(submission.getId())
+                .roomId(roomId)
+                .uploadUrl(presignedUrl.uploadUrl())
+                .audioUrl(presignedUrl.objectKey()) // 임시로 objectKey 반환 (업로드 완료 후 CDN URL로 변경)
+                .expiresIn(300) // 5분
+                .status(submission.getStatus())
+                .build();
     }
 
     /**

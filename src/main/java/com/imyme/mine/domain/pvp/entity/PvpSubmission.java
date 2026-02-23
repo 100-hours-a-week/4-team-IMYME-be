@@ -64,7 +64,7 @@ public class PvpSubmission {
             createdAt = LocalDateTime.now();
         }
         if (status == null) {
-            status = PvpSubmissionStatus.UPLOADED;
+            status = PvpSubmissionStatus.PENDING;
         }
     }
 

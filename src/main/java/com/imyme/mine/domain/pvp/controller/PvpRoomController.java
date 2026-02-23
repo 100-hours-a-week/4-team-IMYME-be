@@ -1,8 +1,10 @@
 package com.imyme.mine.domain.pvp.controller;
 
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
+import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
 import com.imyme.mine.domain.pvp.dto.response.RoomResponse;
+import com.imyme.mine.domain.pvp.dto.response.SubmissionResponse;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import com.imyme.mine.domain.pvp.service.PvpRoomService;
 import com.imyme.mine.global.common.response.ApiResponse;
@@ -88,6 +90,42 @@ public class PvpRoomController {
 
         log.info("방 상태 조회: userId={}, roomId={}", principal.getId(), roomId);
         return ApiResponse.success(pvpRoomService.getRoom(principal.getId(), roomId));
+    }
+
+    /**
+     * 녹음 시작 (THINKING → RECORDING 전환)
+     */
+    @Operation(summary = "녹음 시작", description = "생각 시간이 끝나고 녹음을 시작합니다. (THINKING → RECORDING)")
+    @SecurityRequirement(name = "JWT")
+    @PostMapping("/{roomId}/start-recording")
+    public ApiResponse<RoomResponse> startRecording(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable Long roomId) {
+
+        log.info("녹음 시작: userId={}, roomId={}", principal.getId(), roomId);
+        RoomResponse response = pvpRoomService.startRecording(principal.getId(), roomId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 4.5 녹음 제출 (Presigned URL 발급)
+     */
+    @Operation(summary = "녹음 제출 URL 발급", description = "녹음 파일을 S3에 직접 업로드할 수 있는 Presigned URL을 발급합니다.")
+    @SecurityRequirement(name = "JWT")
+    @PostMapping("/{roomId}/submissions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<SubmissionResponse> createSubmission(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable Long roomId,
+            @Valid @RequestBody CreateSubmissionRequest request) {
+
+        log.info("녹음 제출 URL 발급: userId={}, roomId={}, fileName={}, fileSize={}",
+                principal.getId(), roomId, request.fileName(), request.fileSize());
+
+        SubmissionResponse response = pvpRoomService.createSubmission(
+                principal.getId(), roomId, request);
+
+        return ApiResponse.success(response, "녹음 제출 URL이 발급되었습니다.");
     }
 
     /**
