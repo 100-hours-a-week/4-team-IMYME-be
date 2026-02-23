@@ -57,3 +57,17 @@ CLAUDE.md
 
 # AGENTS.md
 AGENTS.md
+
+# Claude Code CLI
+.claude/
+
+# k6 test results
+k6-tests/results.json
+k6-tests/*.json
+/monitoring/HOW-TO-RUN.md
+/monitoring/CHEATSHEET.md
+/monitoring/METRICS-GUIDE.md
+/monitoring/QUICKSTART.md
+/k6-tests/README.md
+/monitoring/README.md
+>>>>>>> 12ef197d5f041731113231480fe6f2c8eee372c1

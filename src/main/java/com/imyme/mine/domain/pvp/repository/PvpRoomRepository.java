@@ -1,0 +1,98 @@
+package com.imyme.mine.domain.pvp.repository;
+
+import com.imyme.mine.domain.pvp.entity.PvpRoom;
+import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * PvP 방 Repository
+ */
+public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
+
+    /**
+     * 방 목록 조회 (카테고리 필터, 첫 페이지)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.category.id = :categoryId
+            AND r.status = :status
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByCategoryAndStatus(
+            @Param("categoryId") Long categoryId,
+            @Param("status") PvpRoomStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 방 목록 조회 (카테고리 필터, 커서 페이징)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.category.id = :categoryId
+            AND r.status = :status
+            AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByCategoryAndStatusWithCursor(
+            @Param("categoryId") Long categoryId,
+            @Param("status") PvpRoomStatus status,
+            @Param("cursor") LocalDateTime cursor,
+            @Param("lastId") Long lastId,
+            Pageable pageable
+    );
+
+    /**
+     * 전체 방 목록 조회 (첫 페이지)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.status = :status
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByStatus(
+            @Param("status") PvpRoomStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 전체 방 목록 조회 (커서 페이징)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            WHERE r.status = :status
+            AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<PvpRoom> findRoomsByStatusWithCursor(
+            @Param("status") PvpRoomStatus status,
+            @Param("cursor") LocalDateTime cursor,
+            @Param("lastId") Long lastId,
+            Pageable pageable
+    );
+
+    /**
+     * 호스트가 생성한 OPEN 상태 방 조회 (중복 방지용)
+     */
+    Optional<PvpRoom> findByHostUserIdAndStatus(Long hostUserId, PvpRoomStatus status);
+
+    /**
+     * 방 조회 with fetch join (N+1 방지)
+     */
+    @Query("""
+            SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.keyword
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
+            WHERE r.id = :roomId
+            """)
+    Optional<PvpRoom> findByIdWithDetails(@Param("roomId") Long roomId);
+}

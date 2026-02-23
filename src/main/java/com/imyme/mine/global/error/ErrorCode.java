@@ -22,11 +22,14 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Refresh Token이 만료되었습니다. 다시 로그인해주세요."),
     SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "세션이 만료되었거나 로그아웃되었습니다. 다시 로그인해주세요."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    NOT_PARTICIPANT(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
 
     // ========== OAuth (400, 500) ==========
     INVALID_OAUTH_CODE(HttpStatus.BAD_REQUEST, "유효하지 않은 OAuth 인증 코드입니다."),
     INVALID_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 OAuth 제공자입니다."),
+    INVALID_ORIGIN(HttpStatus.BAD_REQUEST, "등록되지 않은 Origin입니다."),
+    INVALID_ENVIRONMENT(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 환경입니다."),
     OAUTH_PROVIDER_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "OAuth 제공자 서버에 일시적인 문제가 발생했습니다."),
     NICKNAME_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "닉네임 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
     SESSION_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "세션 생성에 실패했습니다. 다시 로그인해주세요."),
@@ -64,6 +67,7 @@ public enum ErrorCode {
     CANNOT_DELETE_UPLOADED(HttpStatus.CONFLICT, "AI 분석 대기 중인 시도는 삭제할 수 없습니다."),
     ROOM_FULL(HttpStatus.CONFLICT, "방이 가득 찼습니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 방입니다."),
+    DUPLICATE_ROOM(HttpStatus.CONFLICT, "이미 생성한 대기 중인 방이 있습니다."),
     MAX_ATTEMPTS_EXCEEDED(HttpStatus.CONFLICT, "최대 시도 횟수(5회)를 초과했습니다."),
 
     // ========== 검증 실패 (400, 422) ==========

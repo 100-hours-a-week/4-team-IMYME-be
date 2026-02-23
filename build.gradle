@@ -36,6 +36,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     runtimeOnly 'org.postgresql:postgresql'
 
@@ -75,6 +76,10 @@ dependencies {
     // Prometheus 메트릭 수집
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Sentry (에러 추적 & 성능 모니터링) - Jakarta Starter
+    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.1.0'
+    implementation 'io.sentry:sentry-logback:8.1.0'
 }
 
 tasks.named('test') {

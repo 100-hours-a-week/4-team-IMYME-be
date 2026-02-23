@@ -110,6 +110,43 @@ swagger:
     dev-server-url: http://localhost:8080
 
 # ==================================================
+# OAuth Kakao 동적 Redirect URI 설정 (테스트용)
+# ==================================================
+oauth:
+    kakao:
+        redirect-uris:
+            local: http://localhost:3000/auth/callback/kakao
+            dev: http://localhost:3000/auth/callback/kakao
+            prod: http://localhost:3000/auth/callback/kakao
+        origins:
+            local: http://localhost:3000
+            dev: http://localhost:3000
+            prod: http://localhost:3000
+
+# ==================================================
+# Attempt/Profile 설정 (테스트용)
+# ==================================================
+attempt:
+    upload-expiration-minutes: 10
+    presigned-url-expiration-hours: 1
+
+profile-image:
+    presigned-url-expiration-minutes: 5
+    get-url-expiration-hours: 1
+
+# ==================================================
+# Sentry 설정 (테스트용 더미값)
+# ==================================================
+sentry:
+    dsn: https://test@test.ingest.sentry.io/1234567
+    environment: test
+    traces-sample-rate: 0.0
+    send-default-pii: false
+    logging:
+        minimum-event-level: error
+        minimum-breadcrumb-level: info
+
+# ==================================================
 # 로그 설정 (테스트용 - 간소화)
 # ==================================================
 logging:
