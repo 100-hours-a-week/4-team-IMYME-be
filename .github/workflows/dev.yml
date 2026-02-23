@@ -1,4 +1,4 @@
-name: Backend CI/CD v2
+name: Backend CI/CD v2 dev
 
 on:
   pull_request:
