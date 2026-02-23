@@ -7,8 +7,6 @@ import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.auth.service.OAuthService;
 import com.imyme.mine.global.common.response.ApiResponse;
-import com.imyme.mine.global.error.BusinessException;
-import com.imyme.mine.global.error.ErrorCode;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * E2E 테스트 전용 인증 컨트롤러
- * - 테스트 환경에서만 활성화됩니다 (@Profile("test"))
+ * - 운영 환경을 제외한 모든 환경에서 활성화됩니다 (@Profile("!prod"))
  * - Swagger 문서에 노출되지 않습니다 (@Hidden)
  * - 실제 OAuth 프로세스를 거치지 않고 고정된 테스트 계정으로 로그인할 수 있습니다.
  */
 @Hidden
-// test(자동화테스트) 또는 dev(개발) 환경에서 활성화
-@Profile({"test", "dev"})
+// 운영(prod) 환경을 제외한 모든 환경에서 활성화 (로컬, dev, test 등)
+@Profile("!prod")
 @Slf4j
 @RestController
 @RequestMapping("/e2e")
@@ -39,6 +37,33 @@ public class E2EAuthController {
 
     private final UserRepository userRepository;
     private final OAuthService oauthService;
+
+    /**
+     * E2E 테스트 유저 생성 (또는 조회)
+     * - E2E 테스트 유저가 없으면 생성하고, 있으면 기존 유저 정보를 반환합니다.
+     * - 한 번만 실행하면 됩니다.
+     */
+    @PostMapping("/create-user")
+    @Transactional
+    public ApiResponse<User> createE2EUser() {
+        log.info("E2E test user creation attempt");
+
+        User testUser = userRepository
+            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(E2E_TEST_USER_OAUTH_ID)
+                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .nickname("E2E테스터")
+                    .build();
+
+                userRepository.save(newUser);
+                log.info("E2E test user created: userId={}", newUser.getId());
+                return newUser;
+            });
+
+        return ApiResponse.success(testUser, "E2E 테스트 유저 준비 완료");
+    }
 
     /**
      * E2E 테스트 로그인 엔드포인트
@@ -53,10 +78,20 @@ public class E2EAuthController {
     public ApiResponse<OAuthLoginResponse> e2eLogin(@Valid @RequestBody E2ELoginRequest request) {
         log.info("E2E test login attempt: deviceUuid={}", request.deviceUuid());
 
-        // E2E 테스트 유저 조회
+        // E2E 테스트 유저 조회 (없으면 자동 생성)
         User testUser = userRepository
             .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(E2E_TEST_USER_OAUTH_ID)
+                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .nickname("E2E테스터")
+                    .build();
+
+                userRepository.save(newUser);
+                log.info("E2E test user auto-created during login: userId={}", newUser.getId());
+                return newUser;
+            });
 
         // 공통 로그인 로직 실행 (토큰 발급)
         OAuthLoginResponse response = oauthService.login(testUser, request.deviceUuid(), false);

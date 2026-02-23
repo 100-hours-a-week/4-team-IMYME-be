@@ -45,6 +45,7 @@ public enum ErrorCode {
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "기기 정보를 찾을 수 없습니다."),
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "PvP 방을 찾을 수 없습니다."),
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "제출 정보를 찾을 수 없습니다."),
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
 
@@ -74,6 +75,9 @@ public enum ErrorCode {
     ROOM_CANNOT_BE_DELETED(HttpStatus.FORBIDDEN, "게스트 입장 후에는 방을 삭제할 수 없습니다."),
     GAME_ALREADY_STARTED(HttpStatus.FORBIDDEN, "게임이 시작되어 나갈 수 없습니다."),
     MAX_ATTEMPTS_EXCEEDED(HttpStatus.CONFLICT, "최대 시도 횟수(5회)를 초과했습니다."),
+    ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이미 녹음을 제출했습니다."),
+    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "파일 크기가 너무 큽니다. (최대 100MB)"),
+    INVALID_ROOM_STATUS(HttpStatus.FORBIDDEN, "현재 방 상태에서는 이 작업을 수행할 수 없습니다."),
 
     // ========== 검증 실패 (400, 422) ==========
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "입력값 검증에 실패했습니다."),

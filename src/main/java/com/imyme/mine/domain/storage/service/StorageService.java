@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -39,6 +41,9 @@ public class StorageService {
         "audio/m4a",
         "audio/webm"
     );
+
+    private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    private static final int PVP_URL_EXPIRATION_MINUTES = 5; // 5분
 
     @Transactional
     public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
@@ -124,5 +129,72 @@ public class StorageService {
             case "audio/webm" -> "webm";
             default -> throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
         };
+    }
+
+    /**
+     * PvP 녹음 제출용 Presigned URL 발급
+     */
+    public PresignedUrlResponse generatePvpPresignedUrl(Long submissionId, String fileName, String contentType, Long fileSize) {
+        log.debug("PvP Presigned URL 생성 시작 - submissionId: {}, contentType: {}, fileSize: {}",
+            submissionId, contentType, fileSize);
+
+        // 파일 크기 검증
+        if (fileSize > MAX_FILE_SIZE) {
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
+        }
+
+        // Content-Type 정규화 및 검증
+        String normalizedContentType = normalizeContentType(contentType);
+        String extension = getExtensionFromContentType(normalizedContentType);
+
+        // ObjectKey 생성 (pvp/{submissionId}_{uuid}.{ext})
+        String uuid = UUID.randomUUID().toString();
+        String objectKey = String.format("pvp/%d_%s.%s", submissionId, uuid, extension);
+
+        // Presigned PUT 요청 생성 (5분 만료)
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofMinutes(PVP_URL_EXPIRATION_MINUTES))
+            .putObjectRequest(builder -> builder
+                .bucket(s3Properties.getBucket())
+                .key(objectKey)
+                .contentType(normalizedContentType)
+            )
+            .build();
+
+        PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+        LocalDateTime presignedExpiresAt = LocalDateTime.now().plus(Duration.ofMinutes(PVP_URL_EXPIRATION_MINUTES));
+
+        log.info("PvP Presigned URL 생성 완료 - submissionId: {}, objectKey: {}", submissionId, objectKey);
+
+        return PresignedUrlResponse.of(
+            submissionId,
+            presignedRequest.url().toString(),
+            normalizedContentType,
+            objectKey,
+            presignedExpiresAt
+        );
+    }
+
+    /**
+     * AI 서버 접근용 Presigned GET URL 생성
+     * - STT 변환을 위해 AI 서버가 S3 파일을 다운로드할 수 있도록 임시 URL 생성
+     * - 1시간 유효
+     */
+    public String generatePresignedGetUrl(String objectKey) {
+        log.debug("Presigned GET URL 생성 시작 - objectKey: {}", objectKey);
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofHours(1)) // AI 서버 처리 시간 고려하여 1시간
+            .getObjectRequest(builder -> builder
+                .bucket(s3Properties.getBucket())
+                .key(objectKey)
+            )
+            .build();
+
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        String url = presignedRequest.url().toString();
+
+        log.info("Presigned GET URL 생성 완료 - objectKey: {}", objectKey);
+        return url;
     }
 }

@@ -23,9 +23,9 @@ public interface PvpHistoryRepository extends JpaRepository<PvpHistory, Long> {
             SELECT h FROM PvpHistory h
             WHERE h.user.id = :userId
             AND (:includeHidden = true OR h.isHidden = false)
-            AND (:categoryId IS NULL OR h.category.id = :categoryId)
-            AND (:keywordId IS NULL OR h.keyword.id = :keywordId)
-            AND (:cursor IS NULL OR h.finishedAt < :cursor OR (h.finishedAt = :cursor AND h.id < :lastId))
+            AND (CAST(:categoryId AS long) IS NULL OR h.category.id = :categoryId)
+            AND (CAST(:keywordId AS long) IS NULL OR h.keyword.id = :keywordId)
+            AND (CAST(:cursor AS timestamp) IS NULL OR h.finishedAt < :cursor OR (h.finishedAt = :cursor AND h.id < :lastId))
             ORDER BY h.finishedAt DESC, h.id DESC
             """)
     List<PvpHistory> findMyHistories(
@@ -45,9 +45,9 @@ public interface PvpHistoryRepository extends JpaRepository<PvpHistory, Long> {
             SELECT h FROM PvpHistory h
             WHERE h.user.id = :userId
             AND (:includeHidden = true OR h.isHidden = false)
-            AND (:categoryId IS NULL OR h.category.id = :categoryId)
-            AND (:keywordId IS NULL OR h.keyword.id = :keywordId)
-            AND (:cursorScore IS NULL OR h.score < :cursorScore OR (h.score = :cursorScore AND h.id < :lastId))
+            AND (CAST(:categoryId AS long) IS NULL OR h.category.id = :categoryId)
+            AND (CAST(:keywordId AS long) IS NULL OR h.keyword.id = :keywordId)
+            AND (CAST(:cursorScore AS int) IS NULL OR h.score < :cursorScore OR (h.score = :cursorScore AND h.id < :lastId))
             ORDER BY h.score DESC, h.id DESC
             """)
     List<PvpHistory> findMyHistoriesByScore(
