@@ -6,9 +6,7 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
 import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
-import com.imyme.mine.domain.pvp.dto.request.CompleteSubmissionRequest;
-import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
-import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
+import com.imyme.mine.domain.pvp.dto.request.*;
 import com.imyme.mine.domain.pvp.dto.response.*;
 import com.imyme.mine.domain.pvp.entity.*;
 import com.imyme.mine.domain.pvp.repository.PvpFeedbackRepository;
@@ -623,6 +621,33 @@ public class PvpRoomService {
                 .isWinner(history.getIsWinner())
                 .isHidden(history.getIsHidden())
                 .finishedAt(history.getFinishedAt())
+                .build();
+    }
+
+    /**
+     * 4.9 방 숨기기
+     */
+    @Transactional
+    public UpdateHistoryResponse updateHistoryVisibility(Long userId, Long historyId, UpdateHistoryRequest request) {
+        // 1. 기록 조회
+        PvpHistory history = pvpHistoryRepository.findById(historyId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        // 2. 소유자 확인
+        if (!history.getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 3. 숨김 상태 업데이트
+        history.updateHiddenStatus(request.isHidden());
+        pvpHistoryRepository.save(history);
+
+        log.info("기록 숨김 상태 변경: historyId={}, userId={}, isHidden={}", historyId, userId, request.isHidden());
+
+        return UpdateHistoryResponse.builder()
+                .historyId(history.getId())
+                .isHidden(history.getIsHidden())
+                .updatedAt(LocalDateTime.now())
                 .build();
     }
 
