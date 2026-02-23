@@ -1,15 +1,15 @@
-name: Backend CI/CD main mvp2
+name: Backend CI/CD release mvp2
 
 on:
   pull_request:
     branches:
-      - main
+      - release
 #      - infra/cicd
 
   push:
     branches:
 #      - infra/cicd
-      - main
+      - release
       # - dev   # dev merge 결과 → CD
 
 permissions:
@@ -99,7 +99,7 @@ jobs:
   cd:
     needs: ci
     # if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
 
 
     runs-on: ubuntu-latest
@@ -143,7 +143,7 @@ jobs:
           platforms: linux/arm64
           tags: |
             219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:${{ github.sha }}
-            219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:prod-latest
+            219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:release-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -152,7 +152,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          IMAGE_URI="219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:prod-latest"
+          IMAGE_URI="219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:release-latest"
 
           cat > /tmp/ssm-params.json << 'ENDJSON'
           {
@@ -164,9 +164,9 @@ jobs:
               "echo '# ------------- COMMON --------------' >> /home/ubuntu/.env",
               "aws ssm get-parameters-by-path --path '/MINE/MVP1/BE/ENV/COMMON' --with-decryption --query 'Parameters[*].[Name,Value]' --output text --region ap-northeast-2 | while IFS=$(printf '\\t') read -r name value; do key=$(basename \"$name\"); echo \"$key=${value:-}\" >> /home/ubuntu/.env; done",
               "echo '' >> /home/ubuntu/.env",
-              "echo '# ------------- PROD --------------' >> /home/ubuntu/.env",
-              "aws ssm get-parameters-by-path --path '/MINE/MVP1/BE/ENV/PROD' --with-decryption --query 'Parameters[*].[Name,Value]' --output text --region ap-northeast-2 | while IFS=$(printf '\\t') read -r name value; do key=$(basename \"$name\"); echo \"$key=${value:-}\" >> /home/ubuntu/.env; done",
-              "IMAGE_URI=219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:prod-latest",
+              "echo '# ------------- RELEASE --------------' >> /home/ubuntu/.env",
+              "aws ssm get-parameters-by-path --path '/MINE/MVP1/BE/ENV/RELEASE' --with-decryption --query 'Parameters[*].[Name,Value]' --output text --region ap-northeast-2 | while IFS=$(printf '\\t') read -r name value; do key=$(basename \"$name\"); echo \"$key=${value:-}\" >> /home/ubuntu/.env; done",
+              "IMAGE_URI=219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:release-latest",
               "docker pull $IMAGE_URI",
               "docker compose up -d",
               "docker image prune -f"
@@ -176,8 +176,8 @@ jobs:
 
           COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:aws:autoscaling:groupName,Values=mine_mvp1_be_asg-prod" \
-            --comment "backend main deploy (${GITHUB_SHA})" \
+            --targets "Key=tag:aws:autoscaling:groupName,Values=mine_mvp1_be_asg" \
+            --comment "backend release deploy (${GITHUB_SHA})" \
             --parameters file:///tmp/ssm-params.json \
             --region ap-northeast-2 \
             --query "Command.CommandId" \
@@ -222,7 +222,7 @@ jobs:
       # 5️⃣ 배포 후 스모크 테스트
       - name: Post-deploy Smoke Test
         run: |
-            BASE_URL="${{ secrets.PROD_BASE_URL }}"
+            BASE_URL="${{ secrets.RELEASE_BASE_URL }}"
             for i in $(seq 1 12); do
               echo "Attempt $i/12..."
               if curl -fsS "$BASE_URL/server/health" >/dev/null 2>&1; then

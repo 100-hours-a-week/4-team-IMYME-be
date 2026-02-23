@@ -1,0 +1,10 @@
+services:
+  backend:
+    image: 219268921033.dkr.ecr.ap-northeast-2.amazonaws.com/imyme-backend:latest
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    restart: always
+    volumes:
+      - ./logs:/app/logs
