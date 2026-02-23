@@ -39,7 +39,7 @@ public class PvpRoomController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "OPEN") PvpRoomStatus status,
             @RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 
         log.info("방 목록 조회: userId={}, categoryId={}, status={}", principal.getId(), categoryId, status);
         return ApiResponse.success(pvpRoomService.getRooms(categoryId, status, cursor, size));

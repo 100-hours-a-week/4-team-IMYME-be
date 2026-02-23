@@ -36,14 +36,26 @@ public class PvpRoomService {
      * 4.1 방 목록 조회 (커서 페이징)
      */
     public RoomListResponse getRooms(Long categoryId, PvpRoomStatus status, String cursor, int size) {
+        // 카테고리 유효성 검사
+        if (categoryId != null) {
+            categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        }
+
         LocalDateTime cursorTime = null;
         Long lastId = null;
 
+        // 커서 파싱 (예외 처리 포함)
         if (cursor != null && !cursor.isBlank()) {
-            String[] parts = cursor.split("_");
-            if (parts.length == 2) {
-                cursorTime = LocalDateTime.parse(parts[0]);
-                lastId = Long.parseLong(parts[1]);
+            try {
+                String[] parts = cursor.split("_");
+                if (parts.length == 2) {
+                    cursorTime = LocalDateTime.parse(parts[0]);
+                    lastId = Long.parseLong(parts[1]);
+                }
+            } catch (Exception e) {
+                log.warn("Invalid cursor format: {}", cursor, e);
+                throw new BusinessException(ErrorCode.INVALID_CURSOR);
             }
         }
 
