@@ -6,6 +6,8 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
 import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
+import com.imyme.mine.domain.keyword.entity.Keyword;
+import com.imyme.mine.domain.keyword.repository.KeywordRepository;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
 import com.imyme.mine.domain.pvp.dto.response.RoomResponse;
@@ -16,6 +18,7 @@ import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class PvpRoomService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final ForbiddenWordService forbiddenWordService;
+    private final KeywordRepository keywordRepository;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -136,6 +140,94 @@ public class PvpRoomService {
         log.info("방 생성: roomId={}, userId={}, categoryId={}", room.getId(), userId, request.categoryId());
 
         return toRoomResponse(room, "방이 생성되었습니다.");
+    }
+
+    /**
+     * 4.3 방 입장 (게스트)
+     */
+    @Transactional
+    public RoomResponse joinRoom(Long userId, Long roomId) {
+        // 방 조회 (낙관적 락)
+        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 호스트 본인 체크
+        if (room.isHost(userId)) {
+            throw new BusinessException(ErrorCode.CANNOT_JOIN_OWN_ROOM);
+        }
+
+        // 방 상태 검증
+        if (room.getStatus() != PvpRoomStatus.OPEN) {
+            if (room.getStatus() == PvpRoomStatus.CANCELED) {
+                throw new BusinessException(ErrorCode.ROOM_EXPIRED);
+            }
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_MATCHED);
+        }
+
+        // 게스트 중복 체크 (동시성 제어)
+        if (room.getGuestUser() != null) {
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_MATCHED);
+        }
+
+        // 게스트 조회
+        User guest = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 게스트 입장 (MATCHED 전환)
+        room.joinGuest(guest, guest.getNickname());
+
+        // 저장 (낙관적 락으로 동시성 제어)
+        try {
+            pvpRoomRepository.save(room);
+        } catch (Exception e) {
+            log.warn("방 입장 실패 (동시성): roomId={}, userId={}", roomId, userId, e);
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_MATCHED);
+        }
+
+        log.info("게스트 입장: roomId={}, userId={}, status=MATCHED", roomId, userId);
+
+        // 3초 후 키워드 배정 및 THINKING 전환 (비동기)
+        scheduleThinkingTransition(roomId);
+
+        return toRoomResponse(room, "매칭 완료! 잠시 후 키워드가 공개됩니다.");
+    }
+
+    /**
+     * 3초 후 키워드 배정 및 THINKING 전환
+     */
+    @Async
+    @Transactional
+    public void scheduleThinkingTransition(Long roomId) {
+        try {
+            Thread.sleep(3000);
+
+            PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                    .orElse(null);
+
+            if (room == null || room.getStatus() != PvpRoomStatus.MATCHED) {
+                log.warn("THINKING 전환 실패: 방 상태 불일치 - roomId={}", roomId);
+                return;
+            }
+
+            // 키워드 랜덤 배정
+            List<Keyword> keywords = keywordRepository.findAllByCategoryIdAndIsActiveOrderByDisplayOrderAsc(
+                    room.getCategory().getId(), true);
+
+            if (keywords.isEmpty()) {
+                log.error("THINKING 전환 실패: 키워드 없음 - roomId={}, categoryId={}", roomId, room.getCategory().getId());
+                return;
+            }
+
+            Keyword randomKeyword = keywords.get((int) (Math.random() * keywords.size()));
+            room.startThinking(randomKeyword);
+
+            pvpRoomRepository.save(room);
+            log.info("THINKING 전환 완료: roomId={}, keywordId={}", roomId, randomKeyword.getId());
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("THINKING 전환 중단: roomId={}", roomId, e);
+        }
     }
 
     /**

@@ -62,6 +62,21 @@ public class PvpRoomController {
     }
 
     /**
+     * 4.3 방 입장 (게스트)
+     */
+    @Operation(summary = "방 입장", description = "PvP 대결 방에 게스트로 입장합니다.")
+    @SecurityRequirement(name = "JWT")
+    @PostMapping("/{roomId}/join")
+    public ApiResponse<RoomResponse> joinRoom(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable Long roomId) {
+
+        log.info("방 입장: userId={}, roomId={}", principal.getId(), roomId);
+        RoomResponse response = pvpRoomService.joinRoom(principal.getId(), roomId);
+        return ApiResponse.success(response);
+    }
+
+    /**
      * 4.4 방 상태 조회
      */
     @Operation(summary = "방 상태 조회", description = "PvP 대결 방의 현재 상태를 조회합니다.")
