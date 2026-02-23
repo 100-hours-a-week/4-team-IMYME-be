@@ -42,17 +42,17 @@ jobs:
       # 5. 정적 분석 (Static Analysis)
       # ========================================
 
-      # # SpotBugs(버그패턴 캐치) : null위험, 무한 루프 등
-      # - name: Run SpotBugs
-      #   run: ./gradlew spotbugsMain
+      # SpotBugs(버그패턴 캐치) : null위험, 무한 루프 등
+      - name: Run SpotBugs
+        run: ./gradlew spotbugsMain
 
-      # # PMD(좋지 않은 코드 습관 캐치) : 중복코드, 안쓰는 변수 등
-      # - name: Run PMD
-      #   run: ./gradlew pmdMain
+      # PMD(좋지 않은 코드 습관 캐치) : 중복코드, 안쓰는 변수 등
+      - name: Run PMD
+        run: ./gradlew pmdMain
 
-      # # Checkstyle(코드 스타일) : 들여쓰기, 네이밍 규칙, 공백 등
-      # - name: Run Checkstyle
-      #   run: ./gradlew checkstyleMain
+      # Checkstyle(코드 스타일) : 들여쓰기, 네이밍 규칙, 공백 등
+      - name: Run Checkstyle
+        run: ./gradlew checkstyleMain
 
       # 7. 테스트 + 빌드
       - name: Build and Test
