@@ -4,6 +4,8 @@ import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
+import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
+import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
 import com.imyme.mine.domain.pvp.dto.response.RoomListResponse;
 import com.imyme.mine.domain.pvp.dto.response.RoomResponse;
@@ -31,6 +33,7 @@ public class PvpRoomService {
     private final PvpRoomRepository pvpRoomRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ForbiddenWordService forbiddenWordService;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -108,6 +111,11 @@ public class PvpRoomService {
     public RoomResponse createRoom(Long userId, CreateRoomRequest request) {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        // 금지어 검증
+        if (forbiddenWordService.containsForbiddenWord(request.roomName(), ForbiddenWordType.ROOM_NAME)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_WORD);
+        }
 
         pvpRoomRepository.findByHostUserIdAndStatus(userId, PvpRoomStatus.OPEN)
                 .ifPresent(existing -> {

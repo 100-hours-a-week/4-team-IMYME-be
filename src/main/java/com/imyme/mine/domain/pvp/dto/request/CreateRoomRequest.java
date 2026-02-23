@@ -12,7 +12,7 @@ public record CreateRoomRequest(
         Long categoryId,
 
         @NotBlank(message = "방 이름을 입력해주세요")
-        @Size(min = 2, max = 10, message = "방 이름은 2~10자 사이여야 합니다")
+        @Size(min = 2, max = 30, message = "방 이름은 2~30자 사이여야 합니다")
         String roomName
 ) {
 }
