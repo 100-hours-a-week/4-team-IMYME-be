@@ -4,21 +4,20 @@ import com.imyme.mine.domain.pvp.dto.MessageType;
 import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
 import com.imyme.mine.domain.pvp.dto.websocket.RoomJoinedMessage;
 import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
-import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
-import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
+import com.imyme.mine.domain.pvp.service.PvpRoomService;
+import com.imyme.mine.domain.pvp.service.PvpRoomService.LeaveResult;
+import com.imyme.mine.domain.pvp.service.PvpRoomService.LeaveType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * WebSocket 이벤트 리스너
@@ -31,7 +30,7 @@ import java.util.Optional;
 public class WebSocketEventListener {
 
     private final PvpSessionManager sessionManager;
-    private final PvpRoomRepository pvpRoomRepository;
+    private final PvpRoomService pvpRoomService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @EventListener
@@ -44,7 +43,6 @@ public class WebSocketEventListener {
     }
 
     @EventListener
-    @Transactional
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headerAccessor.getSessionId();
@@ -63,50 +61,40 @@ public class WebSocketEventListener {
         log.info("WebSocket DISCONNECT: sessionId={}, roomId={}, userId={} - 세션 정리 완료",
                 sessionId, roomId, userId);
 
-        // 방 조회 후 상태 업데이트 + broadcast
-        Optional<PvpRoom> roomOpt = pvpRoomRepository.findByIdWithDetails(roomId);
-        if (roomOpt.isEmpty()) {
+        // 멀티탭 방어: 같은 유저의 다른 세션이 남아있으면 DB 정리 스킵
+        if (sessionManager.hasOtherSessionsForUser(roomId, userId, sessionId)) {
+            log.info("멀티탭 감지: 다른 세션 존재 - roomId={}, userId={}, DB 정리 스킵", roomId, userId);
             return;
         }
 
-        PvpRoom room = roomOpt.get();
+        // Service에 DB 정리 위임
+        LeaveResult result = pvpRoomService.handleDisconnect(userId, roomId);
 
-        // 이미 종료된 방이면 무시
-        if (room.getStatus() == PvpRoomStatus.FINISHED
-                || room.getStatus() == PvpRoomStatus.CANCELED
-                || room.getStatus() == PvpRoomStatus.EXPIRED) {
+        if (result == null) {
             return;
         }
 
-        if (room.isHost(userId)) {
-            // 호스트 disconnect → 방 취소
-            room.cancel();
-            pvpRoomRepository.save(room);
-            log.info("호스트 disconnect → 방 취소: roomId={}", roomId);
+        // disconnect 브로드캐스트
+        broadcastDisconnect(result, roomId, userId);
+    }
 
+    private void broadcastDisconnect(LeaveResult result, Long roomId, Long userId) {
+        if (result.type() == LeaveType.HOST_LEFT) {
             RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
                     .status(PvpRoomStatus.CANCELED)
-                    .message("호스트가 연결이 끊겨 방이 취소되었습니다.")
+                    .message("호스트의 연결이 끊겨 방이 취소되었습니다.")
                     .build();
             messagingTemplate.convertAndSend(
                     "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData)
-            );
-
-        } else if (room.isGuest(userId)) {
-            // 게스트 disconnect → 게스트 제거, 방 OPEN 복구
-            room.removeGuest();
-            pvpRoomRepository.save(room);
-            log.info("게스트 disconnect → 방 OPEN 복구: roomId={}", roomId);
-
+                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData));
+        } else {
             RoomJoinedMessage leftData = RoomJoinedMessage.builder()
                     .userId(userId)
                     .message("상대방의 연결이 끊겼습니다.")
                     .build();
             messagingTemplate.convertAndSend(
                     "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.ROOM_LEFT, roomId, leftData)
-            );
+                    PvpWebSocketMessage.of(MessageType.ROOM_LEFT, roomId, leftData));
 
             RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
                     .status(PvpRoomStatus.OPEN)
@@ -114,8 +102,7 @@ public class WebSocketEventListener {
                     .build();
             messagingTemplate.convertAndSend(
                     "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData)
-            );
+                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData));
         }
     }
 

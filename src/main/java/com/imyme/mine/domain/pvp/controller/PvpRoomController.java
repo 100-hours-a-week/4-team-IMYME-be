@@ -1,11 +1,17 @@
 package com.imyme.mine.domain.pvp.controller;
 
+import com.imyme.mine.domain.pvp.dto.MessageType;
 import com.imyme.mine.domain.pvp.dto.request.CompleteSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateRoomRequest;
 import com.imyme.mine.domain.pvp.dto.request.CreateSubmissionRequest;
 import com.imyme.mine.domain.pvp.dto.response.*;
+import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
+import com.imyme.mine.domain.pvp.dto.websocket.RoomJoinedMessage;
+import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import com.imyme.mine.domain.pvp.service.PvpRoomService;
+import com.imyme.mine.domain.pvp.service.PvpRoomService.LeaveResult;
+import com.imyme.mine.domain.pvp.service.PvpRoomService.LeaveType;
 import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.security.UserPrincipal;
 import com.imyme.mine.global.security.annotation.CurrentUser;
@@ -18,6 +24,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "10. PvP Room", description = "PvP 대결 방 API")
@@ -28,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 public class PvpRoomController {
 
     private final PvpRoomService pvpRoomService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * 4.1 방 목록 조회
@@ -74,6 +82,25 @@ public class PvpRoomController {
 
         log.info("방 입장: userId={}, roomId={}", principal.getId(), roomId);
         RoomResponse response = pvpRoomService.joinRoom(principal.getId(), roomId);
+
+        // 트랜잭션 커밋 완료 후 브로드캐스트
+        RoomJoinedMessage joinedData = RoomJoinedMessage.builder()
+                .userId(principal.getId())
+                .nickname(response.getGuestNickname())
+                .message(response.getGuestNickname() + "님이 입장했습니다.")
+                .build();
+        messagingTemplate.convertAndSend(
+                "/topic/pvp/" + roomId,
+                PvpWebSocketMessage.of(MessageType.ROOM_JOINED, roomId, joinedData));
+
+        RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
+                .status(PvpRoomStatus.MATCHED)
+                .message("대결 상대가 입장했습니다.")
+                .build();
+        messagingTemplate.convertAndSend(
+                "/topic/pvp/" + roomId,
+                PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData));
+
         return ApiResponse.success(response);
     }
 
@@ -173,6 +200,33 @@ public class PvpRoomController {
             @PathVariable Long roomId) {
 
         log.info("방 나가기: userId={}, roomId={}", principal.getId(), roomId);
-        pvpRoomService.leaveRoom(principal.getId(), roomId);
+        LeaveResult result = pvpRoomService.leaveRoom(principal.getId(), roomId);
+
+        // 트랜잭션 커밋 완료 후 브로드캐스트
+        if (result.type() == LeaveType.HOST_LEFT) {
+            RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
+                    .status(PvpRoomStatus.CANCELED)
+                    .message("호스트가 퇴장하여 방이 취소되었습니다.")
+                    .build();
+            messagingTemplate.convertAndSend(
+                    "/topic/pvp/" + roomId,
+                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData));
+        } else {
+            RoomJoinedMessage leftData = RoomJoinedMessage.builder()
+                    .userId(principal.getId())
+                    .message("상대방이 퇴장했습니다.")
+                    .build();
+            messagingTemplate.convertAndSend(
+                    "/topic/pvp/" + roomId,
+                    PvpWebSocketMessage.of(MessageType.ROOM_LEFT, roomId, leftData));
+
+            RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
+                    .status(PvpRoomStatus.OPEN)
+                    .message("대결 상대를 기다리고 있습니다.")
+                    .build();
+            messagingTemplate.convertAndSend(
+                    "/topic/pvp/" + roomId,
+                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData));
+        }
     }
 }

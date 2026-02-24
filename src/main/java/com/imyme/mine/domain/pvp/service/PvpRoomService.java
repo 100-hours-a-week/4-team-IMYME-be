@@ -6,8 +6,12 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
 import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
+import com.imyme.mine.domain.pvp.dto.MessageType;
 import com.imyme.mine.domain.pvp.dto.request.*;
 import com.imyme.mine.domain.pvp.dto.response.*;
+import com.imyme.mine.domain.pvp.dto.websocket.AnswerSubmittedMessage;
+import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
+import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
 import com.imyme.mine.domain.pvp.entity.*;
 import com.imyme.mine.domain.pvp.repository.PvpFeedbackRepository;
 import com.imyme.mine.domain.pvp.repository.PvpHistoryRepository;
@@ -21,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +47,7 @@ public class PvpRoomService {
     private final PvpFeedbackRepository pvpFeedbackRepository;
     private final StorageService storageService;
     private final PvpAsyncService pvpAsyncService;
+    private final SimpMessagingTemplate messagingTemplate;
     // TODO v2: RabbitMQ Producer 주입
     // private final RabbitTemplate rabbitTemplate;
 
@@ -340,24 +346,42 @@ public class PvpRoomService {
         long uploadedCount = pvpSubmissionRepository.countByRoomIdAndStatus(
                 submission.getRoom().getId(), PvpSubmissionStatus.UPLOADED);
 
+        Long currentRoomId = submission.getRoom().getId();
         String message;
+
         if (uploadedCount == 2) {
-            // 7. 양쪽 모두 제출 완료
-            log.info("양쪽 제출 완료: roomId={}", submission.getRoom().getId());
+            // 7. 양쪽 모두 제출 완료 → PROCESSING 상태로 전환
+            PvpRoom room = submission.getRoom();
+            room.startProcessing();
+            pvpRoomRepository.save(room);
+            log.info("양쪽 제출 완료 → PROCESSING 전환: roomId={}", currentRoomId);
 
             // TODO v2: RabbitMQ 큐에 PvP 분석 요청 전송
-            // - 메시지: { roomId, submissionIds: [id1, id2] }
-            // - Worker 처리 순서:
-            //   1. 두 제출의 objectKey로부터 Presigned GET URL 생성
-            //   2. AI 서버 STT 변환 (병렬 처리)
-            //   3. 두 sttText 획득 후 PvP 분석 API 호출
-            //   4. 분석 결과 저장 및 승패 판정
-            //   5. 방 상태 PROCESSING → FINISHED 전환
+
+            // PROCESSING 브로드캐스트
+            RoomStatusChangeMessage processingData = RoomStatusChangeMessage.builder()
+                    .status(PvpRoomStatus.PROCESSING)
+                    .message("양쪽 모두 제출 완료! AI 분석이 시작됩니다.")
+                    .build();
+            messagingTemplate.convertAndSend(
+                    "/topic/pvp/" + currentRoomId,
+                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, currentRoomId, processingData));
 
             message = "제출이 완료되었습니다. AI 분석 준비 중입니다.";
         } else {
-            // 8. 한쪽만 제출 → 상대방 대기
-            log.info("한쪽만 제출 완료, 상대방 대기: roomId={}, uploadedCount={}", submission.getRoom().getId(), uploadedCount);
+            // 8. 한쪽만 제출 → 상대방에게 알림
+            log.info("한쪽만 제출 완료, 상대방 대기: roomId={}, uploadedCount={}", currentRoomId, uploadedCount);
+
+            // 한쪽 제출 완료 → ANSWER_SUBMITTED 브로드캐스트
+            AnswerSubmittedMessage submittedData = AnswerSubmittedMessage.builder()
+                    .userId(userId)
+                    .nickname(submission.getUser().getNickname())
+                    .message("상대방이 답변을 제출했습니다.")
+                    .build();
+            messagingTemplate.convertAndSend(
+                    "/topic/pvp/" + currentRoomId,
+                    PvpWebSocketMessage.of(MessageType.ANSWER_SUBMITTED, currentRoomId, submittedData));
+
             message = "상대방의 제출을 기다리고 있습니다.";
         }
 
@@ -371,10 +395,17 @@ public class PvpRoomService {
     }
 
     /**
+     * 나가기 결과 타입
+     */
+    public enum LeaveType { HOST_LEFT, GUEST_LEFT }
+
+    public record LeaveResult(Long roomId, LeaveType type, PvpRoomStatus newStatus) {}
+
+    /**
      * 4.10 방 나가기
      */
     @Transactional
-    public void leaveRoom(Long userId, Long roomId) {
+    public LeaveResult leaveRoom(Long userId, Long roomId) {
         PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
@@ -402,6 +433,7 @@ public class PvpRoomService {
             room.cancel();
             pvpRoomRepository.save(room);
             log.info("호스트 방 나가기: roomId={}, status=CANCELED", roomId);
+            return new LeaveResult(roomId, LeaveType.HOST_LEFT, PvpRoomStatus.CANCELED);
 
         } else {
             // 게스트 나가기
@@ -413,6 +445,43 @@ public class PvpRoomService {
             room.removeGuest();
             pvpRoomRepository.save(room);
             log.info("게스트 방 나가기: roomId={}, status=OPEN", roomId);
+            return new LeaveResult(roomId, LeaveType.GUEST_LEFT, PvpRoomStatus.OPEN);
+        }
+    }
+
+    /**
+     * WebSocket disconnect 시 DB 정리
+     * - leaveRoom에 위임하되, 이미 종료된 방이면 예외를 던지지 않고 null 반환
+     */
+    @Transactional
+    public LeaveResult handleDisconnect(Long userId, Long roomId) {
+        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+                .orElse(null);
+
+        if (room == null) {
+            log.warn("disconnect 처리 실패: 방 없음 - roomId={}, userId={}", roomId, userId);
+            return null;
+        }
+
+        // 이미 종료된 방이면 DB 정리 불필요
+        if (room.getStatus() == PvpRoomStatus.FINISHED
+                || room.getStatus() == PvpRoomStatus.CANCELED
+                || room.getStatus() == PvpRoomStatus.EXPIRED) {
+            log.info("disconnect 처리 스킵: 이미 종료된 방 - roomId={}, status={}", roomId, room.getStatus());
+            return null;
+        }
+
+        // 참여자가 아니면 무시
+        if (!room.isParticipant(userId)) {
+            log.warn("disconnect 처리 스킵: 참여자 아님 - roomId={}, userId={}", roomId, userId);
+            return null;
+        }
+
+        try {
+            return leaveRoom(userId, roomId);
+        } catch (BusinessException e) {
+            log.warn("disconnect 처리 중 예외 (무시): roomId={}, userId={}, error={}", roomId, userId, e.getMessage());
+            return null;
         }
     }
 

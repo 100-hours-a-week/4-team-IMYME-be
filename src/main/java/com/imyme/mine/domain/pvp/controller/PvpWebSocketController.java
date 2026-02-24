@@ -1,238 +1,95 @@
 package com.imyme.mine.domain.pvp.controller;
 
-import com.imyme.mine.domain.pvp.dto.MessageType;
-import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
-import com.imyme.mine.domain.pvp.dto.websocket.RoomJoinedMessage;
-import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
 import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
 import com.imyme.mine.domain.pvp.websocket.PvpSessionManager;
-import com.imyme.mine.domain.auth.entity.User;
-import com.imyme.mine.domain.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * PvP WebSocket 컨트롤러
- * - /app/pvp/{roomId}/join  → 방 참여 (DB 연동 + 2명 제한)
- * - /app/pvp/{roomId}/leave → 방 퇴장 (호스트: cancel, 게스트: removeGuest)
+ * PvP WebSocket 컨트롤러 (세션 등록/제거 전용, DB 쓰기·브로드캐스트 없음)
+ *
+ * - /app/pvp/{roomId}/register-session  → 참여자 확인(read-only) + 세션 등록
+ * - /app/pvp/{roomId}/unregister-session → 세션 제거
+ *
+ * DB 쓰기와 브로드캐스트는 REST API(PvpRoomController) 또는 WebSocketEventListener에서 수행합니다.
  */
 @Slf4j
 @Controller
 @RequiredArgsConstructor
 public class PvpWebSocketController {
 
-    private final SimpMessagingTemplate messagingTemplate;
     private final PvpSessionManager sessionManager;
     private final PvpRoomRepository pvpRoomRepository;
-    private final UserRepository userRepository;
 
     /**
-     * 방 참여
-     * 클라이언트 → /app/pvp/{roomId}/join
-     * 서버 → /topic/pvp/{roomId} (ROOM_JOINED + STATUS_CHANGE 브로드캐스트)
+     * 세션 등록 (DB 변경 없음)
+     *
+     * 클라이언트는 REST로 방 참여/생성 완료 후 WS 연결하여 이 메서드를 호출합니다.
+     * - 참여자 확인 (read-only) → 세션 등록
      */
-    @MessageMapping("/pvp/{roomId}/join")
-    @Transactional
-    public void joinRoom(@DestinationVariable Long roomId, SimpMessageHeaderAccessor headerAccessor) {
+    @MessageMapping("/pvp/{roomId}/register-session")
+    public void registerSession(@DestinationVariable Long roomId, SimpMessageHeaderAccessor headerAccessor) {
         String sessionId = headerAccessor.getSessionId();
         Long userId = extractUserId(headerAccessor);
 
         if (userId == null) {
-            log.warn("방 참여 실패: userId 추출 불가 - sessionId={}, roomId={}", sessionId, roomId);
-            sendError(roomId, "인증 정보를 확인할 수 없습니다.");
+            log.warn("WS 세션 등록 실패: userId 추출 불가 - sessionId={}, roomId={}", sessionId, roomId);
             return;
         }
 
-        // 1. 방 조회
+        // 방 조회 (read-only)
         Optional<PvpRoom> roomOpt = pvpRoomRepository.findByIdWithDetails(roomId);
         if (roomOpt.isEmpty()) {
-            log.warn("방 참여 실패: 방 없음 - roomId={}, userId={}", roomId, userId);
-            sendError(roomId, "존재하지 않는 방입니다.");
+            log.warn("WS 세션 등록 실패: 방 없음 - roomId={}, userId={}", roomId, userId);
             return;
         }
 
         PvpRoom room = roomOpt.get();
 
-        // 2. CANCELED 또는 FINISHED, EXPIRED 상태 방은 입장 불가
-        if (room.getStatus() == PvpRoomStatus.CANCELED || room.getStatus() == PvpRoomStatus.FINISHED || room.getStatus() == PvpRoomStatus.EXPIRED) {
-            log.warn("방 참여 실패: 종료된 방 - roomId={}, userId={}, status={}", roomId, userId, room.getStatus());
-            sendError(roomId, "이미 종료된 방입니다.");
+        // 종료된 방은 세션 등록 불가
+        if (room.getStatus() == PvpRoomStatus.CANCELED ||
+            room.getStatus() == PvpRoomStatus.FINISHED ||
+            room.getStatus() == PvpRoomStatus.EXPIRED) {
+            log.warn("WS 세션 등록 실패: 종료된 방 - roomId={}, userId={}, status={}", roomId, userId, room.getStatus());
             return;
         }
 
-        // 3. 호스트 본인이면 세션만 등록 (재연결)
-        if (room.isHost(userId)) {
-            sessionManager.addSession(sessionId, roomId, userId);
-            log.info("호스트 연결: userId={}, roomId={}", userId, roomId);
-
-            RoomJoinedMessage joinedData = RoomJoinedMessage.builder()
-                    .userId(userId)
-                    .nickname(room.getHostNickname())
-                    .message(room.getHostNickname() + "님이 입장했습니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.ROOM_JOINED, roomId, joinedData)
-            );
+        // 참여자 확인 (호스트 또는 게스트만 세션 등록 가능)
+        if (!room.isParticipant(userId)) {
+            log.warn("WS 세션 등록 실패: 참여자 아님 - roomId={}, userId={}", roomId, userId);
             return;
         }
 
-        // 4. 이미 게스트로 참여 중이면 세션만 등록 (재연결)
-        if (room.isGuest(userId)) {
-            sessionManager.addSession(sessionId, roomId, userId);
-            log.info("게스트 재연결: userId={}, roomId={}", userId, roomId);
-            return;
-        }
-
-        // 5. 방 상태 검증 (OPEN 상태에서만 게스트 입장 가능)
-        if (room.getStatus() != PvpRoomStatus.OPEN) {
-            log.warn("방 참여 실패: 방 상태 {} - roomId={}, userId={}", room.getStatus(), roomId, userId);
-            sendError(roomId, "현재 입장할 수 없는 방입니다. (상태: " + room.getStatus() + ")");
-            return;
-        }
-
-        // 6. 2명 제한 검증
-        if (room.getGuestUser() != null) {
-            log.warn("방 참여 실패: 이미 2명 - roomId={}, userId={}", roomId, userId);
-            sendError(roomId, "이미 대결 상대가 있습니다.");
-            return;
-        }
-
-        // 7. 유저 조회
-        Optional<User> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) {
-            log.warn("방 참여 실패: 유저 없음 - userId={}", userId);
-            sendError(roomId, "유저 정보를 찾을 수 없습니다.");
-            return;
-        }
-
-        User guest = userOpt.get();
-
-        // 8. 게스트 입장 (DB 업데이트: OPEN → MATCHED)
-        room.joinGuest(guest, guest.getNickname());
-        pvpRoomRepository.save(room);
-
-        // 9. 세션 등록
+        // 세션 등록 (DB 변경 없음, 브로드캐스트 없음)
         sessionManager.addSession(sessionId, roomId, userId);
-
-        log.info("게스트 입장: userId={}, roomId={}, 방 상태: OPEN → MATCHED", userId, roomId);
-
-        // 10. ROOM_JOINED 브로드캐스트
-        RoomJoinedMessage joinedData = RoomJoinedMessage.builder()
-                .userId(userId)
-                .nickname(guest.getNickname())
-                .message(guest.getNickname() + "님이 입장했습니다.")
-                .build();
-
-        messagingTemplate.convertAndSend(
-                "/topic/pvp/" + roomId,
-                PvpWebSocketMessage.of(MessageType.ROOM_JOINED, roomId, joinedData)
-        );
-
-        // 11. STATUS_CHANGE 브로드캐스트 (MATCHED)
-        RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
-                .status(PvpRoomStatus.MATCHED)
-                .message("대결 상대가 입장했습니다. 키워드를 선정해주세요.")
-                .build();
-
-        messagingTemplate.convertAndSend(
-                "/topic/pvp/" + roomId,
-                PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData)
-        );
+        log.info("WS 세션 등록: userId={}, roomId={}, role={}", userId, roomId, room.isHost(userId) ? "HOST" : "GUEST");
     }
 
     /**
-     * 방 퇴장
-     * 클라이언트 → /app/pvp/{roomId}/leave
-     * - 호스트 퇴장: 방 CANCELED
-     * - 게스트 퇴장: 게스트 제거, 방 OPEN으로 복구
+     * 세션 제거 (DB 변경 없음)
+     *
+     * WS에서는 세션만 정리합니다. 실제 방 나가기는 REST DELETE /pvp/rooms/{roomId}로 처리합니다.
      */
-    @MessageMapping("/pvp/{roomId}/leave")
-    @Transactional
-    public void leaveRoom(@DestinationVariable Long roomId, SimpMessageHeaderAccessor headerAccessor) {
+    @MessageMapping("/pvp/{roomId}/unregister-session")
+    public void unregisterSession(@DestinationVariable Long roomId, SimpMessageHeaderAccessor headerAccessor) {
         String sessionId = headerAccessor.getSessionId();
         Long userId = extractUserId(headerAccessor);
 
-        if (userId == null) {
-            log.warn("방 퇴장 실패: userId 추출 불가 - sessionId={}, roomId={}", sessionId, roomId);
-            return;
-        }
-
-        // 세션 매니저에서 제거
         sessionManager.removeSession(sessionId);
-
-        // 방 조회
-        Optional<PvpRoom> roomOpt = pvpRoomRepository.findByIdWithDetails(roomId);
-        if (roomOpt.isEmpty()) {
-            log.warn("방 퇴장: 방 없음 - roomId={}", roomId);
-            return;
-        }
-
-        PvpRoom room = roomOpt.get();
-
-        if (room.isHost(userId)) {
-            // 호스트 퇴장 → 방 취소
-            room.cancel();
-            pvpRoomRepository.save(room);
-            log.info("호스트 퇴장: roomId={} → CANCELED", roomId);
-
-            RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
-                    .status(PvpRoomStatus.CANCELED)
-                    .message("호스트가 퇴장하여 방이 취소되었습니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData)
-            );
-
-        } else if (room.isGuest(userId)) {
-            // 게스트 퇴장 → 방 OPEN으로 복구
-            room.removeGuest();
-            pvpRoomRepository.save(room);
-            log.info("게스트 퇴장: roomId={} → OPEN", roomId);
-
-            RoomJoinedMessage leftData = RoomJoinedMessage.builder()
-                    .userId(userId)
-                    .message("상대방이 퇴장했습니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.ROOM_LEFT, roomId, leftData)
-            );
-
-            RoomStatusChangeMessage statusData = RoomStatusChangeMessage.builder()
-                    .status(PvpRoomStatus.OPEN)
-                    .message("대결 상대를 기다리고 있습니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData)
-            );
-        } else {
-            log.warn("방 퇴장: 참여자가 아님 - roomId={}, userId={}", roomId, userId);
-        }
-    }
-
-    private void sendError(Long roomId, String message) {
-        messagingTemplate.convertAndSend(
-                "/topic/pvp/" + roomId,
-                PvpWebSocketMessage.error(roomId, message)
-        );
+        log.info("WS 세션 제거: userId={}, roomId={}, sessionId={}", userId, roomId, sessionId);
     }
 
     /**
-     * sessionAttributes에서 userId 추출 (null 방어 + 타입 캐스팅 방어)
+     * sessionAttributes에서 userId 추출
      */
     private Long extractUserId(SimpMessageHeaderAccessor headerAccessor) {
         Map<String, Object> attrs = headerAccessor.getSessionAttributes();
