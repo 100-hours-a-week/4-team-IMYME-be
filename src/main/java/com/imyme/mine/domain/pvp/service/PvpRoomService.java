@@ -188,9 +188,9 @@ public class PvpRoomService {
         // 게스트 입장 (MATCHED 전환)
         room.joinGuest(guest, guest.getNickname());
 
-        // 저장 (낙관적 락으로 동시성 제어)
+        // 저장 (낙관적 락으로 동시성 제어, saveAndFlush로 즉시 flush → 예외를 여기서 처리)
         try {
-            pvpRoomRepository.save(room);
+            pvpRoomRepository.saveAndFlush(room);
         } catch (Exception e) {
             log.warn("방 입장 실패 (동시성): roomId={}, userId={}", roomId, userId, e);
             throw new BusinessException(ErrorCode.ROOM_ALREADY_MATCHED);
