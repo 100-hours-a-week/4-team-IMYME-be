@@ -2,20 +2,21 @@ package com.imyme.mine.domain.pvp.service;
 
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
-import com.imyme.mine.domain.pvp.dto.MessageType;
-import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
-import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
 import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
+import com.imyme.mine.domain.pvp.messaging.PvpChannels;
+import com.imyme.mine.domain.pvp.messaging.PvpMessage;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
+import com.imyme.mine.global.messaging.MessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class PvpAsyncService {
 
     private final PvpRoomRepository pvpRoomRepository;
     private final KeywordRepository keywordRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final MessagePublisher messagePublisher;
 
     // Self-injection: 내부 @Async 메서드 호출 시 프록시를 거치도록
     // @Lazy: 순환 참조 방지 (빈 생성 시점이 아닌 첫 사용 시점에 주입)
@@ -70,20 +71,19 @@ public class PvpAsyncService {
             pvpRoomRepository.save(room);
             log.info("THINKING 전환 완료: roomId={}, keywordId={}", roomId, randomKeyword.getId());
 
-            // THINKING 브로드캐스트 (키워드 정보 + 생각 종료 시간)
-            RoomStatusChangeMessage thinkingData = RoomStatusChangeMessage.builder()
-                    .status(PvpRoomStatus.THINKING)
-                    .keyword(RoomStatusChangeMessage.KeywordData.builder()
-                            .id(randomKeyword.getId())
-                            .name(randomKeyword.getName())
-                            .build())
-                    .startedAt(room.getStartedAt())
-                    .thinkingEndsAt(room.getStartedAt() != null ? room.getStartedAt().plusSeconds(30) : null)
-                    .message("키워드가 공개되었습니다! 생각 시간이 시작됩니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, thinkingData));
+            // THINKING 브로드캐스트 (커밋 후 Redis Pub/Sub)
+            final Long keywordId = randomKeyword.getId();
+            final String keywordName = randomKeyword.getName();
+            final var startedAt = room.getStartedAt();
+            final var thinkingEndsAt = startedAt != null ? startedAt.plusSeconds(30) : null;
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
+                            PvpMessage.thinkingStarted(roomId, keywordId, keywordName, startedAt, thinkingEndsAt));
+                }
+            });
 
             // 30초 후 RECORDING 자동 전환 (self를 통해 프록시 거치기)
             self.scheduleRecordingTransition(roomId);
@@ -115,14 +115,14 @@ public class PvpAsyncService {
             pvpRoomRepository.save(room);
             log.info("RECORDING 자동 전환 완료: roomId={}", roomId);
 
-            // RECORDING 브로드캐스트
-            RoomStatusChangeMessage recordingData = RoomStatusChangeMessage.builder()
-                    .status(PvpRoomStatus.RECORDING)
-                    .message("생각 시간이 종료되었습니다! 녹음을 시작하세요.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + roomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, recordingData));
+            // RECORDING 브로드캐스트 (커밋 후 Redis Pub/Sub)
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
+                            PvpMessage.recordingStarted(roomId));
+                }
+            });
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

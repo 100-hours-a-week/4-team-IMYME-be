@@ -6,13 +6,11 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.forbidden.entity.ForbiddenWordType;
 import com.imyme.mine.domain.forbidden.service.ForbiddenWordService;
-import com.imyme.mine.domain.pvp.dto.MessageType;
 import com.imyme.mine.domain.pvp.dto.request.*;
 import com.imyme.mine.domain.pvp.dto.response.*;
-import com.imyme.mine.domain.pvp.dto.websocket.AnswerSubmittedMessage;
-import com.imyme.mine.domain.pvp.dto.websocket.PvpWebSocketMessage;
-import com.imyme.mine.domain.pvp.dto.websocket.RoomStatusChangeMessage;
 import com.imyme.mine.domain.pvp.entity.*;
+import com.imyme.mine.domain.pvp.messaging.PvpChannels;
+import com.imyme.mine.domain.pvp.messaging.PvpMessage;
 import com.imyme.mine.domain.pvp.repository.PvpFeedbackRepository;
 import com.imyme.mine.domain.pvp.repository.PvpHistoryRepository;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
@@ -21,13 +19,15 @@ import com.imyme.mine.domain.storage.dto.PresignedUrlResponse;
 import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
+import com.imyme.mine.global.messaging.MessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,7 +47,7 @@ public class PvpRoomService {
     private final PvpFeedbackRepository pvpFeedbackRepository;
     private final StorageService storageService;
     private final PvpAsyncService pvpAsyncService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final MessagePublisher messagePublisher;
     // TODO v2: RabbitMQ Producer 주입
     // private final RabbitTemplate rabbitTemplate;
 
@@ -358,29 +358,29 @@ public class PvpRoomService {
 
             // TODO v2: RabbitMQ 큐에 PvP 분석 요청 전송
 
-            // PROCESSING 브로드캐스트
-            RoomStatusChangeMessage processingData = RoomStatusChangeMessage.builder()
-                    .status(PvpRoomStatus.PROCESSING)
-                    .message("양쪽 모두 제출 완료! AI 분석이 시작됩니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + currentRoomId,
-                    PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, currentRoomId, processingData));
+            // PROCESSING 브로드캐스트 (커밋 후 Redis Pub/Sub)
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publish(PvpChannels.getRoomChannel(currentRoomId),
+                            PvpMessage.statusChange(currentRoomId, PvpRoomStatus.PROCESSING, "양쪽 모두 제출 완료! AI 분석이 시작됩니다."));
+                }
+            });
 
             message = "제출이 완료되었습니다. AI 분석 준비 중입니다.";
         } else {
             // 8. 한쪽만 제출 → 상대방에게 알림
             log.info("한쪽만 제출 완료, 상대방 대기: roomId={}, uploadedCount={}", currentRoomId, uploadedCount);
 
-            // 한쪽 제출 완료 → ANSWER_SUBMITTED 브로드캐스트
-            AnswerSubmittedMessage submittedData = AnswerSubmittedMessage.builder()
-                    .userId(userId)
-                    .nickname(submission.getUser().getNickname())
-                    .message("상대방이 답변을 제출했습니다.")
-                    .build();
-            messagingTemplate.convertAndSend(
-                    "/topic/pvp/" + currentRoomId,
-                    PvpWebSocketMessage.of(MessageType.ANSWER_SUBMITTED, currentRoomId, submittedData));
+            // ANSWER_SUBMITTED 브로드캐스트 (커밋 후 Redis Pub/Sub)
+            final String nickname = submission.getUser().getNickname();
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publish(PvpChannels.getRoomChannel(currentRoomId),
+                            PvpMessage.answerSubmitted(currentRoomId, userId, nickname));
+                }
+            });
 
             message = "상대방의 제출을 기다리고 있습니다.";
         }
