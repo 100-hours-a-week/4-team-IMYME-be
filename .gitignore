@@ -73,3 +73,16 @@ k6-tests/*.json
 /monitoring/QUICKSTART.md
 /k6-tests/README.md
 /monitoring/README.md
+
+# Redis persistence files
+dump.rdb
+appendonly.aof
+*.rdb
+*.aof
+
+# Docker volumes (로컬에서 생성되는 볼륨 데이터)
+# docker-compose.yml에서 생성되는 볼륨은 무시하지 않음 (외부 관리)
+
+# 개발 가이드 문서 (선택적 - 팀 정책에 따라)
+README-*.md
+!README.md

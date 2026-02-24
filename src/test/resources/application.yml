@@ -68,6 +68,22 @@ cloud:
             bucket: test-bucket
 
 # ==================================================
+# Redis 설정 (테스트용 - GitHub Actions 서비스 컨테이너)
+# ==================================================
+    data:
+        redis:
+            host: localhost
+            port: 6379
+            password:
+            lettuce:
+                pool:
+                    max-active: 10
+                    max-idle: 5
+                    min-idle: 2
+                    max-wait: 3000ms
+            timeout: 3000ms
+
+# ==================================================
 # AI 서버 설정 (테스트용 가짜값)
 # ==================================================
 ai-server:
