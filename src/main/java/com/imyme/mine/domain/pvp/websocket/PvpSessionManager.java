@@ -97,6 +97,21 @@ public class PvpSessionManager {
     }
 
     /**
+     * 같은 방에 같은 유저의 다른 세션이 있는지 확인 (멀티탭 방어)
+     */
+    public boolean hasOtherSessionsForUser(Long roomId, Long userId, String excludeSessionId) {
+        Set<String> sessionIds = roomToSessions.get(roomId);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return false;
+        }
+        return sessionIds.stream()
+                .filter(sid -> !sid.equals(excludeSessionId))
+                .map(sessionToRoom::get)
+                .filter(Objects::nonNull)
+                .anyMatch(info -> info.userId().equals(userId));
+    }
+
+    /**
      * 전체 세션 수 조회
      */
     public int getSessionCount() {

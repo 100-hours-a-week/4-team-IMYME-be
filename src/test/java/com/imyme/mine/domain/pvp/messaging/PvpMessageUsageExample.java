@@ -53,14 +53,14 @@ public class PvpMessageUsageExample {
     }
 
     /**
-     * 예시 3: 제출 완료 시 상대방에게 알림
+     * 예시 3: 답변 제출 시 상대방에게 알림
      */
-    public void notifySubmissionCompleted(Long roomId, Long userId) {
-        PvpMessage message = PvpMessage.submissionCompleted(roomId, userId);
+    public void notifyAnswerSubmitted(Long roomId, Long userId, String nickname) {
+        PvpMessage message = PvpMessage.answerSubmitted(roomId, userId, nickname);
         String channel = PvpChannels.getRoomChannel(roomId);
 
         messagePublisher.publish(channel, message);
-        log.info("제출 완료 알림 발행: roomId={}, userId={}", roomId, userId);
+        log.info("답변 제출 알림 발행: roomId={}, userId={}", roomId, userId);
     }
 
     /**
