@@ -14,21 +14,43 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class RoomResponse {
-    private Long id;
-    private Long categoryId;
-    private String categoryName;
-    private String roomName;
+    private RoomInfo room;
+    private CategoryInfo category;
     private PvpRoomStatus status;
-    private Long hostUserId;
-    private String hostNickname;
-    private Long guestUserId;
-    private String guestNickname;
     private KeywordInfo keyword;
+    private UserInfo host;
+    private UserInfo guest;
     private LocalDateTime createdAt;
     private LocalDateTime matchedAt;
     private LocalDateTime startedAt;
     private LocalDateTime thinkingEndsAt;
     private String message;
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class RoomInfo {
+        private Long id;
+        private String name;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class CategoryInfo {
+        private Long id;
+        private String name;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class UserInfo {
+        private Long id;
+        private String nickname;
+        private String profileImageUrl;
+        private Integer level;
+    }
 
     @Getter
     @AllArgsConstructor

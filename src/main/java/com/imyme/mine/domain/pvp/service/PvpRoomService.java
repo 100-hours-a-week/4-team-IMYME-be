@@ -654,6 +654,9 @@ public class PvpRoomService {
     // ===== 내부 변환 메서드 =====
 
     RoomResponse toRoomResponse(PvpRoom room, String message) {
+        User host = room.getHostUser();
+        User guest = room.getGuestUser();
+
         RoomResponse.KeywordInfo keywordInfo = null;
         if (room.getKeyword() != null) {
             keywordInfo = RoomResponse.KeywordInfo.builder()
@@ -669,16 +672,28 @@ public class PvpRoomService {
         }
 
         return RoomResponse.builder()
-                .id(room.getId())
-                .categoryId(room.getCategory().getId())
-                .categoryName(room.getCategory().getName())
-                .roomName(room.getRoomName())
+                .room(RoomResponse.RoomInfo.builder()
+                        .id(room.getId())
+                        .name(room.getRoomName())
+                        .build())
+                .category(RoomResponse.CategoryInfo.builder()
+                        .id(room.getCategory().getId())
+                        .name(room.getCategory().getName())
+                        .build())
                 .status(room.getStatus())
-                .hostUserId(room.getHostUser().getId())
-                .hostNickname(room.getHostNickname())
-                .guestUserId(room.getGuestUser() != null ? room.getGuestUser().getId() : null)
-                .guestNickname(room.getGuestNickname())
                 .keyword(keywordInfo)
+                .host(RoomResponse.UserInfo.builder()
+                        .id(host.getId())
+                        .nickname(host.getNickname())
+                        .profileImageUrl(host.getProfileImageUrl())
+                        .level(host.getLevel())
+                        .build())
+                .guest(guest != null ? RoomResponse.UserInfo.builder()
+                        .id(guest.getId())
+                        .nickname(guest.getNickname())
+                        .profileImageUrl(guest.getProfileImageUrl())
+                        .level(guest.getLevel())
+                        .build() : null)
                 .createdAt(room.getCreatedAt())
                 .matchedAt(room.getMatchedAt())
                 .startedAt(room.getStartedAt())
