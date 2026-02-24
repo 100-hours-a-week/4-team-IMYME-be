@@ -66,6 +66,18 @@ public interface PvpHistoryRepository extends JpaRepository<PvpHistory, Long> {
     Optional<PvpHistory> findByRoomIdAndUserId(Long roomId, Long userId);
 
     /**
+     * 여러 방의 상대방 점수 일괄 조회 (N+1 방지)
+     *
+     * @param roomIds 방 ID 목록
+     * @return roomId를 키로 하는 PvpHistory 목록
+     */
+    @Query("""
+            SELECT h FROM PvpHistory h
+            WHERE h.room.id IN :roomIds
+            """)
+    List<PvpHistory> findByRoomIdIn(@Param("roomIds") List<Long> roomIds);
+
+    /**
      * 승률/평균 점수 통계 조회
      */
     @Query("""
