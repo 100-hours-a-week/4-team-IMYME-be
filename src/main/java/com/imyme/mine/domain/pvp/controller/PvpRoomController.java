@@ -84,10 +84,11 @@ public class PvpRoomController {
         RoomResponse response = pvpRoomService.joinRoom(principal.getId(), roomId);
 
         // 트랜잭션 커밋 완료 후 브로드캐스트
+        String guestNickname = response.getGuest() != null ? response.getGuest().getNickname() : "게스트";
         RoomJoinedMessage joinedData = RoomJoinedMessage.builder()
                 .userId(principal.getId())
-                .nickname(response.getGuestNickname())
-                .message(response.getGuestNickname() + "님이 입장했습니다.")
+                .nickname(guestNickname)
+                .message(guestNickname + "님이 입장했습니다.")
                 .build();
         messagingTemplate.convertAndSend(
                 "/topic/pvp/" + roomId,
