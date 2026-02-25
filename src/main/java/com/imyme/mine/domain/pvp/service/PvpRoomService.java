@@ -448,34 +448,28 @@ public class PvpRoomService {
             throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
         }
 
-        // THINKING 이후 상태에서는 나가기 불가
-        if (room.getStatus() == PvpRoomStatus.THINKING ||
-            room.getStatus() == PvpRoomStatus.RECORDING ||
-            room.getStatus() == PvpRoomStatus.PROCESSING ||
-            room.getStatus() == PvpRoomStatus.FINISHED) {
-            throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
-        }
-
         if (room.isHost(userId)) {
-            // 호스트 나가기
+            // 호스트 나가기: OPEN 상태에서만 방 취소 가능
             if (room.getStatus() == PvpRoomStatus.MATCHED) {
-                // 게스트 입장 후에는 방 삭제 불가
                 throw new BusinessException(ErrorCode.ROOM_CANNOT_BE_DELETED);
             }
+            if (room.getStatus() != PvpRoomStatus.OPEN) {
+                throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
+            }
 
-            // OPEN 상태에서만 방 취소 가능
             room.cancel();
             pvpRoomRepository.save(room);
             log.info("호스트 방 나가기: roomId={}, status=CANCELED", roomId);
             return new LeaveResult(roomId, LeaveType.HOST_LEFT, PvpRoomStatus.CANCELED);
 
         } else {
-            // 게스트 나가기
-            if (room.getStatus() != PvpRoomStatus.MATCHED) {
+            // 게스트 나가기: MATCHED 또는 THINKING에서 허용
+            if (room.getStatus() != PvpRoomStatus.MATCHED
+                    && room.getStatus() != PvpRoomStatus.THINKING) {
                 throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
             }
 
-            // 게스트 제거, 방 OPEN으로 복구
+            // 게스트 제거, 방 OPEN으로 복구 (THINKING 정보도 초기화)
             room.removeGuest();
             pvpRoomRepository.save(room);
             log.info("게스트 방 나가기: roomId={}, status=OPEN", roomId);
