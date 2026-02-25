@@ -16,8 +16,8 @@ import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
-import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
+import com.imyme.mine.domain.knowledge.service.KnowledgeBaseService;
 import com.imyme.mine.global.config.AttemptProperties;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.error.BusinessException;
@@ -46,6 +46,7 @@ public class AttemptService {
     private final CardAttemptRepository cardAttemptRepository;
     private final CardFeedbackRepository cardFeedbackRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
+    private final KnowledgeBaseService knowledgeBaseService;
     private final AiServerClient aiServerClient;
     private final ApplicationEventPublisher eventPublisher;
     private final S3Presigner s3Presigner;
@@ -285,11 +286,10 @@ public class AttemptService {
         defaults.put("maxScore", 100);
         defaults.put("keywords", List.of(card.getKeyword().getName()));
 
-        List<String> knowledgeContents = knowledgeBaseRepository.findByKeywordId(card.getKeyword().getId())
-            .stream()
-            .filter(KnowledgeBase::getIsActive)
-            .map(KnowledgeBase::getContent)
-            .toList();
+        // KnowledgeBaseService 사용 (캐싱 적용)
+        List<String> knowledgeContents = knowledgeBaseService.getModelAnswersByKeyword(
+            card.getKeyword().getId()
+        );
         if (!knowledgeContents.isEmpty()) {
             defaults.put("knowledgeBase", knowledgeContents);
         }

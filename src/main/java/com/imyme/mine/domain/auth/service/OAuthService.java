@@ -7,6 +7,7 @@ import com.imyme.mine.domain.auth.entity.*;
 import com.imyme.mine.domain.auth.repository.DeviceRepository;
 import com.imyme.mine.domain.auth.repository.UserRepository;
 import com.imyme.mine.domain.auth.repository.UserSessionRepository;
+import com.imyme.mine.domain.user.service.NicknameService;
 import com.imyme.mine.global.config.JwtProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -34,6 +35,7 @@ public class OAuthService {
     private final UserRepository userRepository;
     private final UserSessionRepository userSessionRepository;
     private final DeviceRepository deviceRepository;
+    private final NicknameService nicknameService;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
 
@@ -171,20 +173,24 @@ public class OAuthService {
         return userRepository.save(user);
     }
 
-    // 닉네임 중복 방지 (기본닉네임 + 랜덤숫자)
+    /**
+     * 닉네임 중복 방지 (Redis SET Atomic Operation)
+     * - Race Condition 완벽 방지
+     * - 조회와 선점을 한 번에 처리 (Atomic)
+     */
     private String generateUniqueNickname(String nickname) {
-        // 닉네임만으로 존재 여부 확인
-        if (!userRepository.existsByNickname(nickname)) {
-            return nickname;
+        // 1. 원본 닉네임 시도 (Atomic 선점)
+        if (nicknameService.tryReserveNickname(nickname)) {
+            return nickname;  // 선점 성공!
         }
 
-        // 중복되면 뒤에 랜덤 숫자 붙여서 시도 (최대 100회)
+        // 2. 실패 시 접미사 붙여서 재시도 (최대 100회)
         int attempts = 0;
         while (attempts++ < MAX_RETRIES) {
             long suffix = Math.abs(secureRandom.nextLong() % 1_000_000);
             String candidate = nickname + "#" + suffix;
-            if (!userRepository.existsByNickname(candidate)) {
-                return candidate;
+            if (nicknameService.tryReserveNickname(candidate)) {
+                return candidate;  // 선점 성공!
             }
         }
 

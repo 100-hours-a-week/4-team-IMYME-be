@@ -23,4 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 닉네임 중복 확인
     boolean existsByNickname(String nickname);
+
+    // 모든 닉네임 조회 (Redis 캐시 초기화용)
+    @Query("SELECT u.nickname FROM User u WHERE u.deletedAt IS NULL")
+    List<String> findAllNicknames();
 }
