@@ -28,10 +28,32 @@ services:
     networks:
       - mine-dev-network
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: mine-rabbitmq-dev
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    volumes:
+      - rabbitmq-dev-data:/var/lib/rabbitmq
+    restart: unless-stopped
+    networks:
+      - mine-dev-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   redis-dev-data:
     driver: local
   postgres-dev-data:
+    driver: local
+  rabbitmq-dev-data:
     driver: local
 
 networks:

@@ -32,6 +32,20 @@ spring:
     flyway:
         enabled: false
 
+    # RabbitMQ 설정 (테스트용 - 임베디드 사용 또는 비활성화)
+    # 실제 RabbitMQ가 필요한 통합 테스트에서는 Testcontainers 권장
+    rabbitmq:
+        host: localhost
+        port: 5672
+        username: guest
+        password: guest
+        listener:
+            simple:
+                acknowledge-mode: manual
+                prefetch: 1
+                retry:
+                    enabled: false  # 테스트에서는 재시도 비활성화
+
     # OAuth 설정 (테스트용 가짜값)
     security:
         oauth2:
