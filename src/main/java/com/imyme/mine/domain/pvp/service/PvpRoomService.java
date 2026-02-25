@@ -11,6 +11,8 @@ import com.imyme.mine.domain.pvp.dto.response.*;
 import com.imyme.mine.domain.pvp.entity.*;
 import com.imyme.mine.domain.pvp.messaging.PvpChannels;
 import com.imyme.mine.domain.pvp.messaging.PvpMessage;
+import com.imyme.mine.domain.pvp.messaging.RabbitMQMessagePublisher;
+import com.imyme.mine.domain.pvp.dto.message.SttRequestDto;
 import com.imyme.mine.domain.pvp.repository.PvpFeedbackRepository;
 import com.imyme.mine.domain.pvp.repository.PvpHistoryRepository;
 import com.imyme.mine.domain.pvp.repository.PvpRoomRepository;
@@ -51,8 +53,7 @@ public class PvpRoomService {
     private final PvpAsyncService pvpAsyncService;
     private final MessagePublisher messagePublisher;
     private final ProfileImageService profileImageService;
-    // TODO v2: RabbitMQ Producer 주입
-    // private final RabbitTemplate rabbitTemplate;
+    private final RabbitMQMessagePublisher rabbitMQMessagePublisher;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -343,10 +344,31 @@ public class PvpRoomService {
         submission.submit(request.durationSeconds());
         pvpSubmissionRepository.save(submission);
 
-        // TODO v2: RabbitMQ 큐에 STT 변환 요청 전송
-        // - 메시지: { submissionId, objectKey }
-        // - Worker가 비동기로 STT 변환 처리
-        // - 변환 완료 시 sttText 업데이트 및 상태 전환
+        // 6. RabbitMQ 큐에 STT 변환 요청 전송
+        // S3 Presigned GET URL 생성 (AI 서버가 다운로드할 수 있도록)
+        String audioUrl = storageService.generatePresignedGetUrl(objectKey);
+
+        SttRequestDto sttRequest = SttRequestDto.builder()
+                .roomId(submission.getRoom().getId())
+                .userId(userId)
+                .audioUrl(audioUrl)
+                .timestamp(System.currentTimeMillis() / 1000) // Unix timestamp (초 단위)
+                .build();
+
+        // 트랜잭션 커밋 후 RabbitMQ 메시지 발행
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    rabbitMQMessagePublisher.publishSttRequest(sttRequest);
+                    log.info("STT 변환 요청 발행 완료: submissionId={}, roomId={}, userId={}",
+                            submissionId, submission.getRoom().getId(), userId);
+                } catch (Exception e) {
+                    log.error("STT 변환 요청 발행 실패: submissionId={}", submissionId, e);
+                    // TODO: 실패 시 재시도 로직 또는 알림 처리
+                }
+            }
+        });
 
         log.info("제출 완료: submissionId={}, userId={}, status=UPLOADED", submissionId, userId);
 
@@ -364,7 +386,11 @@ public class PvpRoomService {
             pvpRoomRepository.save(room);
             log.info("양쪽 제출 완료 → PROCESSING 전환: roomId={}", currentRoomId);
 
-            // TODO v2: RabbitMQ 큐에 PvP 분석 요청 전송
+            // TODO v2: Feedback Request는 양쪽 STT가 모두 완료된 후 발행
+            // - STT Response Consumer에서 양쪽 STT 완료 확인
+            // - Feedback Request 발행 (양쪽 user_text 포함)
+            // - AI 서버가 Feedback Response 반환
+            // - Feedback Response Consumer에서 승패 결정 및 결과 저장
 
             // PROCESSING 브로드캐스트 (커밋 후 Redis Pub/Sub)
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
