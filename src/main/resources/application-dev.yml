@@ -24,11 +24,12 @@ spring:
                         redirect-uri: ${FRONTEND_URL_DEV}/auth/callback/kakao
 
     # Dev 환경 Redis 설정
+    # ElastiCache: TLS OFF, ACL 없음 (Private Subnet + SG로 보안 통제)
     data:
         redis:
             host: ${REDIS_HOST}
-            port: ${REDIS_PORT}
-            password: ${REDIS_PASSWORD}
+            port: ${REDIS_PORT:6379}
+            # password 제거: AWS ElastiCache에서 액세스 제어 미사용
 
 logging:
     level:

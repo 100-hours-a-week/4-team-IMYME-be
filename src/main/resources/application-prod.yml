@@ -20,6 +20,23 @@ spring:
                     kakao:
                         redirect-uri: ${FRONTEND_URL_PROD}/auth/callback/kakao
 
+    # Prod 환경 Redis 설정
+    # ElastiCache: TLS ON, ACL 사용 (최고 보안 수준)
+    data:
+        redis:
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT:6379}
+            password: ${REDIS_PASSWORD}  # AWS Secrets Manager에서 주입
+            ssl:
+                enabled: true  # TLS 필수
+            timeout: 5000ms
+            lettuce:
+                pool:
+                    max-active: 20
+                    max-idle: 10
+                    min-idle: 5
+                    max-wait: 5000ms
+
 logging:
     level:
         root: INFO

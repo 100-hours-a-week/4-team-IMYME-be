@@ -1,0 +1,51 @@
+spring:
+    config:
+        activate:
+            on-profile: release # 'release' 프로필일 때 활성화 (사전 프로덕션)
+
+    flyway:
+        locations: classpath:db/migration
+        # Release는 실제 데이터 사용, testdata 제외
+
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false      # 운영과 동일하게 쿼리 로그 끔
+        open-in-view: false
+
+    # Release 환경 카카오 OAuth 설정
+    security:
+        oauth2:
+            client:
+                registration:
+                    kakao:
+                        redirect-uri: ${FRONTEND_URL_RELEASE}/auth/callback/kakao
+
+    # Release 환경 Redis 설정
+    # ElastiCache: TLS ON, ACL 사용 (Prod와 동일한 보안 수준)
+    data:
+        redis:
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT:6379}
+            password: ${REDIS_PASSWORD}  # AWS Secrets Manager 또는 환경변수
+            ssl:
+                enabled: true  # TLS 활성화 (Prod와 동일)
+            timeout: 5000ms
+            lettuce:
+                pool:
+                    max-active: 15  # Prod(20)보다는 작게
+                    max-idle: 8
+                    min-idle: 3
+                    max-wait: 5000ms
+
+logging:
+    level:
+        root: INFO
+        com.imyme.mine: DEBUG  # Prod보다는 상세한 로그 (디버깅용)
+        org.springframework.security: INFO
+        org.hibernate.SQL: WARN
+
+# Release 환경에서 배치 작업 설정 (Prod 검증용)
+knowledge:
+    batch:
+        enabled: false  # 필요 시 true로 변경
