@@ -59,6 +59,24 @@ spring:
             timeout: 3000ms
 
     # ==================================================
+    # RabbitMQ 공통
+    # ==================================================
+    rabbitmq:
+        host: ${RABBITMQ_HOST:localhost}
+        port: ${RABBITMQ_PORT:5672}
+        username: ${RABBITMQ_USER:admin}
+        password: ${RABBITMQ_PASSWORD:admin}
+        listener:
+            simple:
+                acknowledge-mode: manual  # Manual Ack (수동 확인)
+                prefetch: 1               # QoS - 동시 처리 메시지 수 제한
+                retry:
+                    enabled: true
+                    initial-interval: 3000ms
+                    max-attempts: 3
+                    multiplier: 2.0
+
+    # ==================================================
     # Security / OAuth2 공통
     # ==================================================
     security:
