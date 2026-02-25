@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.util.Map;
@@ -29,6 +30,7 @@ public class PvpWebSocketController {
 
     private final PvpSessionManager sessionManager;
     private final PvpRoomRepository pvpRoomRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * 세션 등록 (DB 변경 없음)
@@ -50,6 +52,7 @@ public class PvpWebSocketController {
         Optional<PvpRoom> roomOpt = pvpRoomRepository.findByIdWithDetails(roomId);
         if (roomOpt.isEmpty()) {
             log.warn("WS 세션 등록 실패: 방 없음 - roomId={}, userId={}", roomId, userId);
+            sendError(userId, "존재하지 않는 방입니다.");
             return;
         }
 
@@ -60,12 +63,14 @@ public class PvpWebSocketController {
             room.getStatus() == PvpRoomStatus.FINISHED ||
             room.getStatus() == PvpRoomStatus.EXPIRED) {
             log.warn("WS 세션 등록 실패: 종료된 방 - roomId={}, userId={}, status={}", roomId, userId, room.getStatus());
+            sendError(userId, "이미 종료된 방입니다.");
             return;
         }
 
         // 참여자 확인 (호스트 또는 게스트만 세션 등록 가능)
         if (!room.isParticipant(userId)) {
             log.warn("WS 세션 등록 실패: 참여자 아님 - roomId={}, userId={}", roomId, userId);
+            sendError(userId, "해당 방의 참여자가 아닙니다.");
             return;
         }
 
@@ -86,6 +91,18 @@ public class PvpWebSocketController {
 
         sessionManager.removeSession(sessionId);
         log.info("WS 세션 제거: userId={}, roomId={}, sessionId={}", userId, roomId, sessionId);
+    }
+
+    /**
+     * 특정 유저에게 에러 메시지 전송
+     * - 클라이언트 구독 경로: /user/queue/pvp/errors
+     */
+    private void sendError(Long userId, String errorMessage) {
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/pvp/errors",
+                Map.of("error", errorMessage, "timestamp", System.currentTimeMillis())
+        );
     }
 
     /**
