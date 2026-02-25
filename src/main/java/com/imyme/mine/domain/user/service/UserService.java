@@ -14,6 +14,8 @@ import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,8 +39,10 @@ public class UserService {
      * - User Soft Delete (deleted_at 설정)
      * - 관련 세션 Hard Delete
      * - 기기와 사용자 연결 해제 (lastUser = NULL)
+     * - 캐시 무효화 (userProfile만 삭제, PvP 피드백은 유지)
      */
     @Transactional
+    @CacheEvict(value = "userProfile", key = "#userId")
     public void withdrawUser(Long userId) {
         log.info("회원 탈퇴 시작: userId={}", userId);
 
@@ -59,7 +63,12 @@ public class UserService {
         log.info("회원 탈퇴 완료: userId={}", userId);
     }
 
-    // 프로필 조회
+    /**
+     * 프로필 조회 (캐싱 적용)
+     * - TTL: 30분 (RedisConfig에서 설정)
+     * - 프로필 수정 시 캐시 무효화
+     */
+    @Cacheable(value = "userProfile", key = "#userId")
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -69,7 +78,12 @@ public class UserService {
         return UserProfileResponse.from(user, profileImageUrl);
     }
 
-    // 프로필 수정 - Dirty Checking 활용
+    /**
+     * 프로필 수정 (캐시 무효화)
+     * - Dirty Checking 활용
+     * - 수정 후 캐시 자동 삭제
+     */
+    @CacheEvict(value = "userProfile", key = "#userId")
     @Transactional
     public UserProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)

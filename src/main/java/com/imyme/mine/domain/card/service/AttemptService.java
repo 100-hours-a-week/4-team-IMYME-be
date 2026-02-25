@@ -24,6 +24,7 @@ import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,6 +90,14 @@ public class AttemptService {
         return AttemptCreateResponse.of(savedAttempt, expiresAt);
     }
 
+    /**
+     * Solo 시도 상세 조회 (캐싱 적용)
+     * - TTL: 7일 (RedisConfig에서 설정)
+     * - 조건부 캐싱: COMPLETED 상태일 때만 캐싱 (Immutable 데이터)
+     * - PROCESSING/FAILED는 캐싱하지 않음 (폴링 API)
+     */
+    @Cacheable(value = "ai:feedback:solo", key = "#attemptId",
+               condition = "#result != null && #result.status() == 'COMPLETED'")
     @Transactional(readOnly = true)
     public AttemptDetailResponse getAttemptDetail(Long userId, Long cardId, Long attemptId) {
         log.debug("시도 상세 조회 - userId: {}, cardId: {}, attemptId: {}", userId, cardId, attemptId);

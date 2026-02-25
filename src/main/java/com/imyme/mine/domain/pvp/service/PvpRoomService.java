@@ -25,6 +25,7 @@ import com.imyme.mine.global.error.ErrorCode;
 import com.imyme.mine.global.messaging.MessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -520,8 +521,13 @@ public class PvpRoomService {
     }
 
     /**
-     * 4.7 PvP 결과 조회
+     * 4.7 PvP 결과 조회 (캐싱 적용)
+     * - TTL: 7일 (RedisConfig에서 설정)
+     * - Immutable 데이터: 생성 후 절대 변경 없음
+     * - 조건부 캐싱: FINISHED 상태일 때만 캐싱 (PROCESSING은 캐싱 안 함)
      */
+    @Cacheable(value = "ai:feedback:pvp", key = "#roomId + ':' + #userId",
+               condition = "#result != null && #result.status().name() == 'FINISHED'")
     public RoomResultResponse getRoomResult(Long userId, Long roomId) {
         // 1. 방 조회
         PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
