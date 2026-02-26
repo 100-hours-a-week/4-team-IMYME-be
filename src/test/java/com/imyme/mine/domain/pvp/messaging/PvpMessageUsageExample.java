@@ -25,7 +25,7 @@ public class PvpMessageUsageExample {
         var guestInfo = new GuestInfo(guestId, guestNickname);
 
         // 메시지 발행
-        PvpMessage message = PvpMessage.guestJoined(roomId, guestInfo);
+        PvpMessage message = PvpMessage.guestJoined(roomId, guestInfo, "GUEST");
         String channel = PvpChannels.getRoomChannel(roomId);
 
         messagePublisher.publish(channel, message);
@@ -56,7 +56,7 @@ public class PvpMessageUsageExample {
      * 예시 3: 답변 제출 시 상대방에게 알림
      */
     public void notifyAnswerSubmitted(Long roomId, Long userId, String nickname) {
-        PvpMessage message = PvpMessage.answerSubmitted(roomId, userId, nickname);
+        PvpMessage message = PvpMessage.answerSubmitted(roomId, userId, nickname, "HOST");
         String channel = PvpChannels.getRoomChannel(roomId);
 
         messagePublisher.publish(channel, message);

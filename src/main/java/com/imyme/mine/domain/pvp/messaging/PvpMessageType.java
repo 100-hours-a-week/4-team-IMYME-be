@@ -11,6 +11,7 @@ public enum PvpMessageType {
     HOST_LEFT,
     THINKING_STARTED,
     RECORDING_STARTED,
+    READY,
     ANSWER_SUBMITTED,
     ANALYSIS_COMPLETED
 }

@@ -82,7 +82,7 @@ public class WebSocketEventListener {
                     PvpMessage.hostLeft(roomId));
         } else {
             messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
-                    PvpMessage.guestLeft(roomId, userId));
+                    PvpMessage.guestLeft(roomId, userId, "GUEST"));
             messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                     PvpMessage.statusChange(roomId, PvpRoomStatus.OPEN, "대결 상대를 기다리고 있습니다."));
         }
