@@ -24,13 +24,36 @@ spring:
                         redirect-uri: ${FRONTEND_URL_DEV}/auth/callback/kakao
 
     # Dev 환경 Redis 설정
+    # ElastiCache: TLS OFF, ACL 없음 (Private Subnet + SG로 보안 통제)
     data:
         redis:
             host: ${REDIS_HOST}
-            port: ${REDIS_PORT}
-            password: ${REDIS_PASSWORD}
+            port: ${REDIS_PORT:6379}
+            # password 제거: AWS ElastiCache에서 액세스 제어 미사용
+
+    # Dev 환경 RabbitMQ 설정
+    # Option 1: Docker Compose (간단한 테스트)
+    # Option 2: Amazon MQ (운영 환경 유사 테스트)
+    rabbitmq:
+        host: ${RABBITMQ_HOST:localhost}
+        port: ${RABBITMQ_PORT:5672}
+        username: ${RABBITMQ_USER:admin}
+        password: ${RABBITMQ_PASSWORD:admin}
+        # TLS 미사용 (Private Subnet + SG로 보안 통제)
+        # Amazon MQ 사용 시 amqp:// 프로토콜 (비암호화)
+        connection-timeout: 10000ms
+        listener:
+            simple:
+                acknowledge-mode: manual
+                prefetch: 1  # 동시 처리 메시지 수 제한
+                retry:
+                    enabled: true
+                    initial-interval: 3000ms
+                    max-attempts: 3
+                    multiplier: 2.0
 
 logging:
     level:
         com.imyme.mine: DEBUG
         org.flywaydb: INFO
+        org.springframework.amqp: DEBUG  # RabbitMQ 디버깅

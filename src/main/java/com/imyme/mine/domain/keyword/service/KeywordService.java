@@ -11,6 +11,7 @@ import com.imyme.mine.domain.keyword.repository.KeywordRepository;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,13 @@ public class KeywordService {
     private final KeywordRepository keywordRepository;
     private final CategoryRepository categoryRepository;
 
+    /**
+     * 특정 카테고리의 키워드 조회 (캐싱 적용)
+     * - TTL: 2시간 (RedisConfig에서 설정)
+     * - sync=true: Cache Stampede 방지
+     * - key: categoryId + isActive 조합으로 개별 캐싱
+     */
+    @Cacheable(value = "keywords", key = "#categoryId + ':' + #isActive", sync = true)
     public CategoryKeywordsResponse getKeywordsByCategory(Long categoryId, Boolean isActive) {
         Category category = categoryRepository.findById(categoryId)
             .orElseThrow(() -> new BusinessException(
@@ -47,6 +55,13 @@ public class KeywordService {
         return CategoryKeywordsResponse.of(category, keywords);
     }
 
+    /**
+     * 모든 키워드를 카테고리별로 그룹핑하여 조회 (캐싱 적용)
+     * - TTL: 2시간 (RedisConfig에서 설정)
+     * - sync=true: Cache Stampede 방지
+     * - key: 'all' + isActive로 캐싱
+     */
+    @Cacheable(value = "keywords", key = "'all:' + #isActive", sync = true)
     public List<CategoryWithKeywordsResponse> getAllKeywordsGroupedByCategory(Boolean isActive) {
         List<Keyword> keywords;
         if (isActive == null) {

@@ -8,7 +8,9 @@ services:
       - "6379:6379"
     volumes:
       - redis-dev-data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes
+    # 비밀번호 제거: Dev 서버는 Private Subnet + SG로 보안 통제
+    # TLS도 사용하지 않음 (application-dev.yml과 일치)
     restart: unless-stopped
     networks:
       - mine-dev-network

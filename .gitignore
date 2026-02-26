@@ -86,3 +86,5 @@ appendonly.aof
 # 개발 가이드 문서 (선택적 - 팀 정책에 따라)
 README-*.md
 !README.md
+
+/docs
