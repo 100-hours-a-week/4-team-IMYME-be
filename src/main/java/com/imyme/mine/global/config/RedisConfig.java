@@ -14,6 +14,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import com.imyme.mine.domain.pvp.messaging.PvpRedisSubscriber;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -85,8 +87,13 @@ public class RedisConfig {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        // activateDefaultTyping 제거: Record와 호환 문제 발생
-        // GenericJackson2JsonRedisSerializer가 기본적으로 타입 정보를 포함함
+        // Record는 final 클래스이므로 NON_FINAL이 아닌 EVERYTHING을 사용해야 타입 정보(@class)가 포함됨
+        // 타입 정보가 없으면 역직렬화 시 LinkedHashMap으로 조립 → ClassCastException → 500
+        objectMapper.activateDefaultTyping(
+            LaissezFaireSubTypeValidator.instance,
+            ObjectMapper.DefaultTyping.EVERYTHING,
+            JsonTypeInfo.As.PROPERTY
+        );
 
         GenericJackson2JsonRedisSerializer serializer =
             new GenericJackson2JsonRedisSerializer(objectMapper);
