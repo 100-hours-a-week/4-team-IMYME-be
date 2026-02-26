@@ -70,6 +70,7 @@ spring:
             simple:
                 acknowledge-mode: manual  # Manual Ack (수동 확인)
                 prefetch: 1               # QoS - 동시 처리 메시지 수 제한
+                missing-queues-fatal: false  # AI 서버가 큐 생성 담당, 큐 없어도 부팅 가능
                 retry:
                     enabled: true
                     initial-interval: 3000ms
