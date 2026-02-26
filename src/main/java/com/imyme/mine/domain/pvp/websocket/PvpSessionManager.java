@@ -1,23 +1,41 @@
 package com.imyme.mine.domain.pvp.websocket;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * PvP WebSocket 세션 관리자
- * - sessionId → SessionInfo 매핑
- * - roomId → sessionId Set 역매핑
+ * PvP WebSocket 세션 관리자 (Redis 기반)
+ * - sessionId → SessionInfo 매핑: pvp:session:{sessionId}
+ * - roomId → sessionId Set 역매핑: pvp:room:{roomId}:sessions
+ * - TTL 2시간: 비정상 종료 시 자동 정리
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class PvpSessionManager {
 
-    private final Map<String, SessionInfo> sessionToRoom = new ConcurrentHashMap<>();
-    private final Map<Long, Set<String>> roomToSessions = new ConcurrentHashMap<>();
+    private static final String SESSION_KEY_PREFIX = "pvp:session:";
+    private static final String ROOM_KEY_PREFIX = "pvp:room:";
+    private static final String ROOM_KEY_SUFFIX = ":sessions";
+    private static final Duration SESSION_TTL = Duration.ofHours(2);
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private String sessionKey(String sessionId) {
+        return SESSION_KEY_PREFIX + sessionId;
+    }
+
+    private String roomKey(Long roomId) {
+        return ROOM_KEY_PREFIX + roomId + ROOM_KEY_SUFFIX;
+    }
 
     /**
      * 세션 등록
@@ -30,8 +48,9 @@ public class PvpSessionManager {
         }
 
         SessionInfo info = new SessionInfo(sessionId, roomId, userId, LocalDateTime.now());
-        sessionToRoom.put(sessionId, info);
-        roomToSessions.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
+        redisTemplate.opsForValue().set(sessionKey(sessionId), info, SESSION_TTL);
+        redisTemplate.opsForSet().add(roomKey(roomId), sessionId);
+        redisTemplate.expire(roomKey(roomId), SESSION_TTL);
         log.info("세션 등록: sessionId={}, roomId={}, userId={}", sessionId, roomId, userId);
     }
 
@@ -43,15 +62,18 @@ public class PvpSessionManager {
             return null;
         }
 
-        SessionInfo removed = sessionToRoom.remove(sessionId);
+        SessionInfo removed = getSession(sessionId);
         if (removed != null) {
-            Set<String> sessions = roomToSessions.get(removed.roomId());
-            if (sessions != null) {
-                sessions.remove(sessionId);
-                if (sessions.isEmpty()) {
-                    roomToSessions.remove(removed.roomId());
-                }
+            redisTemplate.delete(sessionKey(sessionId));
+            String roomKeyStr = roomKey(removed.roomId());
+            redisTemplate.opsForSet().remove(roomKeyStr, sessionId);
+
+            // room set이 비었으면 key 삭제 (메모리 정리)
+            Long remainingSize = redisTemplate.opsForSet().size(roomKeyStr);
+            if (remainingSize != null && remainingSize == 0) {
+                redisTemplate.delete(roomKeyStr);
             }
+
             log.info("세션 제거: sessionId={}, roomId={}, userId={}",
                     sessionId, removed.roomId(), removed.userId());
         }
@@ -65,7 +87,8 @@ public class PvpSessionManager {
         if (sessionId == null) {
             return null;
         }
-        return sessionToRoom.get(sessionId);
+        Object value = redisTemplate.opsForValue().get(sessionKey(sessionId));
+        return convertToSessionInfo(value);
     }
 
     /**
@@ -75,8 +98,8 @@ public class PvpSessionManager {
         if (roomId == null) {
             return 0;
         }
-        Set<String> sessions = roomToSessions.get(roomId);
-        return sessions == null ? 0 : sessions.size();
+        Long size = redisTemplate.opsForSet().size(roomKey(roomId));
+        return size == null ? 0 : size.intValue();
     }
 
     /**
@@ -86,12 +109,12 @@ public class PvpSessionManager {
         if (roomId == null) {
             return Collections.emptyList();
         }
-        Set<String> sessionIds = roomToSessions.get(roomId);
-        if (sessionIds == null) {
+        Set<Object> sessionIds = redisTemplate.opsForSet().members(roomKey(roomId));
+        if (sessionIds == null || sessionIds.isEmpty()) {
             return Collections.emptyList();
         }
         return sessionIds.stream()
-                .map(sessionToRoom::get)
+                .map(sid -> getSession(sid.toString()))
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -100,13 +123,14 @@ public class PvpSessionManager {
      * 같은 방에 같은 유저의 다른 세션이 있는지 확인 (멀티탭 방어)
      */
     public boolean hasOtherSessionsForUser(Long roomId, Long userId, String excludeSessionId) {
-        Set<String> sessionIds = roomToSessions.get(roomId);
+        Set<Object> sessionIds = redisTemplate.opsForSet().members(roomKey(roomId));
         if (sessionIds == null || sessionIds.isEmpty()) {
             return false;
         }
         return sessionIds.stream()
+                .map(Object::toString)
                 .filter(sid -> !sid.equals(excludeSessionId))
-                .map(sessionToRoom::get)
+                .map(this::getSession)
                 .filter(Objects::nonNull)
                 .anyMatch(info -> info.userId().equals(userId));
     }
@@ -115,13 +139,45 @@ public class PvpSessionManager {
      * 전체 세션 수 조회
      */
     public int getSessionCount() {
-        return sessionToRoom.size();
+        Set<String> keys = redisTemplate.keys(SESSION_KEY_PREFIX + "*");
+        return keys == null ? 0 : keys.size();
     }
 
     /**
      * 전체 세션 목록 조회 (읽기 전용)
      */
     public Map<String, SessionInfo> getAllSessions() {
-        return Collections.unmodifiableMap(sessionToRoom);
+        Set<String> keys = redisTemplate.keys(SESSION_KEY_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, SessionInfo> result = new LinkedHashMap<>();
+        for (String key : keys) {
+            String sessionId = key.substring(SESSION_KEY_PREFIX.length());
+            SessionInfo info = getSession(sessionId);
+            if (info != null) {
+                result.put(sessionId, info);
+            }
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    /**
+     * Redis에서 조회한 Object를 SessionInfo로 변환
+     * - RedisTemplate value serializer가 Object 타입이라 LinkedHashMap으로 반환될 수 있음
+     */
+    private SessionInfo convertToSessionInfo(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof SessionInfo info) {
+            return info;
+        }
+        try {
+            return objectMapper.convertValue(value, SessionInfo.class);
+        } catch (Exception e) {
+            log.warn("SessionInfo 변환 실패: {}", e.getMessage());
+            return null;
+        }
     }
 }

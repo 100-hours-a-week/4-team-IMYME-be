@@ -306,25 +306,73 @@ jobs:
     if: success()
     runs-on: ubuntu-latest
     steps:
+      - name: Pick a quote
+        id: quote
+        run: |
+          QUOTES=(
+            "배포 완료! 서버가 새 코드를 품에 안았어 🚀"
+            "릴리스 성공! 사용자들이 곧 새 기능을 만나게 될 거야 🎊"
+            "배포까지 완벽! 오늘 야근은 없다 🎉"
+            "서버 재시작 완료! 헬스체크도 통과, 진짜 장인이야 💚"
+            "코드가 서버에 안착했어. 오늘도 수고했어 🏠"
+            "배포 성공! 이제 커피 한 잔 마실 자격 충분해 ☕"
+            "프로덕션 반영 완료! 팀의 노력이 빛을 발했어 ✨"
+            "배포까지 초록불! 오늘 하루도 완벽하게 마무리 🌟"
+          )
+          IDX=$(( RANDOM % ${#QUOTES[@]} ))
+          echo "msg=${QUOTES[$IDX]}" >> $GITHUB_OUTPUT
+
       - name: Discord CD success
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: success
           title: "🟢 개발서버 백엔드 배포 성공"
-          content: "개발서버 백엔드 배포 완료!"
-          color: 0x00FF00
+          description: |
+            **브랜치:** `${{ github.ref_name }}`
+            **커밋:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            **배포자:** `${{ github.actor }}`
+
+            > ${{ steps.quote.outputs.msg }}
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          color: 0x57F287
+          username: "IMYME BE Bot"
+          nocontext: true
 
   cd-notify-failure:
     needs: cd
     if: failure()
     runs-on: ubuntu-latest
     steps:
+      - name: Pick a quote
+        id: quote
+        run: |
+          QUOTES=(
+            "배포 실패... 로그 보면 답 있어! 같이 찾아보자 🔍"
+            "서버가 새 코드를 거부했어. 하지만 반드시 고쳐낸다 💪"
+            "배포 실패! 괜찮아, 롤백은 개발자의 친구야 🔄"
+            "헬스체크 실패? 서버도 쉬고 싶었나봐. 다시 달래보자 🛠️"
+            "빌드는 됐는데 배포에서 막혔어. 조금만 더 파이팅! ⚡"
+            "실패는 더 나은 배포로 가는 디딤돌이야 📈"
+            "배포가 안 됐지만, 원인 파악하면 금방 해결돼 🧩"
+            "오늘의 실패가 내일의 안정적인 배포를 만들어 줄 거야 🌱"
+          )
+          IDX=$(( RANDOM % ${#QUOTES[@]} ))
+          echo "msg=${QUOTES[$IDX]}" >> $GITHUB_OUTPUT
+
       - name: Discord CD failure
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: failure
           title: "🔴 개발서버 백엔드 배포 실패"
-          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 개발서버 백엔드 배포 실패!"
-          color: 0xFF0000
+          description: |
+            **브랜치:** `${{ github.ref_name }}`
+            **커밋:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            **배포자:** `${{ github.actor }}`
+
+            > ${{ steps.quote.outputs.msg }}
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          color: 0xED4245
+          username: "IMYME BE Bot"
+          nocontext: true

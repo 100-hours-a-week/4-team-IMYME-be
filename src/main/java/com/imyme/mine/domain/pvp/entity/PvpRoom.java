@@ -144,6 +144,9 @@ public class PvpRoom {
         this.guestNickname = null;
         this.status = PvpRoomStatus.OPEN;
         this.matchedAt = null;
+        // THINKING에서 나간 경우 키워드/시작 시간 초기화
+        this.keyword = null;
+        this.startedAt = null;
     }
 
     /**

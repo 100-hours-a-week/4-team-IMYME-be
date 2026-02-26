@@ -1,5 +1,9 @@
 package com.imyme.mine.domain.pvp.messaging;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.imyme.mine.domain.pvp.dto.message.FeedbackResponseDto;
+import com.imyme.mine.domain.pvp.dto.message.SttResponseDto;
+import com.imyme.mine.domain.pvp.service.PvpMqConsumerService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +23,9 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class RabbitMQMessageConsumer {
+
+    private final PvpMqConsumerService pvpMqConsumerService;
+    private final ObjectMapper objectMapper;
 
     /**
      * STT Request 수신 (Phase 1)
@@ -74,21 +81,17 @@ public class RabbitMQMessageConsumer {
         try {
             log.info("[RabbitMQ] STT Response 수신: {}", payload);
 
-            // TODO: 메인 서버에서 구현
-            // 1. STT 결과 검증
-            // 2. PvpHistory 업데이트 (userAnswer 저장)
-            // 3. Feedback Request 발행
+            SttResponseDto dto = objectMapper.readValue(message.getBody(), SttResponseDto.class);
+            pvpMqConsumerService.handleSttResponse(dto);
 
-            // 처리 성공 시 Ack
             channel.basicAck(deliveryTag, false);
             log.info("[RabbitMQ] STT Response 처리 완료 (Ack): deliveryTag={}", deliveryTag);
 
         } catch (Exception e) {
             log.error("[RabbitMQ] STT Response 처리 실패", e);
             try {
-                // 처리 실패 시 Nack (재시도)
-                channel.basicNack(deliveryTag, false, true);
-                log.warn("[RabbitMQ] STT Response Nack (재시도): deliveryTag={}", deliveryTag);
+                channel.basicNack(deliveryTag, false, false); // DLQ로 이동
+                log.warn("[RabbitMQ] STT Response Nack (DLQ): deliveryTag={}", deliveryTag);
             } catch (IOException ioException) {
                 log.error("[RabbitMQ] Nack 실패", ioException);
             }
@@ -147,22 +150,17 @@ public class RabbitMQMessageConsumer {
         try {
             log.info("[RabbitMQ] Feedback Response 수신: {}", payload);
 
-            // TODO: 메인 서버에서 구현
-            // 1. 피드백 검증
-            // 2. PvpFeedback 저장
-            // 3. 승자 결정
-            // 4. Redis Pub (결과 알림)
+            FeedbackResponseDto dto = objectMapper.readValue(message.getBody(), FeedbackResponseDto.class);
+            pvpMqConsumerService.handleFeedbackResponse(dto);
 
-            // 처리 성공 시 Ack
             channel.basicAck(deliveryTag, false);
             log.info("[RabbitMQ] Feedback Response 처리 완료 (Ack): deliveryTag={}", deliveryTag);
 
         } catch (Exception e) {
             log.error("[RabbitMQ] Feedback Response 처리 실패", e);
             try {
-                // 처리 실패 시 Nack (재시도)
-                channel.basicNack(deliveryTag, false, true);
-                log.warn("[RabbitMQ] Feedback Response Nack (재시도): deliveryTag={}", deliveryTag);
+                channel.basicNack(deliveryTag, false, false); // DLQ로 이동
+                log.warn("[RabbitMQ] Feedback Response Nack (DLQ): deliveryTag={}", deliveryTag);
             } catch (IOException ioException) {
                 log.error("[RabbitMQ] Nack 실패", ioException);
             }

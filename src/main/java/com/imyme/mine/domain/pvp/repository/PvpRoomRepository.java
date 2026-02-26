@@ -4,8 +4,11 @@ import com.imyme.mine.domain.pvp.entity.PvpRoom;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -95,4 +98,19 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
             WHERE r.id = :roomId
             """)
     Optional<PvpRoom> findByIdWithDetails(@Param("roomId") Long roomId);
+
+    /**
+     * 비관적 락 + fetch join (동시성 방어용)
+     * - Feedback Request 중복 발행 방지
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.keyword
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
+            WHERE r.id = :roomId
+            """)
+    Optional<PvpRoom> findByIdWithDetailsForUpdate(@Param("roomId") Long roomId);
 }
