@@ -123,10 +123,6 @@ public class RedisConfig {
         cacheConfigs.put("ai:feedback:pvp",
             defaultConfig.entryTtl(Duration.ofDays(7)));  // Immutable 데이터
 
-        // Tier 3: 선택 사항
-        cacheConfigs.put("vectorSearch",
-            defaultConfig.entryTtl(Duration.ofHours(1)));
-
         return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)
             .withInitialCacheConfigurations(cacheConfigs)

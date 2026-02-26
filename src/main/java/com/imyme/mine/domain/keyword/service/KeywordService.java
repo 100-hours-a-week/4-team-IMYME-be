@@ -31,9 +31,9 @@ public class KeywordService {
      * 특정 카테고리의 키워드 조회 (캐싱 적용)
      * - TTL: 2시간 (RedisConfig에서 설정)
      * - sync=true: Cache Stampede 방지
-     * - key: categoryId + isActive 조합으로 개별 캐싱
+     * - key: categoryId + isActive 조합으로 개별 캐싱 (null → 'all')
      */
-    @Cacheable(value = "keywords", key = "#categoryId + ':' + #isActive", sync = true)
+    @Cacheable(value = "keywords", key = "#categoryId + ':' + (#isActive != null ? #isActive : 'all')", sync = true)
     public CategoryKeywordsResponse getKeywordsByCategory(Long categoryId, Boolean isActive) {
         Category category = categoryRepository.findById(categoryId)
             .orElseThrow(() -> new BusinessException(
@@ -59,9 +59,9 @@ public class KeywordService {
      * 모든 키워드를 카테고리별로 그룹핑하여 조회 (캐싱 적용)
      * - TTL: 2시간 (RedisConfig에서 설정)
      * - sync=true: Cache Stampede 방지
-     * - key: 'all' + isActive로 캐싱
+     * - key: 'all' + isActive로 캐싱 (null → 'all')
      */
-    @Cacheable(value = "keywords", key = "'all:' + #isActive", sync = true)
+    @Cacheable(value = "keywords", key = "'all:' + (#isActive != null ? #isActive : 'all')", sync = true)
     public List<CategoryWithKeywordsResponse> getAllKeywordsGroupedByCategory(Boolean isActive) {
         List<Keyword> keywords;
         if (isActive == null) {
