@@ -29,7 +29,7 @@ spring:
         redis:
             host: ${REDIS_HOST}
             port: ${REDIS_PORT:6379}
-            # password 제거: AWS ElastiCache에서 액세스 제어 미사용
+            password: ${REDIS_PASSWORD:}  # 비밀번호 설정 (없으면 빈 문자열)
 
     # Dev 환경 RabbitMQ 설정
     # Option 1: Docker Compose (간단한 테스트)
