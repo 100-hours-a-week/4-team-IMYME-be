@@ -55,6 +55,7 @@ public class PvpRoomService {
     private final MessagePublisher messagePublisher;
     private final ProfileImageService profileImageService;
     private final RabbitMQMessagePublisher rabbitMQMessagePublisher;
+    private final com.imyme.mine.domain.pvp.websocket.PvpReadyManager pvpReadyManager;
 
     /**
      * 4.1 방 목록 조회 (커서 페이징)
@@ -215,7 +216,9 @@ public class PvpRoomService {
     }
 
     /**
-     * 녹음 시작 (수동 전환용)
+     * READY 등록 (THINKING 상태에서 준비 완료 알림)
+     * - READY 등록 후 브로드캐스트
+     * - 둘 다 READY면 즉시 RECORDING 전환
      */
     @Transactional
     public RoomResponse startRecording(Long userId, Long roomId) {
@@ -227,16 +230,56 @@ public class PvpRoomService {
             throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
         }
 
+        // 이미 RECORDING 이상이면 no-op
+        if (room.getStatus() == PvpRoomStatus.RECORDING
+                || room.getStatus() == PvpRoomStatus.PROCESSING
+                || room.getStatus() == PvpRoomStatus.FINISHED
+                || room.getStatus() == PvpRoomStatus.CANCELED) {
+            return toRoomResponse(room, "이미 녹음이 시작되었습니다.");
+        }
+
         // 방 상태 검증 (THINKING 상태여야 함)
         if (room.getStatus() != PvpRoomStatus.THINKING) {
             throw new BusinessException(ErrorCode.INVALID_ROOM_STATUS);
         }
 
-        room.startRecording();
-        pvpRoomRepository.save(room);
-        log.info("녹음 수동 시작: roomId={}, userId={}", roomId, userId);
+        // READY 등록 (Redis SADD, 중복 호출 시 no-op)
+        boolean isHost = room.isHost(userId);
+        String role = isHost ? "HOST" : "GUEST";
+        String nickname = isHost ? room.getHostNickname() : room.getGuestNickname();
+        boolean isNew = pvpReadyManager.addReady(roomId, userId);
 
-        return toRoomResponse(room, "녹음을 시작합니다.");
+        if (!isNew) {
+            log.info("READY 중복 호출 무시: roomId={}, userId={}", roomId, userId);
+            return toRoomResponse(room, "이미 준비 완료되었습니다.");
+        }
+
+        // READY 브로드캐스트
+        messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
+                PvpMessage.ready(roomId, userId, nickname, role));
+
+        // 둘 다 READY면 즉시 RECORDING 전환
+        long readyCount = pvpReadyManager.getReadyCount(roomId);
+        if (readyCount >= 2) {
+            room.startRecording();
+            pvpRoomRepository.save(room);
+            pvpReadyManager.clearReady(roomId);
+            log.info("양쪽 READY → RECORDING 즉시 전환: roomId={}", roomId);
+
+            // 커밋 후 RECORDING 브로드캐스트
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
+                            PvpMessage.recordingStarted(roomId));
+                }
+            });
+
+            return toRoomResponse(room, "양쪽 준비 완료! 녹음을 시작합니다.");
+        }
+
+        log.info("READY 등록: roomId={}, userId={}, readyCount={}", roomId, userId, readyCount);
+        return toRoomResponse(room, "준비 완료! 상대방을 기다리고 있습니다.");
     }
 
     /**
@@ -474,6 +517,7 @@ public class PvpRoomService {
             // 게스트 제거, 방 OPEN으로 복구 (THINKING 정보도 초기화)
             room.removeGuest();
             pvpRoomRepository.save(room);
+            pvpReadyManager.clearReady(roomId);
             log.info("게스트 방 나가기: roomId={}, status=OPEN", roomId);
             return new LeaveResult(roomId, LeaveType.GUEST_LEFT, PvpRoomStatus.OPEN);
         }

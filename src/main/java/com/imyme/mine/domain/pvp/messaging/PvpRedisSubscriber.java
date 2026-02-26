@@ -116,6 +116,15 @@ public class PvpRedisSubscriber implements MessageListener {
                         .build();
                 yield PvpWebSocketMessage.of(MessageType.STATUS_CHANGE, roomId, statusData);
             }
+            case READY -> {
+                RoomJoinedMessage readyData = RoomJoinedMessage.builder()
+                        .userId(data != null ? toLong(data.get("userId")) : null)
+                        .nickname(data != null ? (String) data.get("nickname") : null)
+                        .role(data != null ? (String) data.get("role") : null)
+                        .message(pvpMessage.getMessage())
+                        .build();
+                yield PvpWebSocketMessage.of(MessageType.PLAYER_READY, roomId, readyData);
+            }
             case ANSWER_SUBMITTED -> {
                 AnswerSubmittedMessage submitted = AnswerSubmittedMessage.builder()
                         .userId(data != null ? toLong(data.get("userId")) : null)

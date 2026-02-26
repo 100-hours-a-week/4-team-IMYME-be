@@ -118,6 +118,16 @@ public class PvpMessage {
                 .build();
     }
 
+    public static PvpMessage ready(Long roomId, Long userId, String nickname, String role) {
+        Map<String, Object> data = Map.of("userId", userId, "nickname", nickname, "role", role);
+        return PvpMessage.builder()
+                .type(PvpMessageType.READY)
+                .roomId(roomId)
+                .message("상대방이 준비되었습니다.")
+                .data(data)
+                .build();
+    }
+
     public static PvpMessage answerSubmitted(Long roomId, Long userId, String nickname, String role) {
         Map<String, Object> data = Map.of("userId", userId, "nickname", nickname, "role", role);
         return PvpMessage.builder()

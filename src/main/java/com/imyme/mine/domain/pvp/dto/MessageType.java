@@ -13,7 +13,7 @@ public enum MessageType {
     ROOM_LEFT,          // 유저 나감 (브로드캐스트)
 
     // 게임 상태
-    PLAYER_READY,       // 플레이어 준비
+    PLAYER_READY,       // 플레이어 준비 완료 (브로드캐스트)
     GAME_START,         // 게임 시작 (서버 → 클라이언트)
     GAME_COUNTDOWN,     // 카운트다운
     STATUS_CHANGE,      // 방 상태 변경
