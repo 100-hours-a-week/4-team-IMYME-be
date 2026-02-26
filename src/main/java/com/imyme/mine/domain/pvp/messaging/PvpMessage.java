@@ -65,24 +65,24 @@ public class PvpMessage {
     /**
      * 게스트 입장 메시지 생성
      */
-    public static PvpMessage guestJoined(Long roomId, Object guestInfo) {
+    public static PvpMessage guestJoined(Long roomId, Object guestInfo, String role) {
         return PvpMessage.builder()
                 .type(PvpMessageType.GUEST_JOINED)
                 .roomId(roomId)
                 .message("게스트가 입장했습니다.")
-                .data(guestInfo)
+                .data(guestInfo != null ? guestInfo : Map.of("role", role))
                 .build();
     }
 
     /**
      * 게스트 나가기 메시지 생성
      */
-    public static PvpMessage guestLeft(Long roomId, Long userId) {
+    public static PvpMessage guestLeft(Long roomId, Long userId, String role) {
         return PvpMessage.builder()
                 .type(PvpMessageType.GUEST_LEFT)
                 .roomId(roomId)
                 .message("게스트가 나갔습니다.")
-                .data(Map.of("userId", userId))
+                .data(Map.of("userId", userId, "role", role))
                 .build();
     }
 
@@ -118,8 +118,18 @@ public class PvpMessage {
                 .build();
     }
 
-    public static PvpMessage answerSubmitted(Long roomId, Long userId, String nickname) {
-        Map<String, Object> data = Map.of("userId", userId, "nickname", nickname);
+    public static PvpMessage ready(Long roomId, Long userId, String nickname, String role) {
+        Map<String, Object> data = Map.of("userId", userId, "nickname", nickname, "role", role);
+        return PvpMessage.builder()
+                .type(PvpMessageType.READY)
+                .roomId(roomId)
+                .message("상대방이 준비되었습니다.")
+                .data(data)
+                .build();
+    }
+
+    public static PvpMessage answerSubmitted(Long roomId, Long userId, String nickname, String role) {
+        Map<String, Object> data = Map.of("userId", userId, "nickname", nickname, "role", role);
         return PvpMessage.builder()
                 .type(PvpMessageType.ANSWER_SUBMITTED)
                 .roomId(roomId)

@@ -86,7 +86,7 @@ public class PvpRoomController {
         // 트랜잭션 커밋 완료 후 Redis Pub/Sub으로 브로드캐스트
         String guestNickname = response.getGuest() != null ? response.getGuest().getNickname() : "게스트";
         messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
-                PvpMessage.guestJoined(roomId, Map.of("userId", principal.getId(), "nickname", guestNickname)));
+                PvpMessage.guestJoined(roomId, Map.of("userId", principal.getId(), "nickname", guestNickname, "role", "GUEST"), "GUEST"));
         messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                 PvpMessage.statusChange(roomId, PvpRoomStatus.MATCHED, "대결 상대가 입장했습니다."));
 
@@ -197,7 +197,7 @@ public class PvpRoomController {
                     PvpMessage.hostLeft(roomId));
         } else {
             messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
-                    PvpMessage.guestLeft(roomId, principal.getId()));
+                    PvpMessage.guestLeft(roomId, principal.getId(), "GUEST"));
             messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                     PvpMessage.statusChange(roomId, PvpRoomStatus.OPEN, "대결 상대를 기다리고 있습니다."));
         }

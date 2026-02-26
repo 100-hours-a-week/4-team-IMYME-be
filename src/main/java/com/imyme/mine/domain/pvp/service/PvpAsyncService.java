@@ -34,6 +34,7 @@ public class PvpAsyncService {
     private final PvpRoomRepository pvpRoomRepository;
     private final KeywordRepository keywordRepository;
     private final MessagePublisher messagePublisher;
+    private final com.imyme.mine.domain.pvp.websocket.PvpReadyManager pvpReadyManager;
 
     // Self-injection: 내부 @Async / @Transactional 메서드 호출 시 프록시를 거치도록
     // @Lazy: 순환 참조 방지
@@ -117,19 +118,29 @@ public class PvpAsyncService {
 
     /**
      * RECORDING 전환 DB 작업 (트랜잭션 짧게 유지)
+     * - 이미 RECORDING이면 아무 것도 하지 않음 (READY로 조기 전환된 경우)
+     * - ready set 삭제
      */
     @Transactional
     public void doRecordingTransition(Long roomId) {
         PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId).orElse(null);
 
-        if (room == null || room.getStatus() != PvpRoomStatus.THINKING) {
-            log.warn("RECORDING 전환 실패: 방 상태 불일치 - roomId={}", roomId);
+        if (room == null) {
+            log.warn("RECORDING 전환 실패: 방 없음 - roomId={}", roomId);
+            return;
+        }
+
+        // 이미 RECORDING 이상이면 스킵 (READY로 조기 전환된 경우)
+        if (room.getStatus() != PvpRoomStatus.THINKING) {
+            log.info("RECORDING 타이머 스킵: 이미 전환됨 - roomId={}, status={}", roomId, room.getStatus());
+            pvpReadyManager.clearReady(roomId);
             return;
         }
 
         room.startRecording();
         pvpRoomRepository.save(room);
-        log.info("RECORDING 자동 전환 완료: roomId={}", roomId);
+        pvpReadyManager.clearReady(roomId);
+        log.info("RECORDING 타이머 자동 전환 완료: roomId={}", roomId);
 
         // 커밋 후 Redis Pub/Sub 발행
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

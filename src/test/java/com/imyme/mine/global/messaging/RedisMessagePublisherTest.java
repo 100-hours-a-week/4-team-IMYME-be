@@ -123,7 +123,7 @@ class RedisMessagePublisherTest {
 
         // When - 다양한 메시지 발행
         messagePublisher.publish(channel, PvpMessage.statusChange(roomId, PvpRoomStatus.MATCHED, "매칭 완료"));
-        messagePublisher.publish(channel, PvpMessage.guestJoined(roomId, "게스트 정보"));
+        messagePublisher.publish(channel, PvpMessage.guestJoined(roomId, "게스트 정보", "GUEST"));
         messagePublisher.publish(channel, PvpMessage.recordingStarted(roomId));
 
         // Then

@@ -15,5 +15,6 @@ import lombok.NoArgsConstructor;
 public class RoomJoinedMessage {
     private Long userId;
     private String nickname;
+    private String role;
     private String message;
 }
