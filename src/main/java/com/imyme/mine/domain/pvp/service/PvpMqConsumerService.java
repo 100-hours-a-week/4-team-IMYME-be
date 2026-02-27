@@ -115,6 +115,12 @@ public class PvpMqConsumerService {
             return;
         }
 
+        // feedbackRequestedAt 플래그로 중복 발행 차단
+        if (room.isFeedbackRequested()) {
+            log.info("[MQ] Feedback Request 스킵 (이미 발행됨): roomId={}", roomId);
+            return;
+        }
+
         List<PvpSubmission> submissions = pvpSubmissionRepository.findByRoomIdWithUser(roomId);
 
         // PROCESSING 상태인 submission (STT 완료)
@@ -164,6 +170,10 @@ public class PvpMqConsumerService {
                         .build())
                 .users(userAnswers)
                 .build();
+
+        // 발행 시각 기록 후 publish
+        room.markFeedbackRequested();
+        pvpRoomRepository.save(room);
 
         rabbitMQMessagePublisher.publishFeedbackRequest(feedbackRequest);
         log.info("[MQ] Feedback Request 발행: roomId={}, userCount={}", roomId, userAnswers.size());

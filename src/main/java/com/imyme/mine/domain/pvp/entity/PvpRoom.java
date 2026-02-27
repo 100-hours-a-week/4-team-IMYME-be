@@ -75,6 +75,9 @@ public class PvpRoom {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
+    @Column(name = "feedback_requested_at")
+    private LocalDateTime feedbackRequestedAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -127,6 +130,20 @@ public class PvpRoom {
         this.winnerUser = winner;
         this.status = PvpRoomStatus.FINISHED;
         this.finishedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Feedback Request 발행 시각 기록 (중복 발행 방지)
+     */
+    public void markFeedbackRequested() {
+        this.feedbackRequestedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Feedback Request 이미 발행되었는지 확인
+     */
+    public boolean isFeedbackRequested() {
+        return this.feedbackRequestedAt != null;
     }
 
     /**
