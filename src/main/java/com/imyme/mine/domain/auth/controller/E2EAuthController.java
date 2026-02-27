@@ -34,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class E2EAuthController {
 
     private static final String E2E_TEST_USER_OAUTH_ID = "e2e_test_user";
+    private static final String E2E_SOCKET_HOST_OAUTH_ID = "e2e_socket_host";
+    private static final String E2E_SOCKET_GUEST_OAUTH_ID = "e2e_socket_guest";
 
     private final UserRepository userRepository;
     private final OAuthService oauthService;
@@ -99,5 +101,61 @@ public class E2EAuthController {
         log.info("E2E test login successful: userId={}, deviceUuid={}", testUser.getId(), request.deviceUuid());
 
         return ApiResponse.success(response, "E2E 테스트 로그인 성공");
+    }
+
+    /**
+     * E2E 소켓 테스트 HOST 로그인
+     * - PvP 소켓 테스트에서 방을 생성하는 호스트 역할
+     */
+    @PostMapping("/login/host")
+    @Transactional
+    public ApiResponse<OAuthLoginResponse> e2eHostLogin(@Valid @RequestBody E2ELoginRequest request) {
+        log.info("E2E socket host login attempt: deviceUuid={}", request.deviceUuid());
+
+        User hostUser = userRepository
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_HOST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(E2E_SOCKET_HOST_OAUTH_ID)
+                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .nickname("E2E호스트")
+                    .build();
+                userRepository.save(newUser);
+                log.info("E2E socket host auto-created: userId={}", newUser.getId());
+                return newUser;
+            });
+
+        OAuthLoginResponse response = oauthService.login(hostUser, request.deviceUuid(), false);
+        log.info("E2E socket host login successful: userId={}", hostUser.getId());
+
+        return ApiResponse.success(response, "E2E 소켓 호스트 로그인 성공");
+    }
+
+    /**
+     * E2E 소켓 테스트 GUEST 로그인
+     * - PvP 소켓 테스트에서 방에 입장하는 게스트 역할
+     */
+    @PostMapping("/login/guest")
+    @Transactional
+    public ApiResponse<OAuthLoginResponse> e2eGuestLogin(@Valid @RequestBody E2ELoginRequest request) {
+        log.info("E2E socket guest login attempt: deviceUuid={}", request.deviceUuid());
+
+        User guestUser = userRepository
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_GUEST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(E2E_SOCKET_GUEST_OAUTH_ID)
+                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .nickname("E2E게스트")
+                    .build();
+                userRepository.save(newUser);
+                log.info("E2E socket guest auto-created: userId={}", newUser.getId());
+                return newUser;
+            });
+
+        OAuthLoginResponse response = oauthService.login(guestUser, request.deviceUuid(), false);
+        log.info("E2E socket guest login successful: userId={}", guestUser.getId());
+
+        return ApiResponse.success(response, "E2E 소켓 게스트 로그인 성공");
     }
 }
