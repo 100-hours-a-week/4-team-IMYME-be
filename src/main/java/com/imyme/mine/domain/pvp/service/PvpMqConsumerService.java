@@ -23,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -151,15 +152,15 @@ public class PvpMqConsumerService {
             return; // 아직 대기 중
         }
 
-        // Feedback Request 생성
+        // Feedback Request 생성 (항상 2명 포함)
         String keywordName = room.getKeyword() != null ? room.getKeyword().getName() : "";
+        List<FeedbackRequestDto.UserAnswer> userAnswers = buildUserAnswers(room, submissions);
 
-        List<FeedbackRequestDto.UserAnswer> userAnswers = completedStt.stream()
-                .map(s -> FeedbackRequestDto.UserAnswer.builder()
-                        .userId(s.getUser().getId())
-                        .userText(s.getSttText())
-                        .build())
-                .toList();
+        if (userAnswers.size() != 2) {
+            log.warn("[MQ] Feedback Request 스킵: users size != 2 - roomId={}, size={}",
+                    roomId, userAnswers.size());
+            return;
+        }
 
         FeedbackRequestDto feedbackRequest = FeedbackRequestDto.builder()
                 .roomId(roomId)
@@ -399,6 +400,38 @@ public class PvpMqConsumerService {
                 messagePublisher.publish(PvpChannels.getRoomChannel(roomId), message);
             }
         });
+    }
+
+    /**
+     * Feedback Request용 users 배열 생성 (항상 2명)
+     * - PROCESSING: sttText 사용
+     * - FAILED 또는 없음: user_text = ""
+     */
+    private List<FeedbackRequestDto.UserAnswer> buildUserAnswers(PvpRoom room, List<PvpSubmission> submissions) {
+        User host = room.getHostUser();
+        User guest = room.getGuestUser();
+
+        if (host == null || guest == null) {
+            log.warn("[MQ] Feedback Request 생성 실패: host/guest null - roomId={}", room.getId());
+            return List.of();
+        }
+
+        Map<Long, PvpSubmission> submissionMap = submissions.stream()
+                .collect(Collectors.toMap(s -> s.getUser().getId(), s -> s));
+
+        return List.of(host, guest).stream()
+                .map(user -> {
+                    PvpSubmission s = submissionMap.get(user.getId());
+                    String text = "";
+                    if (s != null && s.getStatus() == PvpSubmissionStatus.PROCESSING) {
+                        text = s.getSttText() != null ? s.getSttText() : "";
+                    }
+                    return FeedbackRequestDto.UserAnswer.builder()
+                            .userId(user.getId())
+                            .userText(text)
+                            .build();
+                })
+                .toList();
     }
 
     private String nullSafe(String value) {
