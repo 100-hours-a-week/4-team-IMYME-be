@@ -48,3 +48,71 @@ INSERT INTO users (
     CURRENT_TIMESTAMP
 )
 ON CONFLICT (oauth_id, oauth_provider) DO NOTHING;
+
+-- E2E 소켓 테스트용 HOST 유저
+INSERT INTO users (
+    oauth_id,
+    oauth_provider,
+    email,
+    nickname,
+    profile_image_url,
+    role,
+    level,
+    total_card_count,
+    active_card_count,
+    consecutive_days,
+    win_count,
+    last_login_at,
+    created_at,
+    updated_at
+) VALUES (
+    'e2e_socket_host',
+    'E2E_TEST',
+    'e2e_host@test.com',
+    'E2E호스트',
+    NULL,
+    'USER',
+    1,
+    0,
+    0,
+    1,
+    0,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+)
+ON CONFLICT (oauth_id, oauth_provider) DO NOTHING;
+
+-- E2E 소켓 테스트용 GUEST 유저
+INSERT INTO users (
+    oauth_id,
+    oauth_provider,
+    email,
+    nickname,
+    profile_image_url,
+    role,
+    level,
+    total_card_count,
+    active_card_count,
+    consecutive_days,
+    win_count,
+    last_login_at,
+    created_at,
+    updated_at
+) VALUES (
+    'e2e_socket_guest',
+    'E2E_TEST',
+    'e2e_guest@test.com',
+    'E2E게스트',
+    NULL,
+    'USER',
+    1,
+    0,
+    0,
+    1,
+    0,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+)
+ON CONFLICT (oauth_id, oauth_provider) DO NOTHING;
