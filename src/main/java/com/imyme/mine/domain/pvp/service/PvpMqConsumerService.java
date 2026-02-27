@@ -115,6 +115,12 @@ public class PvpMqConsumerService {
             return;
         }
 
+        // feedbackRequestedAt 플래그로 중복 발행 차단
+        if (room.isFeedbackRequested()) {
+            log.info("[MQ] Feedback Request 스킵 (이미 발행됨): roomId={}", roomId);
+            return;
+        }
+
         List<PvpSubmission> submissions = pvpSubmissionRepository.findByRoomIdWithUser(roomId);
 
         // PROCESSING 상태인 submission (STT 완료)
@@ -165,6 +171,10 @@ public class PvpMqConsumerService {
                 .users(userAnswers)
                 .build();
 
+        // 발행 시각 기록 후 publish
+        room.markFeedbackRequested();
+        pvpRoomRepository.save(room);
+
         rabbitMQMessagePublisher.publishFeedbackRequest(feedbackRequest);
         log.info("[MQ] Feedback Request 발행: roomId={}, userCount={}", roomId, userAnswers.size());
     }
@@ -210,44 +220,52 @@ public class PvpMqConsumerService {
             return;
         }
 
-        // 피드백 저장
+        // feedbackMap 생성 (userId → feedback)
+        Map<Long, FeedbackResponseDto.UserFeedback> feedbackMap = dto.getFeedbacks().stream()
+                .collect(Collectors.toMap(FeedbackResponseDto.UserFeedback::getUserId, f -> f));
+
+        // 방 참여자 목록
+        User host = room.getHostUser();
+        User guest = room.getGuestUser();
+        List<User> participants = new java.util.ArrayList<>();
+        if (host != null) participants.add(host);
+        if (guest != null) participants.add(guest);
+
+        // 피드백 저장 (참여자 기준, FAIL 유저도 포함)
         User winner = null;
         int highestScore = -1;
         boolean tie = false;
 
-        for (FeedbackResponseDto.UserFeedback feedback : dto.getFeedbacks()) {
+        for (User user : participants) {
             // Idempotent guard: 이미 피드백 존재하면 스킵
-            if (pvpFeedbackRepository.existsByRoomIdAndUserId(roomId, feedback.getUserId())) {
-                log.info("[MQ] Feedback 스킵 (이미 존재): roomId={}, userId={}", roomId, feedback.getUserId());
+            if (pvpFeedbackRepository.existsByRoomIdAndUserId(roomId, user.getId())) {
+                log.info("[MQ] Feedback 스킵 (이미 존재): roomId={}, userId={}", roomId, user.getId());
                 continue;
             }
 
-            User user = userRepository.findById(feedback.getUserId()).orElse(null);
-            if (user == null) {
-                log.warn("[MQ] Feedback 저장 실패: 유저 없음 - userId={}", feedback.getUserId());
-                continue;
-            }
+            FeedbackResponseDto.UserFeedback fb = feedbackMap.get(user.getId());
+            int score = (fb != null && fb.getScore() != null) ? fb.getScore() : 0;
 
-            // PvpFeedback 생성
-            Map<String, Object> feedbackJson = Map.of(
-                    "summary", nullSafe(feedback.getSummary()),
-                    "keywords", feedback.getKeywords() != null ? feedback.getKeywords() : List.of(),
-                    "facts", nullSafe(feedback.getFacts()),
-                    "understanding", nullSafe(feedback.getUnderstanding()),
-                    "personalizedFeedback", nullSafe(feedback.getPersonalizedFeedback())
-            );
+            Map<String, Object> feedbackJson = (fb != null)
+                    ? Map.of(
+                        "summary", nullSafe(fb.getSummary()),
+                        "keywords", fb.getKeywords() != null ? fb.getKeywords() : List.of(),
+                        "facts", nullSafe(fb.getFacts()),
+                        "understanding", nullSafe(fb.getUnderstanding()),
+                        "personalizedFeedback", nullSafe(fb.getPersonalizedFeedback()))
+                    : failFeedbackJson();
 
             PvpFeedback pvpFeedback = PvpFeedback.builder()
                     .room(room)
                     .user(user)
-                    .score(feedback.getScore())
+                    .score(score)
                     .pvpFeedbackJson(feedbackJson)
                     .modelVersion(MODEL_VERSION)
                     .build();
             pvpFeedbackRepository.save(pvpFeedback);
 
             // Submission 완료 처리
-            pvpSubmissionRepository.findByRoomIdAndUserId(roomId, feedback.getUserId())
+            pvpSubmissionRepository.findByRoomIdAndUserId(roomId, user.getId())
                     .ifPresent(submission -> {
                         if (submission.getStatus() != PvpSubmissionStatus.COMPLETED) {
                             submission.complete();
@@ -256,14 +274,12 @@ public class PvpMqConsumerService {
                     });
 
             // 승자 결정
-            if (feedback.getScore() != null) {
-                if (feedback.getScore() > highestScore) {
-                    highestScore = feedback.getScore();
-                    winner = user;
-                    tie = false;
-                } else if (feedback.getScore() == highestScore) {
-                    tie = true;
-                }
+            if (score > highestScore) {
+                highestScore = score;
+                winner = user;
+                tie = false;
+            } else if (score == highestScore) {
+                tie = true;
             }
         }
 
@@ -387,5 +403,15 @@ public class PvpMqConsumerService {
 
     private String nullSafe(String value) {
         return value != null ? value : "";
+    }
+
+    private Map<String, Object> failFeedbackJson() {
+        return Map.of(
+                "summary", "분석 실패",
+                "keywords", List.of(),
+                "facts", "분석 실패",
+                "understanding", "분석 실패",
+                "personalizedFeedback", "분석 실패"
+        );
     }
 }
