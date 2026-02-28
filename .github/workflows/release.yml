@@ -186,7 +186,6 @@ jobs:
               "cd /home/ubuntu",
               "aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 219268921033.dkr.ecr.ap-northeast-2.amazonaws.com",
               "> /home/ubuntu/.env",
-              "echo 'SPRING_PROFILES_ACTIVE=release' >> /home/ubuntu/.env",
               "echo '# ------------- COMMON --------------' >> /home/ubuntu/.env",
               "aws ssm get-parameters-by-path --path '/MINE/MVP1/BE/ENV/COMMON' --with-decryption --query 'Parameters[*].[Name,Value]' --output text --region ap-northeast-2 | while IFS=$(printf '\\t') read -r name value; do key=$(basename \"$name\"); echo \"$key=${value:-}\" >> /home/ubuntu/.env; done",
               "echo '' >> /home/ubuntu/.env",
