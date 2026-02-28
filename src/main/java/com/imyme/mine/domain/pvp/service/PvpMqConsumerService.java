@@ -102,7 +102,8 @@ public class PvpMqConsumerService {
      * - 양쪽 STT 완료(PROCESSING) 또는 한쪽 FAIL + 한쪽 완료 시 발행
      * - 비관적 락으로 중복 발행 방지
      */
-    private void tryPublishFeedbackRequest(Long roomId) {
+    @Transactional
+    public void tryPublishFeedbackRequest(Long roomId) {
         // 비관적 락으로 room 조회 (중복 발행 방지: SELECT ... FOR UPDATE)
         PvpRoom room = pvpRoomRepository.findByIdWithDetailsForUpdate(roomId).orElse(null);
         if (room == null) {

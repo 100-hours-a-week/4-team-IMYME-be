@@ -266,12 +266,13 @@ public class PvpRoomService {
             pvpReadyManager.clearReady(roomId);
             log.info("양쪽 READY → RECORDING 즉시 전환: roomId={}", roomId);
 
-            // 커밋 후 RECORDING 브로드캐스트
+            // 커밋 후 RECORDING 브로드캐스트 + 타임아웃 예약
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
                     messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                             PvpMessage.recordingStarted(roomId));
+                    pvpAsyncService.scheduleRecordingTimeout(roomId);
                 }
             });
 
