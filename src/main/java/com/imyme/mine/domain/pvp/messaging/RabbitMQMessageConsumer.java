@@ -28,45 +28,6 @@ public class RabbitMQMessageConsumer {
     private final ObjectMapper objectMapper;
 
     /**
-     * STT Request 수신 (Phase 1)
-     * 메인 서버 → AI 서버 (음성 인식 요청)
-     *
-     * AI 서버에서 구현 예정
-     *
-     * @param payload 수신한 메시지 (DTO)
-     * @param channel RabbitMQ 채널
-     * @param message RabbitMQ 메시지 (Ack/Nack용)
-     */
-    @RabbitListener(queues = "pvp.stt.request", autoStartup = "${mq.consumer.request.enabled:false}")
-    public void consumeSttRequest(Object payload, Channel channel, Message message) {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-
-        try {
-            log.info("[RabbitMQ] STT Request 수신: {}", payload);
-
-            // TODO: AI 서버에서 구현
-            // 1. 음성 파일 S3에서 다운로드
-            // 2. STT 처리 (음성 → 텍스트)
-            // 3. STT Response 발행
-
-            // 처리 성공 시 Ack
-            channel.basicAck(deliveryTag, false);
-            log.info("[RabbitMQ] STT Request 처리 완료 (Ack): deliveryTag={}", deliveryTag);
-
-        } catch (Exception e) {
-            log.error("[RabbitMQ] STT Request 처리 실패", e);
-            try {
-                // 처리 실패 시 Nack (재시도)
-                // requeue=true: 재시도 / requeue=false: DLQ로 이동
-                channel.basicNack(deliveryTag, false, true);
-                log.warn("[RabbitMQ] STT Request Nack (재시도): deliveryTag={}", deliveryTag);
-            } catch (IOException ioException) {
-                log.error("[RabbitMQ] Nack 실패", ioException);
-            }
-        }
-    }
-
-    /**
      * STT Response 수신 (Phase 1)
      * AI 서버 → 메인 서버 (음성 인식 결과)
      *
@@ -92,43 +53,6 @@ public class RabbitMQMessageConsumer {
             try {
                 channel.basicNack(deliveryTag, false, false); // DLQ로 이동
                 log.warn("[RabbitMQ] STT Response Nack (DLQ): deliveryTag={}", deliveryTag);
-            } catch (IOException ioException) {
-                log.error("[RabbitMQ] Nack 실패", ioException);
-            }
-        }
-    }
-
-    /**
-     * Feedback Request 수신 (Phase 2)
-     * 메인 서버 → AI 서버 (피드백 생성 요청)
-     *
-     * AI 서버에서 구현 예정
-     *
-     * @param payload 수신한 메시지 (DTO)
-     * @param channel RabbitMQ 채널
-     * @param message RabbitMQ 메시지 (Ack/Nack용)
-     */
-    @RabbitListener(queues = "pvp.feedback.request", autoStartup = "${mq.consumer.request.enabled:false}")
-    public void consumeFeedbackRequest(Object payload, Channel channel, Message message) {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-
-        try {
-            log.info("[RabbitMQ] Feedback Request 수신: {}", payload);
-
-            // TODO: AI 서버에서 구현
-            // 1. 피드백 생성 (AI 추론)
-            // 2. Feedback Response 발행
-
-            // 처리 성공 시 Ack
-            channel.basicAck(deliveryTag, false);
-            log.info("[RabbitMQ] Feedback Request 처리 완료 (Ack): deliveryTag={}", deliveryTag);
-
-        } catch (Exception e) {
-            log.error("[RabbitMQ] Feedback Request 처리 실패", e);
-            try {
-                // 처리 실패 시 Nack (재시도)
-                channel.basicNack(deliveryTag, false, true);
-                log.warn("[RabbitMQ] Feedback Request Nack (재시도): deliveryTag={}", deliveryTag);
             } catch (IOException ioException) {
                 log.error("[RabbitMQ] Nack 실패", ioException);
             }
