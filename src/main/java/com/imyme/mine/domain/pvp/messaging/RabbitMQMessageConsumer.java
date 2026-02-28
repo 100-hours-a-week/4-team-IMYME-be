@@ -37,7 +37,7 @@ public class RabbitMQMessageConsumer {
      * @param channel RabbitMQ 채널
      * @param message RabbitMQ 메시지 (Ack/Nack용)
      */
-    @RabbitListener(queues = "pvp.stt.request")
+    @RabbitListener(queues = "pvp.stt.request", autoStartup = "${mq.consumer.request.enabled:false}")
     public void consumeSttRequest(Object payload, Channel channel, Message message) {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
@@ -108,7 +108,7 @@ public class RabbitMQMessageConsumer {
      * @param channel RabbitMQ 채널
      * @param message RabbitMQ 메시지 (Ack/Nack용)
      */
-    @RabbitListener(queues = "pvp.feedback.request")
+    @RabbitListener(queues = "pvp.feedback.request", autoStartup = "${mq.consumer.request.enabled:false}")
     public void consumeFeedbackRequest(Object payload, Channel channel, Message message) {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
