@@ -3,33 +3,55 @@
 .gitignore
 .gitattributes
 
+# IDE
+.idea
+.vscode
+.eclipse
+*.iml
+*.ipr
+*.iws
+
 # Build
 build/
+!build/libs
 target/
+out/
 .gradle/
-gradle/
-
-# IDE
-.idea/
-.vscode/
-*.iml
-*.iws
-*.ipr
-
-# Env
-.env
-.env.local
-.env.*.local
+!gradle/wrapper/gradle-wrapper.jar
 
 # Logs
-logs/
 *.log
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Docs
-docs/
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Documentation
 *.md
-!README.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Docker
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+.nyc_output/
