@@ -236,7 +236,6 @@ public class PvpMqConsumerService {
         // 피드백 저장 (참여자 기준, FAIL 유저도 포함)
         User winner = null;
         int highestScore = -1;
-        boolean tie = false;
 
         for (User user : participants) {
             // Idempotent guard: 이미 피드백 존재하면 스킵
@@ -275,18 +274,15 @@ public class PvpMqConsumerService {
                         }
                     });
 
-            // 승자 결정
+            // 승자 결정 (동점은 먼저 높은 점수에 도달한 유저 승리 - 무승부 없음)
             if (score > highestScore) {
                 highestScore = score;
                 winner = user;
-                tie = false;
-            } else if (score == highestScore) {
-                tie = true;
             }
         }
 
-        // 동점이면 무승부
-        if (tie) {
+        // 둘 다 0점이면 둘 다 패배 (무승부 없음, 아무도 이기지 않음)
+        if (highestScore == 0) {
             winner = null;
         }
 
@@ -298,7 +294,7 @@ public class PvpMqConsumerService {
         createHistories(room, dto.getFeedbacks());
 
         log.info("[MQ] 게임 완료: roomId={}, winner={}", roomId,
-                winner != null ? winner.getId() : "무승부");
+                winner != null ? winner.getId() : "둘다패배(0점)");
 
         // 브로드캐스트
         broadcastAfterCommit(roomId, PvpMessage.analysisCompleted(roomId));
