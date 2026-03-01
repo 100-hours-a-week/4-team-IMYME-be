@@ -102,5 +102,8 @@
         <!-- 서버 관련 -->
         <logger name="org.apache.catalina" level="WARN"/>
         <logger name="org.apache.coyote" level="WARN"/>
+
+        <!-- Sentry 로그 끄기 -->
+        <logger name="io.sentry" level="WARN"/>
     </springProfile>
 </configuration>

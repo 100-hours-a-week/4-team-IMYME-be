@@ -75,3 +75,9 @@ logging:
 knowledge:
     batch:
         enabled: false
+
+# Sentry 설정 (운영 환경용)
+sentry:
+    environment: prod
+    debug: false  # debug 로그 끔
+    traces-sample-rate: 0.1  # 10% 샘플링 (비용 절감)
