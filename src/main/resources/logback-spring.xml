@@ -39,8 +39,8 @@
 <!--        <logger name="root" level="DEBUG"/>-->
     </springProfile>
 
-    <!-- ==================== PROD 환경: JSON 로그 (Loki용) ==================== -->
-    <springProfile name="prod">
+    <!-- ==================== PROD/RELEASE 환경: JSON 로그 (Loki용) ==================== -->
+    <springProfile name="prod,release">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdcKeyName>clientIp</includeMdcKeyName>
