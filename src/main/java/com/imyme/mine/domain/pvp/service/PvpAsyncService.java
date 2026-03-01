@@ -261,14 +261,15 @@ public class PvpAsyncService {
         pvpRoomRepository.save(room);
         log.info("[Timeout] PROCESSING 전환: roomId={}, submittedCount={}", roomId, submittedCount);
 
-        afterCommit(() -> {
-            messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
-                    PvpMessage.statusChange(roomId, PvpRoomStatus.PROCESSING,
-                            "제출 시간이 종료되었습니다. AI 분석을 시작합니다."));
+        // 트랜잭션 안에서 Feedback Request 발행 (비관적 락 필요)
+        pvpMqConsumerService.tryPublishFeedbackRequest(roomId);
 
-            // Feedback Request 발행 (이미 STT 완료된 경우 대비)
-            pvpMqConsumerService.tryPublishFeedbackRequest(roomId);
-        });
+        // afterCommit은 브로드캐스트만
+        afterCommit(() ->
+                messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
+                        PvpMessage.statusChange(roomId, PvpRoomStatus.PROCESSING,
+                                "제출 시간이 종료되었습니다. AI 분석을 시작합니다."))
+        );
     }
 
     // ===== Helper =====
