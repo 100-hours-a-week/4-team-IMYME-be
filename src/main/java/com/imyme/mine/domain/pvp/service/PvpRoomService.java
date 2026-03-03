@@ -495,11 +495,10 @@ public class PvpRoomService {
         }
 
         if (room.isHost(userId)) {
-            // 호스트 나가기: OPEN 상태에서만 방 취소 가능
-            if (room.getStatus() == PvpRoomStatus.MATCHED) {
-                throw new BusinessException(ErrorCode.ROOM_CANNOT_BE_DELETED);
-            }
-            if (room.getStatus() != PvpRoomStatus.OPEN) {
+            // 호스트 나가기: OPEN, MATCHED, THINKING 상태에서만 방 취소 가능
+            if (room.getStatus() != PvpRoomStatus.OPEN
+                    && room.getStatus() != PvpRoomStatus.MATCHED
+                    && room.getStatus() != PvpRoomStatus.THINKING) {
                 throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
             }
 

@@ -338,6 +338,12 @@ public class PvpMqConsumerService {
         User guestUser = room.getGuestUser();
         User winnerUser = room.getWinnerUser();
 
+        // 승자 winCount 증가
+        if (winnerUser != null) {
+            winnerUser.incrementWinCount();
+            userRepository.save(winnerUser);
+        }
+
         // 호스트 히스토리
         if (hostUser != null) {
             int hostScore = scoreMap.getOrDefault(hostUser.getId(), 0);
