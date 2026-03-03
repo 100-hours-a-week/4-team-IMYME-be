@@ -3,6 +3,12 @@ spring:
         activate:
             on-profile: release # 'release' 프로필일 때 활성화 (사전 프로덕션)
 
+    # JSON 날짜 포맷 설정 (Release에서도 KST 고정)
+    jackson:
+        serialization:
+            write-dates-as-timestamps: false
+        time-zone: Asia/Seoul
+
     flyway:
         locations: classpath:db/migration
         # Release는 실제 데이터 사용, testdata 제외
@@ -75,9 +81,3 @@ logging:
 knowledge:
     batch:
         enabled: false  # 필요 시 true로 변경
-
-# Sentry 설정 (운영 환경용)
-sentry:
-    environment: release
-    debug: false  # debug 로그 끔
-    traces-sample-rate: 0.1  # 10% 샘플링 (비용 절감)

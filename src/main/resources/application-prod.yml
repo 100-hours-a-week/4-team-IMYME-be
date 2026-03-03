@@ -3,6 +3,12 @@ spring:
         activate:
             on-profile: prod
 
+    # JSON 날짜 포맷 설정 (Prod에서도 KST 고정)
+    jackson:
+        serialization:
+            write-dates-as-timestamps: false
+        time-zone: Asia/Seoul
+
     flyway:
         locations: classpath:db/migration
 
