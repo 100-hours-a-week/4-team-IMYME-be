@@ -17,6 +17,7 @@ import com.imyme.mine.global.messaging.MessagePublisher;
 import com.imyme.mine.global.security.UserPrincipal;
 import com.imyme.mine.global.security.annotation.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -57,7 +58,10 @@ public class PvpRoomController {
     /**
      * 4.2 방 생성
      */
-    @Operation(summary = "방 생성", description = "PvP 대결 방을 생성합니다.")
+    @Operation(summary = "방 생성", description = "PvP 대결 방을 생성합니다. (방 이름 2~30자, 금지어 포함 시 실패)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "금지어 포함 (FORBIDDEN_WORD)")
+    })
     @SecurityRequirement(name = "JWT")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
