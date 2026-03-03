@@ -15,6 +15,15 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     // Refresh Token으로 세션 조회
     Optional<UserSession> findByRefreshToken(String refreshToken);
 
+    // Refresh Token으로 세션 + user + device 한 번에 조회
+    @Query("""
+        SELECT s FROM UserSession s
+        JOIN FETCH s.user
+        JOIN FETCH s.device
+        WHERE s.refreshToken = :hashedToken
+        """)
+    Optional<UserSession> findByRefreshTokenWithRelations(@Param("hashedToken") String hashedToken);
+
     // 사용자의 모든 세션 삭제 (로그아웃 전체)
     @Modifying
     @Query("DELETE FROM UserSession s WHERE s.user.id = :userId")

@@ -208,7 +208,7 @@ public class AttemptService {
     }
 
     private CardAttempt findAttemptWithValidation(Long userId, Long cardId, Long attemptId) {
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+        CardAttempt attempt = cardAttemptRepository.findByIdWithCardAndUser(attemptId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
 
         // 카드 일치 여부 및 소유권 확인
@@ -224,17 +224,14 @@ public class AttemptService {
      * - Card와 CardAttempt의 일치 여부 확인
      */
     private ValidatedAttempt validateAttemptOwnership(Long userId, Long cardId, Long attemptId) {
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
-
-        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
+        CardAttempt attempt = cardAttemptRepository.findByIdWithCardAndUser(attemptId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
 
-        if (!attempt.getCard().getId().equals(card.getId())) {
+        if (!attempt.getCard().getId().equals(cardId) || !attempt.getCard().getUser().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.INVALID_CARD_ATTEMPT_MISMATCH);
         }
 
-        return new ValidatedAttempt(card, attempt);
+        return new ValidatedAttempt(attempt.getCard(), attempt);
     }
 
     private Short calculateNextAttemptNo(Long cardId) {

@@ -77,8 +77,8 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: success
-          title: "🟢 개발서버 백엔드 CI 성공"
-          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 개발서버 백엔드 CI 성공!"
+          title: "🟢 운영서버 백엔드 CI 성공"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 운영서버 백엔드 CI 성공!"
           color: 0x00FF00
 
   ci-notify-failure:
@@ -91,8 +91,8 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: failure
-          title: "🔴 개발서버 백엔드 CI 실패"
-          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 개발서버 백엔드 CI 실패!"
+          title: "🔴 운영서버 백엔드 CI 실패"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 운영서버 백엔드 CI 실패!"
           color: 0xFF0000
 
   # 2) CD
@@ -244,8 +244,8 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: success
-          title: "🟢 개발서버 백엔드 배포 성공"
-          content: "개발서버 백엔드 배포 완료!"
+          title: "🟢 운영서버 백엔드 배포 성공"
+          content: "운영서버 백엔드 배포 완료!"
           color: 0x00FF00
 
   cd-notify-failure:
@@ -258,6 +258,6 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_BE }}
           status: failure
-          title: "🔴 개발서버 백엔드 배포 실패"
-          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 개발서버 백엔드 배포 실패!"
+          title: "🔴 운영서버 백엔드 배포 실패"
+          content: "<@&${{ secrets.BACKEND_ROLE_ID }}> 운영서버 백엔드 배포 실패!"
           color: 0xFF0000

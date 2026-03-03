@@ -51,7 +51,7 @@ public class TokenRefreshService {
         String hashedRefreshToken = TokenHasher.hash(rawRefreshToken);
 
         // 해시값으로 세션 조회
-        UserSession userSession = userSessionRepository.findByRefreshToken(hashedRefreshToken)
+        UserSession userSession = userSessionRepository.findByRefreshTokenWithRelations(hashedRefreshToken)
                 .orElseGet(() -> {
                     // 탈취 감지: DB에 없는 토큰 사용 시도
                     tokenTheftDetector.detectSuspiciousTokenUsage(

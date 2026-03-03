@@ -144,7 +144,7 @@ public class CardService {
     public CardDetailResponse getCardDetail(Long userId, Long cardId) {
         log.debug("카드 상세 조회 - userId: {}, cardId: {}", userId, cardId);
 
-        Card card = cardRepository.findByIdAndUserId(cardId, userId)
+        Card card = cardRepository.findByIdAndUserIdWithRelations(cardId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CARD_NOT_FOUND));
 
         List<CardAttempt> attempts = cardAttemptRepository.findByCardIdOrderByAttemptNoDesc(cardId);
