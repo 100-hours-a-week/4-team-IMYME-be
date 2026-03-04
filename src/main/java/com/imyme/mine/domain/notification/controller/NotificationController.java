@@ -2,6 +2,7 @@ package com.imyme.mine.domain.notification.controller;
 
 import com.imyme.mine.domain.notification.dto.MarkAllReadResponse;
 import com.imyme.mine.domain.notification.dto.NotificationListResponse;
+import com.imyme.mine.domain.notification.dto.UnreadCountResponse;
 import com.imyme.mine.domain.notification.service.NotificationService;
 import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.security.UserPrincipal;
@@ -51,6 +52,18 @@ public class NotificationController {
             principal.getId(), isRead, type, cursor, size
         );
         return ApiResponse.success(response);
+    }
+
+    @Operation(
+        summary = "안 읽은 알림 개수 조회",
+        description = "읽지 않은 알림 개수를 조회합니다. 네비게이션 바 뱃지 표시용 초경량 API입니다."
+    )
+    @SecurityRequirement(name = "JWT")
+    @GetMapping("/unread-count")
+    public ApiResponse<UnreadCountResponse> getUnreadCount(
+        @CurrentUser UserPrincipal principal
+    ) {
+        return ApiResponse.success(notificationService.getUnreadCount(principal.getId()));
     }
 
     @Operation(

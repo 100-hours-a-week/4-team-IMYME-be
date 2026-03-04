@@ -2,6 +2,7 @@ package com.imyme.mine.domain.notification.service;
 
 import com.imyme.mine.domain.notification.dto.MarkAllReadResponse;
 import com.imyme.mine.domain.notification.dto.NotificationListResponse;
+import com.imyme.mine.domain.notification.dto.UnreadCountResponse;
 import com.imyme.mine.domain.notification.entity.Notification;
 import com.imyme.mine.domain.notification.entity.NotificationType;
 import com.imyme.mine.domain.notification.repository.NotificationRepository;
@@ -54,6 +55,10 @@ public class NotificationService {
         }
 
         return NotificationListResponse.of(notifications, size);
+    }
+
+    public UnreadCountResponse getUnreadCount(Long userId) {
+        return new UnreadCountResponse(notificationRepository.countByUserIdAndIsReadFalse(userId));
     }
 
     @Transactional
