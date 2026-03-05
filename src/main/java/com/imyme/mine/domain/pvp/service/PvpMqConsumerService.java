@@ -357,7 +357,7 @@ public class PvpMqConsumerService {
                     .roomName(room.getRoomName())
                     .role(PvpRole.HOST)
                     .score(hostScore)
-                    .level(hostUser.getLevel())
+                    .level(calculateLevel(hostScore))
                     .isWinner(hostWon)
                     .opponentUser(guestUser)
                     .opponentNickname(guestUser != null ? guestUser.getNickname() : "알 수 없음")
@@ -381,7 +381,7 @@ public class PvpMqConsumerService {
                     .roomName(room.getRoomName())
                     .role(PvpRole.GUEST)
                     .score(guestScore)
-                    .level(guestUser.getLevel())
+                    .level(calculateLevel(guestScore))
                     .isWinner(guestWon)
                     .opponentUser(hostUser)
                     .opponentNickname(hostUser != null ? hostUser.getNickname() : "알 수 없음")
@@ -393,6 +393,19 @@ public class PvpMqConsumerService {
                     .build();
             pvpHistoryRepository.save(guestHistory);
         }
+    }
+
+    /**
+     * score → level 변환
+     * 0→0 / 1~20→1 / 21~40→2 / 41~60→3 / 61~80→4 / 81~100→5
+     */
+    private static int calculateLevel(int score) {
+        if (score <= 0)  return 0;
+        if (score <= 20) return 1;
+        if (score <= 40) return 2;
+        if (score <= 60) return 3;
+        if (score <= 80) return 4;
+        return 5;
     }
 
     /**

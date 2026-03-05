@@ -477,7 +477,7 @@ public class PvpRoomService {
     /**
      * 나가기 결과 타입
      */
-    public enum LeaveType { HOST_LEFT, GUEST_LEFT }
+    public enum LeaveType { HOST_LEFT, GUEST_LEFT, NOOP }
 
     public record LeaveResult(Long roomId, LeaveType type, PvpRoomStatus newStatus) {}
 
@@ -491,8 +491,11 @@ public class PvpRoomService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // 참여자 확인
+        // WebSocket disconnect가 REST leave보다 먼저 처리된 경우 이미 방에서 제거되어 있을 수 있음 (Race condition)
+        // NOT_PARTICIPANT를 던지지 않고 NOOP으로 처리하여 idempotent하게 동작
         if (!room.isParticipant(userId)) {
-            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+            log.info("방 나가기: 이미 나간 상태 (NOOP) - roomId={}, userId={}", roomId, userId);
+            return new LeaveResult(roomId, LeaveType.NOOP, room.getStatus());
         }
 
         if (room.isHost(userId)) {
