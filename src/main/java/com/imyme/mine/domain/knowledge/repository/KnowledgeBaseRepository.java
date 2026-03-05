@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 지식 베이스 리포지토리
@@ -17,6 +18,10 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
 
     // 콘텐츠 해시 존재 여부 확인
     boolean existsByContentHash(String contentHash);
+
+    // 여러 콘텐츠 해시 일괄 조회 (N+1 방지용)
+    @Query("SELECT kb.contentHash FROM KnowledgeBase kb WHERE kb.contentHash IN :hashes")
+    Set<String> findContentHashesByHashIn(@Param("hashes") Set<String> hashes);
 
     // 콘텐츠 해시로 지식 조회
     Optional<KnowledgeBase> findByContentHash(String contentHash);
