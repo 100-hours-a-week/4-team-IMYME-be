@@ -135,6 +135,30 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
     );
 
     /**
+     * 키워드별 벡터 유사도 검색 - 경량 버전 (embedding 제외)
+     * - evaluateCandidate()에서 embedding 미사용 → SELECT에서 제거
+     * - 결과 25건 기준 전송 payload 132KB → 29KB (77% 감소)
+     */
+    @Query(value = """
+        SELECT kb.id          AS id,
+               kb.keyword_id  AS keywordId,
+               kb.content     AS content,
+               kb.content_hash AS contentHash,
+               (kb.embedding <=> CAST(:queryEmbedding AS vector)) AS distance
+        FROM knowledge_base kb
+        WHERE kb.is_active = true
+          AND kb.embedding IS NOT NULL
+          AND kb.keyword_id = :keywordId
+        ORDER BY distance ASC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<KnowledgeSearchResultLight> findSimilarKnowledgeByKeywordLight(
+        @Param("queryEmbedding") String queryEmbedding,
+        @Param("keywordId") Long keywordId,
+        @Param("limit") int limit
+    );
+
+    /**
      * 모든 활성 지식 조회 (최신순)
      * - 목적: 관리자 페이지에서 지식 목록 표시
      */
