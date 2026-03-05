@@ -70,10 +70,11 @@ public class PvpAsyncService {
 
     /**
      * THINKING 전환 DB 작업 (트랜잭션 짧게 유지)
+     * - 비관적 락: leaveRoom과 직렬화하여 낙관적 잠금 충돌 방지
      */
     @Transactional
     public void doThinkingTransition(Long roomId) {
-        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId).orElse(null);
+        PvpRoom room = pvpRoomRepository.findByIdWithDetailsForUpdate(roomId).orElse(null);
 
         if (room == null || room.getStatus() != PvpRoomStatus.MATCHED) {
             log.warn("THINKING 전환 실패: 방 상태 불일치 - roomId={}", roomId);
