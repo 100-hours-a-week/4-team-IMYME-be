@@ -52,11 +52,14 @@ public class SoloFeedbackSaveService {
 
         String feedbackJson = convertSoloFeedbackToJson(result.feedback());
 
+        int score = result.overallScore() != null ? result.overallScore() : 0;
+        short level = (short) calculateLevel(score);
+
         // @MapsId를 사용하므로 attemptId만 설정 (attempt는 JPA가 관리)
         CardFeedback newFeedback = CardFeedback.builder()
             .attempt(attempt)
-            .overallScore(result.overallScore())
-            .level(result.level().shortValue())
+            .overallScore(score)
+            .level(level)
             .feedbackJson(feedbackJson)
             .modelVersion(SOLO_MODEL_VERSION)
             .build();
@@ -67,13 +70,26 @@ public class SoloFeedbackSaveService {
         Card card = attempt.getCard();
         boolean wasGhost = card.getAttemptCount() == null || card.getAttemptCount() == 0;
         attempt.complete(); // sttText는 이미 설정되어 있음
-        card.completeAttempt(result.level().shortValue());
+        card.completeAttempt(level);
         if (wasGhost) {
             card.getUser().incrementActiveCardCount();
         }
 
         log.info("Solo feedback saved - attemptId: {}, score: {}, level: {}",
             attemptId, result.overallScore(), result.level());
+    }
+
+    /**
+     * score → level 변환
+     * 0→0 / 1~20→1 / 21~40→2 / 41~60→3 / 61~80→4 / 81~100→5
+     */
+    private static int calculateLevel(int score) {
+        if (score <= 0)  return 0;
+        if (score <= 20) return 1;
+        if (score <= 40) return 2;
+        if (score <= 60) return 3;
+        if (score <= 80) return 4;
+        return 5;
     }
 
     private String convertSoloFeedbackToJson(SoloFeedback feedback) {
