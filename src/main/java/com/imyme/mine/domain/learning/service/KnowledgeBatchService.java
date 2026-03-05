@@ -215,34 +215,45 @@ public class KnowledgeBatchService {
 
     /**
      * 3단계: 피드백 아이템 추출 (중복 제거 및 해시 계산)
+     * - 모든 contentHash를 한 번에 조회하여 N+1 쿼리 방지
      */
     private List<FeedbackItem> extractFeedbackItems(List<CardFeedback> feedbacks, String keywordName) {
-        List<FeedbackItem> feedbackItems = new ArrayList<>();
+        // 1) 모든 피드백의 해시 계산
+        record FeedbackWithHash(CardFeedback feedback, String text, String hash) {}
+        List<FeedbackWithHash> candidates = new ArrayList<>();
 
         for (CardFeedback feedback : feedbacks) {
             try {
-                String personalizedFeedback = extractPersonalizedFeedback(feedback.getFeedbackJson());
+                String text = extractPersonalizedFeedback(feedback.getFeedbackJson());
+                log.debug("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), text);
 
-                log.debug("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), personalizedFeedback);
-
-                if (personalizedFeedback != null && !personalizedFeedback.isBlank()) {
-                    String contentHash = calculateSHA256(personalizedFeedback);
-
-                    // 이미 존재하는 지식인지 확인 (중복 방지)
-                    if (!knowledgeRepository.existsByContentHash(contentHash)) {
-                        feedbackItems.add(new FeedbackItem(
-                            String.valueOf(feedback.getAttemptId()),
-                            keywordName,
-                            personalizedFeedback
-                        ));
-                    } else {
-                        log.debug("이미 존재하는 지식 스킵 - Hash: {}", contentHash);
-                    }
+                if (text != null && !text.isBlank()) {
+                    candidates.add(new FeedbackWithHash(feedback, text, calculateSHA256(text)));
                 } else {
                     log.warn("ID: {} - 텍스트 추출 실패 (null 또는 빈 값)", feedback.getAttemptId());
                 }
             } catch (Exception e) {
                 log.warn("피드백 추출 실패 - attemptId: {}", feedback.getAttemptId(), e);
+            }
+        }
+
+        // 2) 전체 해시를 1번 쿼리로 일괄 조회
+        Set<String> allHashes = candidates.stream()
+            .map(FeedbackWithHash::hash)
+            .collect(java.util.stream.Collectors.toSet());
+        Set<String> existingHashes = knowledgeRepository.findContentHashesByHashIn(allHashes);
+
+        // 3) 메모리에서 중복 필터링
+        List<FeedbackItem> feedbackItems = new ArrayList<>();
+        for (FeedbackWithHash c : candidates) {
+            if (existingHashes.contains(c.hash())) {
+                log.debug("이미 존재하는 지식 스킵 - Hash: {}", c.hash());
+            } else {
+                feedbackItems.add(new FeedbackItem(
+                    String.valueOf(c.feedback().getAttemptId()),
+                    keywordName,
+                    c.text()
+                ));
             }
         }
 
