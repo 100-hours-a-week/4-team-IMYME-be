@@ -64,6 +64,7 @@ public class SecurityConfig {
                                 "/ws/**",  // WebSocket 엔드포인트 (핸드셰이크에서 JWT 검증)
                                 "/websocket-test", // WebSocket 테스트 페이지
                                 "/test/pvp/**", // PvP WebSocket 테스트 API
+                                "/test/sse/**", // SSE 수동 테스트 API
                                 "/error",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
