@@ -39,4 +39,16 @@ public class AttemptSttService {
         // STT 실패 → 클라이언트에 FAILED 알림 (연결 종료)
         sseEmitterRegistry.emit(attemptId, "FAILED");
     }
+
+    /**
+     * 분석 실패 상태만 DB에 저장 (SSE emit 없음)
+     * SoloService Virtual Thread 내부에서 호출 — 별도 Spring Bean을 통해야 @Transactional이 적용됨
+     */
+    @Transactional
+    public void recordFailure(Long attemptId, String errorCode) {
+        cardAttemptRepository.findById(attemptId).ifPresent(attempt -> {
+            attempt.fail(errorCode);
+            log.info("분석 실패 상태 저장 - attemptId: {}, errorCode: {}", attemptId, errorCode);
+        });
+    }
 }

@@ -55,7 +55,7 @@ public class SseEmitterRegistry {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
         Runnable cleanup = () -> {
-            emitters.remove(attemptId);
+            emitters.remove(attemptId, emitter);  // 재구독 시 새 emitter를 지우지 않도록 atomic compare-and-remove
             log.info("[SSE] emitter 제거: attemptId={}, 남은 수={}", attemptId, emitters.size());
         };
         emitter.onCompletion(cleanup);

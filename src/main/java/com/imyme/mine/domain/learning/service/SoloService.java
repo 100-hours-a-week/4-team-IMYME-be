@@ -3,7 +3,7 @@ package com.imyme.mine.domain.learning.service;
 import com.imyme.mine.domain.ai.client.AiServerClient;
 import com.imyme.mine.domain.ai.dto.solo.*;
 import com.imyme.mine.domain.card.event.AttemptUploadedEvent;
-import com.imyme.mine.domain.card.repository.CardAttemptRepository;
+import com.imyme.mine.domain.card.service.AttemptSttService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import com.imyme.mine.global.sse.SseEmitterRegistry;
@@ -29,8 +29,8 @@ public class SoloService {
 
     private final AiServerClient aiServerClient;
     private final SoloFeedbackSaveService feedbackSaveService;
-    private final CardAttemptRepository attemptRepository;
     private final SseEmitterRegistry sseEmitterRegistry;
+    private final AttemptSttService attemptSttService;
 
     private static final int MAX_RETRIES = 60;  // 최대 60회 (3분)
     private static final long POLL_INTERVAL_MS = 3000;  // 3초 간격
@@ -126,7 +126,7 @@ public class SoloService {
                 // 실패 상태 확인
                 if ("failed".equalsIgnoreCase(response.status())) {
                     log.error("Solo 분석 실패 - attemptId: {}", attemptId);
-                    markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+                    attemptSttService.recordFailure(attemptId,"AI_FEEDBACK_FAILED");
                     sseEmitterRegistry.emit(attemptId, "FAILED");
                     return;
                 }
@@ -137,13 +137,13 @@ public class SoloService {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Solo 폴링 중단 - attemptId: {}", attemptId, e);
-                markAttemptFailed(attemptId, "POLLING_INTERRUPTED");
+                attemptSttService.recordFailure(attemptId,"POLLING_INTERRUPTED");
                 sseEmitterRegistry.emit(attemptId, "FAILED");
                 throw new RuntimeException("Solo polling interrupted", e);
 
             } catch (BusinessException e) {
                 if (e.getErrorCode() == ErrorCode.AI_ANALYSIS_FAILED || e.getErrorCode() == ErrorCode.AI_POLLING_TIMEOUT) {
-                    markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+                    attemptSttService.recordFailure(attemptId,"AI_FEEDBACK_FAILED");
                     sseEmitterRegistry.emit(attemptId, "FAILED");
                     return;
                 }
@@ -157,16 +157,8 @@ public class SoloService {
 
         // 최대 재시도 횟수 초과
         log.warn("Solo 폴링 타임아웃 (3분 초과) - attemptId: {}", attemptId);
-        markAttemptFailed(attemptId, "AI_FEEDBACK_FAILED");
+        attemptSttService.recordFailure(attemptId,"AI_FEEDBACK_FAILED");
         sseEmitterRegistry.emit(attemptId, "FAILED");
-    }
-
-    @Transactional
-    private void markAttemptFailed(Long attemptId, String errorCode) {
-        attemptRepository.findById(attemptId).ifPresent(attempt -> {
-            attempt.fail(errorCode);
-            log.info("Solo 분석 실패 상태 저장 - attemptId: {}, errorCode: {}", attemptId, errorCode);
-        });
     }
 
 }
