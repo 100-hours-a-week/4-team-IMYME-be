@@ -46,4 +46,11 @@ public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> 
         WHERE ca.id = :attemptId
         """)
     Optional<CardAttempt> findByIdWithCardAndUser(@Param("attemptId") Long attemptId);
+
+    /**
+     * 시도 상태만 조회 (SSE Race Condition 방어용)
+     * - SSE 구독 시점에 이미 COMPLETED/FAILED 상태면 즉시 이벤트 전송 후 종료
+     */
+    @Query("SELECT ca.status FROM CardAttempt ca WHERE ca.id = :id")
+    Optional<AttemptStatus> findStatusById(@Param("id") Long id);
 }

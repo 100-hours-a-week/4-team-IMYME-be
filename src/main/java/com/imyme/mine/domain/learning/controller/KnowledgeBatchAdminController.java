@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/v1/admin/knowledge/batch")
 @RequiredArgsConstructor
-@Tag(name = "Knowledge Batch Admin", description = "Knowledge 배치 관리 API")
+@Tag(name = "12. Admin", description = "Knowledge 배치 관리 API")
 public class KnowledgeBatchAdminController {
 
     private final KnowledgeBatchService batchService;

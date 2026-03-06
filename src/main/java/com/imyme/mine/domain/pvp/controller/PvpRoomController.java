@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "10. PvP Room", description = "PvP 대결 방 API")
+@Tag(name = "11. PvP", description = "PvP 대결 방/기록 API")
 @Slf4j
 @RestController
 @RequestMapping("/pvp/rooms")

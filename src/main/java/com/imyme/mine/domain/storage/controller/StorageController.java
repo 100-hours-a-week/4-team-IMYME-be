@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "09. Study Audio", description = "학습 오디오 업로드용 Presigned URL 발급 API")
+@Tag(name = "09. Audio", description = "학습 오디오 업로드용 Presigned URL 발급 API")
 @Slf4j
 @RestController
 @RequestMapping("/learning")
