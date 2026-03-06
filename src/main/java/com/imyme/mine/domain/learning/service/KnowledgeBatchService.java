@@ -8,6 +8,7 @@ import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeSearchResult;
+import com.imyme.mine.domain.knowledge.repository.KnowledgeSearchResultLight;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
 import com.imyme.mine.domain.learning.dto.KnowledgeBatchResult;
@@ -411,9 +412,9 @@ public class KnowledgeBatchService {
     private CandidateDecision evaluateCandidate(KnowledgeCandidate candidate, Long keywordId) {
         String embeddingVector = convertEmbeddingToString(candidate.embedding());
 
-        // 유사 지식 검색
-        List<KnowledgeSearchResult> similars = knowledgeRepository
-            .findSimilarKnowledgeByKeyword(
+        // 유사 지식 검색 (경량 버전: embedding 제외로 payload 77% 감소)
+        List<KnowledgeSearchResultLight> similars = knowledgeRepository
+            .findSimilarKnowledgeByKeywordLight(
                 embeddingVector,
                 keywordId,
                 properties.getMaxSimilarCount()
@@ -421,7 +422,7 @@ public class KnowledgeBatchService {
 
         // 유사도 임계값 필터링
         double threshold = 1.0 - properties.getSimilarityThreshold();
-        List<KnowledgeSearchResult> filteredSimilars = similars.stream()
+        List<KnowledgeSearchResultLight> filteredSimilars = similars.stream()
             .filter(s -> s.getDistance() <= threshold)
             .collect(Collectors.toList());
 
@@ -570,7 +571,7 @@ public class KnowledgeBatchService {
      */
     private KnowledgeEvaluationRequest buildEvaluationRequest(
         KnowledgeCandidate candidate,
-        List<KnowledgeSearchResult> similars
+        List<KnowledgeSearchResultLight> similars
     ) {
         // EvaluationCandidate(String text, String sourceId)
         EvaluationCandidate evalCandidate = new EvaluationCandidate(
