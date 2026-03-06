@@ -19,6 +19,7 @@ import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
 import com.imyme.mine.domain.knowledge.service.KnowledgeBaseService;
 import com.imyme.mine.domain.learning.messaging.SoloMqPublisher;
+import com.imyme.mine.domain.learning.messaging.dto.SoloSttRequestDto;
 import com.imyme.mine.global.config.AttemptProperties;
 import com.imyme.mine.global.config.S3Properties;
 import com.imyme.mine.global.config.SoloMqProperties;
@@ -146,12 +147,12 @@ public class AttemptService {
             if (soloMqProperties.isEnabled()) {
                 // MQ 경로: STT 요청을 MQ로 발행 (AI 서버가 비동기 처리)
                 log.info("[Solo MQ] STT Request 발행 - attemptId: {}", attemptId);
-                Map<String, Object> payload = Map.of(
-                    "attempt_id", attemptId,
-                    "card_id", card.getId(),
-                    "audio_url", readPresignedUrl,
-                    "timestamp", System.currentTimeMillis()
-                );
+                SoloSttRequestDto payload = SoloSttRequestDto.builder()
+                    .attemptId(attemptId)
+                    .userId(card.getUser().getId())
+                    .audioUrl(readPresignedUrl)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
                 soloMqPublisher.publishSttRequest(payload);
             } else {
                 // HTTP 경로: 기존 동기 STT 호출

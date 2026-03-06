@@ -4,8 +4,6 @@ import com.imyme.mine.domain.ai.client.AiServerClient;
 import com.imyme.mine.domain.ai.dto.solo.*;
 import com.imyme.mine.domain.card.event.AttemptUploadedEvent;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
-import com.imyme.mine.domain.learning.messaging.SoloMqPublisher;
-import com.imyme.mine.global.config.SoloMqProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,8 +29,6 @@ public class SoloService {
     private final AiServerClient aiServerClient;
     private final SoloFeedbackSaveService feedbackSaveService;
     private final CardAttemptRepository attemptRepository;
-    private final SoloMqProperties soloMqProperties;
-    private final SoloMqPublisher soloMqPublisher;
 
     private static final int MAX_RETRIES = 60;  // 최대 60회 (3분)
     private static final long POLL_INTERVAL_MS = 3000;  // 3초 간격
@@ -56,8 +52,9 @@ public class SoloService {
     }
 
     /**
-     * Solo 분석을 비동기로 시작
+     * Solo 분석을 비동기로 시작 (HTTP 경로)
      * - AI 서버에 분석 요청 후 Virtual Thread로 백그라운드 폴링
+     * - MQ 모드에서는 AttemptUploadedEvent 자체가 발행되지 않으므로 호출되지 않음
      */
     public void startSoloAnalysisAsync(
         Long attemptId,
@@ -68,31 +65,17 @@ public class SoloService {
         log.info("Solo 분석 시작 - attemptId: {}", attemptId);
 
         try {
-            if (soloMqProperties.isEnabled()) {
-                // MQ 경로: Feedback 요청을 MQ로 발행 (AI 서버가 비동기 처리)
-                log.info("[Solo MQ] Feedback Request 발행 - attemptId: {}", attemptId);
-                Map<String, Object> payload = Map.of(
-                    "attempt_id", attemptId,
-                    "user_text", userText,
-                    "criteria", criteria,
-                    "history", history,
-                    "timestamp", System.currentTimeMillis()
-                );
-                soloMqPublisher.publishFeedbackRequest(payload);
-            } else {
-                // HTTP 경로: 기존 동기 제출 + Virtual Thread 폴링
-                SoloSubmissionRequest request = new SoloSubmissionRequest(
-                    attemptId, userText, criteria, history
-                );
-                SoloSubmissionData submission = aiServerClient.submitSolo(request);
-                log.info("Solo 분석 요청 완료 - attemptId: {}, status: {}",
-                    attemptId, submission.status());
+            SoloSubmissionRequest request = new SoloSubmissionRequest(
+                attemptId, userText, criteria, history
+            );
+            SoloSubmissionData submission = aiServerClient.submitSolo(request);
+            log.info("Solo 분석 요청 완료 - attemptId: {}, status: {}",
+                attemptId, submission.status());
 
-                Thread.startVirtualThread(() -> {
-                    pollAndSaveSoloResult(attemptId);
-                });
-                log.info("Solo 분석 백그라운드 폴링 시작 - attemptId: {}", attemptId);
-            }
+            Thread.startVirtualThread(() -> {
+                pollAndSaveSoloResult(attemptId);
+            });
+            log.info("Solo 분석 백그라운드 폴링 시작 - attemptId: {}", attemptId);
 
         } catch (Exception e) {
             log.error("Solo 분석 요청 실패 - attemptId: {}", attemptId, e);
