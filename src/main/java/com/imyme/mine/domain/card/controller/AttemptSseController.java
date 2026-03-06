@@ -33,7 +33,7 @@ import java.util.Map;
  *    - 분석 완료/실패 시 {@code status-update} 이벤트 수신
  *    - 이미 완료된 경우 즉시 이벤트 전송 (Race Condition 방어)
  */
-@Tag(name = "09. Study Attempt SSE", description = "솔로 모드 AI 분석 결과 SSE 스트리밍 API")
+@Tag(name = "08. Attempt", description = "학습 시도 생성/조회/삭제, 오디오 업로드 완료 처리 API")
 @Slf4j
 @RestController
 @RequestMapping("/cards/{cardId}/attempts/{attemptId}")

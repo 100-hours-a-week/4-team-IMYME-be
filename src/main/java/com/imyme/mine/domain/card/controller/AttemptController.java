@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "08. Study Attempt", description = "학습 시도 생성/조회/삭제, 오디오 업로드 완료 처리 API")
+@Tag(name = "08. Attempt", description = "학습 시도 생성/조회/삭제, 오디오 업로드 완료 처리 API")
 @Slf4j
 @RestController
 @RequestMapping("/cards/{cardId}/attempts")
