@@ -18,8 +18,10 @@ import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.card.repository.CardRepository;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
 import com.imyme.mine.domain.knowledge.service.KnowledgeBaseService;
+import com.imyme.mine.domain.learning.messaging.SoloMqPublisher;
 import com.imyme.mine.global.config.AttemptProperties;
 import com.imyme.mine.global.config.S3Properties;
+import com.imyme.mine.global.config.SoloMqProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +57,8 @@ public class AttemptService {
     private final AttemptProperties attemptProperties;
     private final AttemptUploadService attemptUploadService;
     private final AttemptSttService attemptSttService;
+    private final SoloMqProperties soloMqProperties;
+    private final SoloMqPublisher soloMqPublisher;
 
     private static final int MAX_ATTEMPTS_PER_CARD = 5;
 
@@ -139,22 +143,28 @@ public class AttemptService {
             String readPresignedUrl = generateReadPresignedUrl(objectKey);
             log.debug("읽기용 Presigned URL 생성 완료 - attemptId: {}", attemptId);
 
-            // AI 서버에 읽기용 URL 전달 (외부 HTTP 호출)
-            String sttText = aiServerClient.transcribe(readPresignedUrl);
-
-            // STT 결과 저장 (새 트랜잭션)
-            attemptSttService.recordSttSuccess(attemptId, sttText);
-
-            // Solo 모드 분석 이벤트 발행 (비동기 처리)
-            publishSoloAnalysisEvent(attemptId, card, sttText);
+            if (soloMqProperties.isEnabled()) {
+                // MQ 경로: STT 요청을 MQ로 발행 (AI 서버가 비동기 처리)
+                log.info("[Solo MQ] STT Request 발행 - attemptId: {}", attemptId);
+                Map<String, Object> payload = Map.of(
+                    "attempt_id", attemptId,
+                    "card_id", card.getId(),
+                    "audio_url", readPresignedUrl,
+                    "timestamp", System.currentTimeMillis()
+                );
+                soloMqPublisher.publishSttRequest(payload);
+            } else {
+                // HTTP 경로: 기존 동기 STT 호출
+                String sttText = aiServerClient.transcribe(readPresignedUrl);
+                attemptSttService.recordSttSuccess(attemptId, sttText);
+                publishSoloAnalysisEvent(attemptId, card, sttText);
+            }
 
         } catch (BusinessException e) {
-            // STT 오류 시 FAILED 상태로 변경 (새 트랜잭션)
             String errorCode = mapSttErrorCode(e);
             attemptSttService.recordSttFailure(attemptId, errorCode);
             log.error("STT 처리 실패 - attemptId: {}, errorCode: {}", attemptId, errorCode);
         } catch (Exception e) {
-            // 예상치 못한 오류
             attemptSttService.recordSttFailure(attemptId, "UNKNOWN_ERROR");
             log.error("STT 처리 중 예상치 못한 오류 - attemptId: {}", attemptId, e);
         }
