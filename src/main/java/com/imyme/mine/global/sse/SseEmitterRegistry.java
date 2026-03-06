@@ -68,6 +68,26 @@ public class SseEmitterRegistry {
     }
 
     /**
+     * 중간 단계 이벤트 전송 (연결 유지)
+     * - AUDIO_ANALYSIS → FEEDBACK_GENERATION 전환 시 사용
+     * - emit()과 달리 emitter를 종료하지 않음
+     */
+    public void push(Long attemptId, Map<String, Object> data) {
+        SseEmitter emitter = emitters.get(attemptId);  // remove 하지 않음
+        if (emitter == null) {
+            log.debug("[SSE] push 대상 없음 (미연결 or 이미 종료): attemptId={}", attemptId);
+            return;
+        }
+        try {
+            emitter.send(SseEmitter.event().name("status-update").data(data));
+            log.debug("[SSE] 중간 이벤트 전송: attemptId={}, data={}", attemptId, data);
+        } catch (Exception e) {
+            log.debug("[SSE] push 실패 (연결 종료 추정): attemptId={}", attemptId);
+            emitters.remove(attemptId);
+        }
+    }
+
+    /**
      * 분석 완료/실패 시 클라이언트에 Push
      * - Virtual Thread에서 호출
      * - emitter가 없으면 (미연결 or 이미 종료) no-op

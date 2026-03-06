@@ -55,14 +55,16 @@ public class SseService {
      * SSE 스트림 구독
      * - Race Condition 방어: 구독 시점에 DB 상태를 먼저 확인
      *   → 이미 COMPLETED/FAILED/EXPIRED: 즉시 이벤트 전송 후 emitter 완료
-     *   → PROCESSING/UPLOADED/PENDING: SseEmitterRegistry에 등록하고 SoloService emit 대기
+     *   → PROCESSING: emitter 등록 후 현재 단계(AUDIO_ANALYSIS or FEEDBACK_GENERATION)를 첫 이벤트로 전송
      *
      * @param attemptId 시도 ID (토큰 검증 완료 후 호출됨)
      * @return SseEmitter
      */
     public SseEmitter subscribe(Long attemptId) {
-        AttemptStatus status = cardAttemptRepository.findStatusById(attemptId)
+        CardAttempt attempt = cardAttemptRepository.findById(attemptId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+
+        AttemptStatus status = attempt.getStatus();
 
         if (status == AttemptStatus.COMPLETED
                 || status == AttemptStatus.FAILED
@@ -71,8 +73,23 @@ public class SseService {
             return emitImmediately(attemptId, status.name());
         }
 
-        log.debug("[SSE] 에미터 등록 (분석 진행 중): attemptId={}, currentStatus={}", attemptId, status);
-        return sseEmitterRegistry.register(attemptId);
+        SseEmitter emitter = sseEmitterRegistry.register(attemptId);
+
+        // PROCESSING 상태면 현재 단계를 첫 이벤트로 전송 (클라이언트가 즉시 UI 업데이트 가능)
+        if (status == AttemptStatus.PROCESSING) {
+            String step = (attempt.getSttText() == null) ? "AUDIO_ANALYSIS" : "FEEDBACK_GENERATION";
+            try {
+                emitter.send(SseEmitter.event()
+                    .name("status-update")
+                    .data(Map.of("status", "PROCESSING", "step", step)));
+                log.debug("[SSE] 초기 단계 이벤트 전송: attemptId={}, step={}", attemptId, step);
+            } catch (IOException e) {
+                log.warn("[SSE] 초기 단계 이벤트 전송 실패: attemptId={}", attemptId, e);
+            }
+        }
+
+        log.debug("[SSE] 에미터 등록 완료: attemptId={}, status={}", attemptId, status);
+        return emitter;
     }
 
     /**
