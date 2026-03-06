@@ -1,5 +1,6 @@
 package com.imyme.mine.domain.card.controller;
 
+import com.imyme.mine.domain.card.dto.StreamTokenResponse;
 import com.imyme.mine.global.common.response.ApiResponse;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
@@ -9,6 +10,10 @@ import com.imyme.mine.global.sse.SseService;
 import com.imyme.mine.global.sse.SseTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -50,18 +55,47 @@ public class AttemptSseController {
      */
     @Operation(
         summary = "SSE 스트림 토큰 발급",
-        description = "SSE 구독 전 1회용 토큰을 발급합니다. 토큰은 30초 유효하며 한 번만 사용할 수 있습니다."
+        description = """
+            SSE 구독 전 1회용 토큰을 발급합니다.
+            EventSource API는 Authorization 헤더를 지원하지 않으므로, JWT 대신 단기 토큰을 쿼리 파라미터로 전달합니다.
+            토큰은 **30초 유효**하며 **1회만 사용** 가능합니다.
+            """,
+        security = @SecurityRequirement(name = "JWT")
     )
-    @SecurityRequirement(name = "JWT")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "토큰 발급 성공",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = StreamTokenResponse.class)
+            )
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증 실패",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403",
+            description = "해당 시도에 대한 접근 권한 없음",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @PostMapping("/stream-token")
-    public ApiResponse<Map<String, String>> issueStreamToken(
+    public ApiResponse<StreamTokenResponse> issueStreamToken(
         @CurrentUser UserPrincipal principal,
-        @Parameter(description = "카드 ID") @PathVariable Long cardId,
-        @Parameter(description = "시도 ID") @PathVariable Long attemptId
+        @Parameter(description = "카드 ID", required = true) @PathVariable Long cardId,
+        @Parameter(description = "시도 ID", required = true) @PathVariable Long attemptId
     ) {
         String token = sseService.issueStreamToken(principal.getId(), cardId, attemptId);
         log.info("[SSE] 스트림 토큰 발급: userId={}, cardId={}, attemptId={}", principal.getId(), cardId, attemptId);
-        return ApiResponse.success(Map.of("token", token));
+        return ApiResponse.success(StreamTokenResponse.of(token));
     }
 
     /**
@@ -72,8 +106,70 @@ public class AttemptSseController {
      */
     @Operation(
         summary = "SSE 스트림 구독",
-        description = "AI 분석 결과를 SSE로 수신합니다. stream-token API로 발급받은 토큰을 쿼리 파라미터로 전달하세요."
+        description = """
+            AI 분석 결과를 SSE(Server-Sent Events)로 실시간 수신합니다.
+            `stream-token` API로 발급받은 1회용 토큰을 쿼리 파라미터로 전달하세요.
+
+            **이벤트명**: `status-update`
+
+            **페이로드 형식**:
+            ```json
+            { "status": "PROCESSING", "step": "AUDIO_ANALYSIS" }
+            { "status": "PROCESSING", "step": "FEEDBACK_GENERATION" }
+            { "status": "COMPLETED" }
+            { "status": "FAILED" }
+            { "status": "EXPIRED" }
+            ```
+
+            | status | step | 설명 |
+            |--------|------|------|
+            | PROCESSING | AUDIO_ANALYSIS | STT 변환 중 |
+            | PROCESSING | FEEDBACK_GENERATION | AI 피드백 생성 중 |
+            | COMPLETED | (없음) | 분석 완료. 결과 조회 가능 |
+            | FAILED | (없음) | 분석 실패 |
+            | EXPIRED | (없음) | 타임아웃 (80초 초과) |
+
+            **연결 종료 시점**: `COMPLETED`, `FAILED`, `EXPIRED` 이벤트 수신 시 서버에서 연결을 닫습니다.
+
+            **Race Condition 방어**: 구독 시점에 이미 완료된 경우 즉시 이벤트를 전송하고 연결을 종료합니다.
+            """
     )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "SSE 스트림 연결 성공. `status-update` 이벤트를 수신합니다.",
+            content = @Content(
+                mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                examples = {
+                    @ExampleObject(name = "PROCESSING (STT 중)", value =
+                        "event: status-update\ndata: {\"status\":\"PROCESSING\",\"step\":\"AUDIO_ANALYSIS\"}\n\n"),
+                    @ExampleObject(name = "PROCESSING (피드백 생성 중)", value =
+                        "event: status-update\ndata: {\"status\":\"PROCESSING\",\"step\":\"FEEDBACK_GENERATION\"}\n\n"),
+                    @ExampleObject(name = "COMPLETED", value =
+                        "event: status-update\ndata: {\"status\":\"COMPLETED\"}\n\n"),
+                    @ExampleObject(name = "FAILED", value =
+                        "event: status-update\ndata: {\"status\":\"FAILED\"}\n\n"),
+                    @ExampleObject(name = "EXPIRED", value =
+                        "event: status-update\ndata: {\"status\":\"EXPIRED\"}\n\n")
+                }
+            )
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "토큰이 유효하지 않거나 만료됨 - INVALID_TOKEN",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403",
+            description = "토큰의 attemptId와 경로의 attemptId 불일치 - FORBIDDEN",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "시도를 찾을 수 없음 - ATTEMPT_NOT_FOUND",
+            content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+        )
+    })
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe(
         @Parameter(description = "카드 ID") @PathVariable Long cardId,
