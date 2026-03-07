@@ -52,6 +52,10 @@ spring:
                     max-attempts: 3
                     multiplier: 2.0
 
+solo:
+    mq:
+        enabled: true  # MQ 경로 활성화 (AI 서버가 solo.stt.request 큐로 전환)
+
 logging:
     level:
         com.imyme.mine: DEBUG
