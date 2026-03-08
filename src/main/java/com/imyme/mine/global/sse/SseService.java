@@ -75,6 +75,18 @@ public class SseService {
 
         SseEmitter emitter = sseEmitterRegistry.register(attemptId);
 
+        // 등록 직후 재확인: DB 읽기와 emitter 등록 사이에 완료 이벤트가 발생했을 수 있음
+        CardAttempt reChecked = cardAttemptRepository.findById(attemptId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ATTEMPT_NOT_FOUND));
+        AttemptStatus reCheckedStatus = reChecked.getStatus();
+        if (reCheckedStatus == AttemptStatus.COMPLETED
+                || reCheckedStatus == AttemptStatus.FAILED
+                || reCheckedStatus == AttemptStatus.EXPIRED) {
+            log.debug("[SSE] 등록 후 재확인 - 이미 완료 감지: attemptId={}, status={}", attemptId, reCheckedStatus);
+            sseEmitterRegistry.emit(attemptId, reCheckedStatus.name());
+            return emitter;
+        }
+
         // PROCESSING 상태면 현재 단계를 첫 이벤트로 전송 (클라이언트가 즉시 UI 업데이트 가능)
         if (status == AttemptStatus.PROCESSING) {
             String step = (attempt.getSttText() == null) ? "AUDIO_ANALYSIS" : "FEEDBACK_GENERATION";
