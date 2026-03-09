@@ -110,6 +110,17 @@ ai-server:
 # ==================================================
 # Knowledge 배치 작업 설정 (테스트에서는 비활성화)
 # ==================================================
+solo:
+    mq:
+        enabled: false
+        exchange: solo.direct
+        queue:
+            stt-response: solo.stt.response
+            feedback-response: solo.feedback.response
+        routing:
+            stt-request: solo.stt.request
+            feedback-request: solo.feedback.request
+
 knowledge:
     batch:
         enabled: false

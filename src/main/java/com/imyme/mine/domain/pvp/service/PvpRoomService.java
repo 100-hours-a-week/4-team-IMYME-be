@@ -36,6 +36,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -394,10 +395,11 @@ public class PvpRoomService {
         String audioUrl = storageService.generatePresignedGetUrl(objectKey);
 
         SttRequestDto sttRequest = SttRequestDto.builder()
+                .requestId(UUID.randomUUID().toString())
                 .roomId(submission.getRoom().getId())
                 .userId(userId)
                 .audioUrl(audioUrl)
-                .timestamp(System.currentTimeMillis() / 1000) // Unix timestamp (초 단위)
+                .timestamp(System.currentTimeMillis())
                 .build();
 
         // 트랜잭션 커밋 후 RabbitMQ 메시지 발행
@@ -477,21 +479,25 @@ public class PvpRoomService {
     /**
      * 나가기 결과 타입
      */
-    public enum LeaveType { HOST_LEFT, GUEST_LEFT }
+    public enum LeaveType { HOST_LEFT, GUEST_LEFT, NOOP }
 
     public record LeaveResult(Long roomId, LeaveType type, PvpRoomStatus newStatus) {}
 
     /**
      * 4.10 방 나가기
+     * - 비관적 락: doRecordingTransition과 직렬화하여 레이스 컨디션 방지 (Bug 1 fix)
      */
     @Transactional
     public LeaveResult leaveRoom(Long userId, Long roomId) {
-        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId)
+        PvpRoom room = pvpRoomRepository.findByIdWithDetailsForUpdate(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // 참여자 확인
+        // WebSocket disconnect가 REST leave보다 먼저 처리된 경우 이미 방에서 제거되어 있을 수 있음 (Race condition)
+        // NOT_PARTICIPANT를 던지지 않고 NOOP으로 처리하여 idempotent하게 동작
         if (!room.isParticipant(userId)) {
-            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+            log.info("방 나가기: 이미 나간 상태 (NOOP) - roomId={}, userId={}", roomId, userId);
+            return new LeaveResult(roomId, LeaveType.NOOP, room.getStatus());
         }
 
         if (room.isHost(userId)) {

@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "10. PvP Room", description = "PvP 대결 방 API")
+@Tag(name = "11. PvP", description = "PvP 대결 방/기록 API")
 @Slf4j
 @RestController
 @RequestMapping("/pvp/rooms")
@@ -194,6 +194,12 @@ public class PvpRoomController {
 
         log.info("방 나가기: userId={}, roomId={}", principal.getId(), roomId);
         LeaveResult result = pvpRoomService.leaveRoom(principal.getId(), roomId);
+
+        // WS disconnect가 이미 처리한 경우 (Race condition) - 브로드캐스트 없이 204 반환
+        if (result.type() == LeaveType.NOOP) {
+            log.info("방 나가기 NOOP (이미 처리됨): userId={}, roomId={}", principal.getId(), roomId);
+            return;
+        }
 
         // 트랜잭션 커밋 완료 후 Redis Pub/Sub으로 브로드캐스트
         if (result.type() == LeaveType.HOST_LEFT) {

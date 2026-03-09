@@ -8,6 +8,7 @@ import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
 import com.imyme.mine.domain.knowledge.entity.KnowledgeBase;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeBaseRepository;
 import com.imyme.mine.domain.knowledge.repository.KnowledgeSearchResult;
+import com.imyme.mine.domain.knowledge.repository.KnowledgeSearchResultLight;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
 import com.imyme.mine.domain.learning.dto.KnowledgeBatchResult;
@@ -18,6 +19,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -153,33 +157,46 @@ public class KnowledgeBatchService {
         // 1. 키워드 로드
         Keyword keyword = loadKeyword(keywordId);
 
-        // 2. 피드백 로드
-        List<CardFeedback> feedbacks = loadFeedbacks(keywordId, startDate, endDate, keyword.getName());
-        resultBuilder.totalFeedbacks(feedbacks.size());
+        // 2~5. 페이지 단위 스트리밍 처리 (OOM 방지)
+        int totalFeedbacks = 0;
+        int createdCount = 0;
+        int updatedCount = 0;
+        int ignoredCount = 0;
+        int pageNumber = 0;
+        final int PAGE_SIZE = properties.getBatchSize();
 
-        if (feedbacks.isEmpty()) {
-            return resultBuilder
-                .endTime(LocalDateTime.now())
-                .successKeywords(1)
-                .build();
+        while (true) {
+            Slice<CardFeedback> slice = loadFeedbackSlice(keywordId, startDate, endDate, pageNumber, PAGE_SIZE);
+            List<CardFeedback> feedbacks = slice.getContent();
+
+            if (feedbacks.isEmpty()) {
+                break;
+            }
+
+            totalFeedbacks += feedbacks.size();
+            log.info("페이지 {} 처리 중 - 피드백 {}건", pageNumber, feedbacks.size());
+
+            // 피드백 아이템 추출 (중복 제거 및 해시 계산)
+            List<FeedbackItem> feedbackItems = extractFeedbackItems(feedbacks, keyword.getName());
+            log.info("중복 제거 후 처리 대상: {}개", feedbackItems.size());
+
+            if (!feedbackItems.isEmpty()) {
+                // 배치 생성 및 처리
+                List<List<FeedbackItem>> batches = createBatches(feedbackItems);
+                BatchProcessingResult pageResult = processBatches(batches, keyword, resultBuilder);
+                createdCount += pageResult.createdCount();
+                updatedCount += pageResult.updatedCount();
+                ignoredCount += pageResult.ignoredCount();
+            }
+
+            if (!slice.hasNext()) {
+                break;
+            }
+            pageNumber++;
         }
 
-        // 3. 피드백 아이템 추출 (중복 제거 및 해시 계산)
-        List<FeedbackItem> feedbackItems = extractFeedbackItems(feedbacks, keyword.getName());
-        log.info("중복 제거 후 처리 대상: {}개", feedbackItems.size());
-
-        if (feedbackItems.isEmpty()) {
-            return resultBuilder
-                .endTime(LocalDateTime.now())
-                .successKeywords(1)
-                .build();
-        }
-
-        // 4. 배치 생성
-        List<List<FeedbackItem>> batches = createBatches(feedbackItems);
-
-        // 5. 배치 처리 및 지식 저장
-        BatchProcessingResult processingResult = processBatches(batches, keyword, resultBuilder);
+        resultBuilder.totalFeedbacks(totalFeedbacks);
+        BatchProcessingResult processingResult = new BatchProcessingResult(createdCount, updatedCount, ignoredCount);
 
         return resultBuilder
             .endTime(LocalDateTime.now())
@@ -199,50 +216,59 @@ public class KnowledgeBatchService {
     }
 
     /**
-     * 2단계: 피드백 로드 (날짜 조건 분기 처리)
+     * 2단계: 피드백 Slice 조회 (페이지 단위, OOM 방지)
      */
-    private List<CardFeedback> loadFeedbacks(Long keywordId, LocalDateTime startDate, LocalDateTime endDate, String keywordName) {
-        List<CardFeedback> feedbacks;
+    private Slice<CardFeedback> loadFeedbackSlice(Long keywordId, LocalDateTime startDate, LocalDateTime endDate,
+                                                   int pageNumber, int pageSize) {
+        PageRequest pageable = PageRequest.of(pageNumber, pageSize);
         if (startDate != null && endDate != null) {
-            feedbacks = feedbackRepository.findByKeywordIdAndCreatedAtBetween(keywordId, startDate, endDate);
-            log.info("키워드 '{}' 기간 조회 ({} ~ {}): {}개", keywordName, startDate, endDate, feedbacks.size());
+            return feedbackRepository.findByKeywordIdAndCreatedAtBetweenSlice(keywordId, startDate, endDate, pageable);
         } else {
-            feedbacks = feedbackRepository.findByKeywordId(keywordId);
-            log.info("키워드 '{}' 전체 기간 조회: {}개", keywordName, feedbacks.size());
+            return feedbackRepository.findByKeywordIdSlice(keywordId, pageable);
         }
-        return feedbacks;
     }
 
     /**
      * 3단계: 피드백 아이템 추출 (중복 제거 및 해시 계산)
+     * - 모든 contentHash를 한 번에 조회하여 N+1 쿼리 방지
      */
     private List<FeedbackItem> extractFeedbackItems(List<CardFeedback> feedbacks, String keywordName) {
-        List<FeedbackItem> feedbackItems = new ArrayList<>();
+        // 1) 모든 피드백의 해시 계산
+        record FeedbackWithHash(CardFeedback feedback, String text, String hash) {}
+        List<FeedbackWithHash> candidates = new ArrayList<>();
 
         for (CardFeedback feedback : feedbacks) {
             try {
-                String personalizedFeedback = extractPersonalizedFeedback(feedback.getFeedbackJson());
+                String text = extractPersonalizedFeedback(feedback.getFeedbackJson());
+                log.debug("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), text);
 
-                log.debug("ID: {}, 추출된 텍스트: {}", feedback.getAttemptId(), personalizedFeedback);
-
-                if (personalizedFeedback != null && !personalizedFeedback.isBlank()) {
-                    String contentHash = calculateSHA256(personalizedFeedback);
-
-                    // 이미 존재하는 지식인지 확인 (중복 방지)
-                    if (!knowledgeRepository.existsByContentHash(contentHash)) {
-                        feedbackItems.add(new FeedbackItem(
-                            String.valueOf(feedback.getAttemptId()),
-                            keywordName,
-                            personalizedFeedback
-                        ));
-                    } else {
-                        log.debug("이미 존재하는 지식 스킵 - Hash: {}", contentHash);
-                    }
+                if (text != null && !text.isBlank()) {
+                    candidates.add(new FeedbackWithHash(feedback, text, calculateSHA256(text)));
                 } else {
                     log.warn("ID: {} - 텍스트 추출 실패 (null 또는 빈 값)", feedback.getAttemptId());
                 }
             } catch (Exception e) {
                 log.warn("피드백 추출 실패 - attemptId: {}", feedback.getAttemptId(), e);
+            }
+        }
+
+        // 2) 전체 해시를 1번 쿼리로 일괄 조회
+        Set<String> allHashes = candidates.stream()
+            .map(FeedbackWithHash::hash)
+            .collect(java.util.stream.Collectors.toSet());
+        Set<String> existingHashes = knowledgeRepository.findContentHashesByHashIn(allHashes);
+
+        // 3) 메모리에서 중복 필터링
+        List<FeedbackItem> feedbackItems = new ArrayList<>();
+        for (FeedbackWithHash c : candidates) {
+            if (existingHashes.contains(c.hash())) {
+                log.debug("이미 존재하는 지식 스킵 - Hash: {}", c.hash());
+            } else {
+                feedbackItems.add(new FeedbackItem(
+                    String.valueOf(c.feedback().getAttemptId()),
+                    keywordName,
+                    c.text()
+                ));
             }
         }
 
@@ -386,9 +412,9 @@ public class KnowledgeBatchService {
     private CandidateDecision evaluateCandidate(KnowledgeCandidate candidate, Long keywordId) {
         String embeddingVector = convertEmbeddingToString(candidate.embedding());
 
-        // 유사 지식 검색
-        List<KnowledgeSearchResult> similars = knowledgeRepository
-            .findSimilarKnowledgeByKeyword(
+        // 유사 지식 검색 (경량 버전: embedding 제외로 payload 77% 감소)
+        List<KnowledgeSearchResultLight> similars = knowledgeRepository
+            .findSimilarKnowledgeByKeywordLight(
                 embeddingVector,
                 keywordId,
                 properties.getMaxSimilarCount()
@@ -396,7 +422,7 @@ public class KnowledgeBatchService {
 
         // 유사도 임계값 필터링
         double threshold = 1.0 - properties.getSimilarityThreshold();
-        List<KnowledgeSearchResult> filteredSimilars = similars.stream()
+        List<KnowledgeSearchResultLight> filteredSimilars = similars.stream()
             .filter(s -> s.getDistance() <= threshold)
             .collect(Collectors.toList());
 
@@ -545,7 +571,7 @@ public class KnowledgeBatchService {
      */
     private KnowledgeEvaluationRequest buildEvaluationRequest(
         KnowledgeCandidate candidate,
-        List<KnowledgeSearchResult> similars
+        List<KnowledgeSearchResultLight> similars
     ) {
         // EvaluationCandidate(String text, String sourceId)
         EvaluationCandidate evalCandidate = new EvaluationCandidate(

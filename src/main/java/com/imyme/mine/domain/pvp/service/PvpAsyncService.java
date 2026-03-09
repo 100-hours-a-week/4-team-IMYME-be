@@ -70,10 +70,11 @@ public class PvpAsyncService {
 
     /**
      * THINKING 전환 DB 작업 (트랜잭션 짧게 유지)
+     * - 비관적 락: leaveRoom과 직렬화하여 낙관적 잠금 충돌 방지
      */
     @Transactional
     public void doThinkingTransition(Long roomId) {
-        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId).orElse(null);
+        PvpRoom room = pvpRoomRepository.findByIdWithDetailsForUpdate(roomId).orElse(null);
 
         if (room == null || room.getStatus() != PvpRoomStatus.MATCHED) {
             log.warn("THINKING 전환 실패: 방 상태 불일치 - roomId={}", roomId);
@@ -99,28 +100,28 @@ public class PvpAsyncService {
         final var startedAt = room.getStartedAt();
         final var thinkingEndsAt = startedAt != null ? startedAt.plusSeconds(30) : null;
 
-        // 커밋 후 Redis Pub/Sub 발행
+        // 커밋 후 Redis Pub/Sub 발행 + RECORDING 타이머 예약
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                         PvpMessage.thinkingStarted(roomId, keywordId, keywordName, startedAt, thinkingEndsAt));
+                // startedAt을 함께 전달하여 게스트 재입장 시 stale 타이머 감지 가능
+                self.scheduleRecordingTransition(roomId, startedAt);
             }
         });
-
-        // 30초 후 RECORDING 자동 전환 예약
-        self.scheduleRecordingTransition(roomId);
     }
 
     /**
      * 30초 대기 후 RECORDING 전환 위임
      * - sleep은 트랜잭션 없이 수행
+     * - thinkingStartedAt: 게스트 퇴장 후 재입장 시 stale 타이머 감지용
      */
     @Async
-    public void scheduleRecordingTransition(Long roomId) {
+    public void scheduleRecordingTransition(Long roomId, java.time.LocalDateTime thinkingStartedAt) {
         try {
             Thread.sleep(30000);
-            self.doRecordingTransition(roomId);
+            self.doRecordingTransition(roomId, thinkingStartedAt);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("RECORDING 전환 중단: roomId={}", roomId, e);
@@ -129,12 +130,13 @@ public class PvpAsyncService {
 
     /**
      * RECORDING 전환 DB 작업 (트랜잭션 짧게 유지)
-     * - 이미 RECORDING이면 아무 것도 하지 않음 (READY로 조기 전환된 경우)
-     * - ready set 삭제
+     * - 비관적 락: leaveRoom과 직렬화하여 레이스 컨디션 방지 (Bug 1 fix)
+     * - expectedStartedAt: 게스트 퇴장 후 재입장 시 stale 타이머 감지 (Bug 2 fix)
      */
     @Transactional
-    public void doRecordingTransition(Long roomId) {
-        PvpRoom room = pvpRoomRepository.findByIdWithDetails(roomId).orElse(null);
+    public void doRecordingTransition(Long roomId, java.time.LocalDateTime expectedStartedAt) {
+        // Bug 1: 비관적 락으로 leaveRoom과 직렬화
+        PvpRoom room = pvpRoomRepository.findByIdWithDetailsForUpdate(roomId).orElse(null);
 
         if (room == null) {
             log.warn("RECORDING 전환 실패: 방 없음 - roomId={}", roomId);
@@ -144,6 +146,14 @@ public class PvpAsyncService {
         // 이미 RECORDING 이상이면 스킵 (READY로 조기 전환된 경우)
         if (room.getStatus() != PvpRoomStatus.THINKING) {
             log.info("RECORDING 타이머 스킵: 이미 전환됨 - roomId={}, status={}", roomId, room.getStatus());
+            pvpReadyManager.clearReady(roomId);
+            return;
+        }
+
+        // Bug 2: 게스트 퇴장 후 새 게스트가 재입장한 경우, 이전 페이즈의 타이머는 스킵
+        if (!expectedStartedAt.equals(room.getStartedAt())) {
+            log.info("RECORDING 타이머 스킵: 다른 THINKING 페이즈 - roomId={}, expected={}, actual={}",
+                    roomId, expectedStartedAt, room.getStartedAt());
             pvpReadyManager.clearReady(roomId);
             return;
         }

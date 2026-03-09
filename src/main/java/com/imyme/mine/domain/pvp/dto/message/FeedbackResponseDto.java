@@ -20,6 +20,12 @@ import java.util.List;
 public class FeedbackResponseDto implements Serializable {
 
     /**
+     * 요청 고유 ID (pass-through)
+     */
+    @JsonProperty("request_id")
+    private String requestId;
+
+    /**
      * 방 ID
      */
     @JsonProperty("room_id")

@@ -11,6 +11,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import com.imyme.mine.domain.learning.messaging.SoloRedisSubscriber;
 import com.imyme.mine.domain.pvp.messaging.PvpRedisSubscriber;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
@@ -69,10 +70,13 @@ public class RedisConfig {
      */
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
-            RedisConnectionFactory connectionFactory, PvpRedisSubscriber pvpRedisSubscriber) {
+            RedisConnectionFactory connectionFactory,
+            PvpRedisSubscriber pvpRedisSubscriber,
+            SoloRedisSubscriber soloRedisSubscriber) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(pvpRedisSubscriber, new PatternTopic("pvp:room:*"));
+        container.addMessageListener(soloRedisSubscriber, new PatternTopic("solo:result:*"));
         return container;
     }
 

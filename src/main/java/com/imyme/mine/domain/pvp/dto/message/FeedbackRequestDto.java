@@ -20,6 +20,12 @@ import java.util.List;
 public class FeedbackRequestDto implements Serializable {
 
     /**
+     * 요청 고유 ID (중복 처리 방지)
+     */
+    @JsonProperty("request_id")
+    private String requestId;
+
+    /**
      * 방 ID
      */
     @JsonProperty("room_id")

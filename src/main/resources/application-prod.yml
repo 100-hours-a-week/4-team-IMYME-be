@@ -77,6 +77,10 @@ logging:
         # 운영에선 쿼리 로그 끄거나 에러만 봄
         org.hibernate.SQL: WARN
 
+solo:
+    mq:
+        enabled: true  # AI 서버가 MQ 경로로 전환 (HTTP /transcriptions 엔드포인트 제거됨)
+
 # (선택) 운영 환경에서 배치 작업을 켜려면 여기서 설정
 knowledge:
     batch:

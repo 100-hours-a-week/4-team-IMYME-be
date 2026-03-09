@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "07. Study Card", description = "학습 카드 생성/조회/수정/삭제 API")
+@Tag(name = "07. Card", description = "학습 카드 생성/조회/수정/삭제 API")
 @Slf4j
 @RestController
 @RequestMapping("/cards")

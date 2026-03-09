@@ -6,7 +6,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -27,6 +29,12 @@ public class RabbitMQConfig {
 
     // ===== 큐/라우팅 키 상수 =====
 
+    // DLX / DLQ
+    public static final String PVP_DLX = "be.pvp.dlx";
+    public static final String PVP_DLQ = "be.pvp.dlq";
+    public static final String SOLO_DLX = "be.solo.dlx";
+    public static final String SOLO_DLQ = "be.solo.dlq";
+
     public static final String PVP_DIRECT_EXCHANGE = "pvp.direct";
 
     // Phase 1: STT (Speech-to-Text)
@@ -41,6 +49,40 @@ public class RabbitMQConfig {
     public static final String PVP_FEEDBACK_REQUEST_ROUTING_KEY = "pvp.feedback.request";
     public static final String PVP_FEEDBACK_RESPONSE_ROUTING_KEY = "pvp.feedback.response";
 
+    // ===== PvP DLX / DLQ =====
+
+    @Bean
+    public FanoutExchange pvpDlx() {
+        return new FanoutExchange(PVP_DLX, true, false);
+    }
+
+    @Bean
+    public Queue pvpDlq() {
+        return QueueBuilder.durable(PVP_DLQ).build();
+    }
+
+    @Bean
+    public Binding pvpDlqBinding(Queue pvpDlq, FanoutExchange pvpDlx) {
+        return BindingBuilder.bind(pvpDlq).to(pvpDlx);
+    }
+
+    // ===== Solo DLX / DLQ =====
+
+    @Bean
+    public FanoutExchange soloDlx() {
+        return new FanoutExchange(SOLO_DLX, true, false);
+    }
+
+    @Bean
+    public Queue soloDlq() {
+        return QueueBuilder.durable(SOLO_DLQ).build();
+    }
+
+    @Bean
+    public Binding soloDlqBinding(Queue soloDlq, FanoutExchange soloDlx) {
+        return BindingBuilder.bind(soloDlq).to(soloDlx);
+    }
+
     // ===== Exchange / Queue / Binding (메인 서버가 Consume하는 Response 큐만 선언) =====
 
     @Bean
@@ -50,12 +92,12 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue pvpSttResponseQueue() {
-        return new Queue(PVP_STT_RESPONSE_QUEUE, true, false, false);
+        return QueueBuilder.durable(PVP_STT_RESPONSE_QUEUE).build();
     }
 
     @Bean
     public Queue pvpFeedbackResponseQueue() {
-        return new Queue(PVP_FEEDBACK_RESPONSE_QUEUE, true, false, false);
+        return QueueBuilder.durable(PVP_FEEDBACK_RESPONSE_QUEUE).build();
     }
 
     @Bean
@@ -66,6 +108,37 @@ public class RabbitMQConfig {
     @Bean
     public Binding pvpFeedbackResponseBinding(Queue pvpFeedbackResponseQueue, DirectExchange pvpDirectExchange) {
         return BindingBuilder.bind(pvpFeedbackResponseQueue).to(pvpDirectExchange).with(PVP_FEEDBACK_RESPONSE_ROUTING_KEY);
+    }
+
+    // ===== Solo Exchange / Queue / Binding (Response 큐만 선언) =====
+
+    @Bean
+    public DirectExchange soloDirectExchange(SoloMqProperties soloMqProperties) {
+        return new DirectExchange(soloMqProperties.getExchange(), true, false);
+    }
+
+    @Bean
+    public Queue soloSttResponseQueue(SoloMqProperties soloMqProperties) {
+        return QueueBuilder.durable(soloMqProperties.getQueue().getSttResponse()).build();
+    }
+
+    @Bean
+    public Queue soloFeedbackResponseQueue(SoloMqProperties soloMqProperties) {
+        return QueueBuilder.durable(soloMqProperties.getQueue().getFeedbackResponse()).build();
+    }
+
+    @Bean
+    public Binding soloSttResponseBinding(Queue soloSttResponseQueue, DirectExchange soloDirectExchange,
+                                           SoloMqProperties soloMqProperties) {
+        return BindingBuilder.bind(soloSttResponseQueue).to(soloDirectExchange)
+            .with(soloMqProperties.getQueue().getSttResponse());
+    }
+
+    @Bean
+    public Binding soloFeedbackResponseBinding(Queue soloFeedbackResponseQueue, DirectExchange soloDirectExchange,
+                                                SoloMqProperties soloMqProperties) {
+        return BindingBuilder.bind(soloFeedbackResponseQueue).to(soloDirectExchange)
+            .with(soloMqProperties.getQueue().getFeedbackResponse());
     }
 
     // ===== Message Converter =====

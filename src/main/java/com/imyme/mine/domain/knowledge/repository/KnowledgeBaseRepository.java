@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 지식 베이스 리포지토리
@@ -17,6 +18,10 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
 
     // 콘텐츠 해시 존재 여부 확인
     boolean existsByContentHash(String contentHash);
+
+    // 여러 콘텐츠 해시 일괄 조회 (N+1 방지용)
+    @Query("SELECT kb.contentHash FROM KnowledgeBase kb WHERE kb.contentHash IN :hashes")
+    Set<String> findContentHashesByHashIn(@Param("hashes") Set<String> hashes);
 
     // 콘텐츠 해시로 지식 조회
     Optional<KnowledgeBase> findByContentHash(String contentHash);
@@ -124,6 +129,30 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
         LIMIT :limit
         """, nativeQuery = true)
     List<KnowledgeSearchResult> findSimilarKnowledgeByKeyword(
+        @Param("queryEmbedding") String queryEmbedding,
+        @Param("keywordId") Long keywordId,
+        @Param("limit") int limit
+    );
+
+    /**
+     * 키워드별 벡터 유사도 검색 - 경량 버전 (embedding 제외)
+     * - evaluateCandidate()에서 embedding 미사용 → SELECT에서 제거
+     * - 결과 25건 기준 전송 payload 132KB → 29KB (77% 감소)
+     */
+    @Query(value = """
+        SELECT kb.id          AS id,
+               kb.keyword_id  AS keywordId,
+               kb.content     AS content,
+               kb.content_hash AS contentHash,
+               (kb.embedding <=> CAST(:queryEmbedding AS vector)) AS distance
+        FROM knowledge_base kb
+        WHERE kb.is_active = true
+          AND kb.embedding IS NOT NULL
+          AND kb.keyword_id = :keywordId
+        ORDER BY distance ASC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<KnowledgeSearchResultLight> findSimilarKnowledgeByKeywordLight(
         @Param("queryEmbedding") String queryEmbedding,
         @Param("keywordId") Long keywordId,
         @Param("limit") int limit

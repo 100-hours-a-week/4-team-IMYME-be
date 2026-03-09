@@ -156,6 +156,17 @@ profile-image:
     presigned-url-expiration-minutes: 5
     get-url-expiration-hours: 1
 
+solo:
+    mq:
+        enabled: false  # true: MQ 경로, false: 기존 HTTP 폴링 경로
+        exchange: solo.direct
+        queue:
+            stt-response: solo.stt.response
+            feedback-response: solo.feedback.response
+        routing:
+            stt-request: solo.stt.request
+            feedback-request: solo.feedback.request
+
 knowledge:
     batch:
         enabled: false # 기본은 꺼둠 (Prod나 별도 Worker에서만 켜는 것을 권장)
