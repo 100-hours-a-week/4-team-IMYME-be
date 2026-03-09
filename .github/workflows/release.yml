@@ -82,6 +82,10 @@ jobs:
       # 7. 테스트 + 빌드
       - name: Build and Test
         run: ./gradlew build
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
 
       # 8. JAR artifact 업로드 (CD에서 재사용)
       - name: Upload JAR artifact

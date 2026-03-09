@@ -197,7 +197,7 @@ jobs:
           sleep 10
           ssh-keyscan -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      # 2️⃣ 아티팩트 다운로드
+    # 2️⃣ 아티팩트 다운로드
       - name: Download backend artifact
         uses: actions/download-artifact@v4
         with:
