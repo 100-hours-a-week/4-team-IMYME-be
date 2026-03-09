@@ -77,6 +77,10 @@ logging:
         org.springframework.security: INFO
         org.hibernate.SQL: WARN
 
+solo:
+    mq:
+        enabled: true  # AI 서버가 MQ 경로로 전환 (HTTP /transcriptions 엔드포인트 제거됨)
+
 # Release 환경에서 배치 작업 설정 (Prod 검증용)
 knowledge:
     batch:
