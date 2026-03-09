@@ -53,12 +53,10 @@ public class Challenge {
     @Column(name = "status", nullable = false, length = 20)
     private ChallengeStatus status;
 
-    /**
-     * 1위(명예의 전당) 달성자의 제출 ID
-     * challenge_attempts 엔티티 생성 후 ManyToOne 관계로 전환
-     */
-    @Column(name = "best_submission_id")
-    private Long bestSubmissionId;
+    /** 1위(명예의 전당) 달성자의 제출 (탈퇴 시 NULL, ON DELETE SET NULL) */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "best_submission_id")
+    private ChallengeAttempt bestSubmission;
 
     /**
      * 1~3위 랭킹 및 전체 통계 요약 (JSONB 스냅샷)
@@ -117,8 +115,8 @@ public class Challenge {
      * @param resultSummaryJson 랭킹 및 통계 JSON 스냅샷
      * @param participantCount  Redis에서 집계한 최종 참여자 수
      */
-    public void complete(Long bestSubmissionId, String resultSummaryJson, int participantCount) {
-        this.bestSubmissionId = bestSubmissionId;
+    public void complete(ChallengeAttempt bestSubmission, String resultSummaryJson, int participantCount) {
+        this.bestSubmission = bestSubmission;
         this.resultSummaryJson = resultSummaryJson;
         this.participantCount = participantCount;
         this.status = ChallengeStatus.COMPLETED;
