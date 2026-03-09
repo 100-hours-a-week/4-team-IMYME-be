@@ -14,6 +14,7 @@ spring:
         properties:
             hibernate:
                 format_sql: true  # 쿼리 예쁘게 정렬
+                generate_statistics: true  # 쿼리 수 통계 로깅 (N+1 측정용)
 
     # Dev 환경 카카오 OAuth 설정
     security:

@@ -65,6 +65,7 @@ public class SecurityConfig {
                                 "/websocket-test", // WebSocket 테스트 페이지
                                 "/test/pvp/**", // PvP WebSocket 테스트 API
                                 "/test/sse/**", // SSE 수동 테스트 API
+                                "/test/perf/**", // perf 프로파일 부하 테스트 Bootstrap API
                                 "/error",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -73,6 +74,7 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/actuator/health",      // 헬스체크 (화이트리스트)
                                 "/actuator/prometheus",  // Prometheus 메트릭 (화이트리스트)
+                                "/actuator/metrics/**",  // JVM 메트릭 (로컬 부하 테스트용)
                                 "/cards/*/attempts/*/stream" // SSE 스트림 (토큰 인증, JWT 미사용)
                         ).permitAll()
                         .anyRequest().authenticated())

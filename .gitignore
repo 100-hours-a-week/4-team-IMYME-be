@@ -98,3 +98,4 @@ README-*.md
 /monitoring/k6-scripts/summary-after-sse.json
 summary-before-sse.json
 summary-after-sse.json
+perf/data/

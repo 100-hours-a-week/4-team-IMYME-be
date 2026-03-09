@@ -1,0 +1,2 @@
+sentry:
+  release: ${SENTRY_RELEASE:local-perf}
