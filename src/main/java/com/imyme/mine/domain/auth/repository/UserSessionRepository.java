@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -46,4 +48,10 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     // 사용자의 활성 세션 존재 여부 확인 (로그아웃 여부 체크용)
     @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM UserSession s WHERE s.user.id = :userId")
     boolean existsByUserId(@Param("userId") Long userId);
+
+    // 만료된 세션 일괄 삭제 (배치용)
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM UserSession s WHERE s.expiresAt < :now")
+    int deleteExpiredSessions(@Param("now") LocalDateTime now);
 }
