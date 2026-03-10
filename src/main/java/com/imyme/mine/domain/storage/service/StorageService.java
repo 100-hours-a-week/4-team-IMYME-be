@@ -13,6 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.Delete;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -21,6 +26,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -29,6 +35,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StorageService {
 
+    private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
     private final CardAttemptRepository cardAttemptRepository;
@@ -129,6 +136,61 @@ public class StorageService {
             case "audio/webm" -> "webm";
             default -> throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
         };
+    }
+
+    /**
+     * S3 오브젝트 단건 삭제 (배치용)
+     *
+     * <p>S3 DeleteObject는 존재하지 않는 키에 대해서도 200을 반환하므로 별도 존재 확인 불필요.
+     *
+     * @param objectKey 삭제할 S3 오브젝트 키
+     */
+    public void deleteObject(String objectKey) {
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+            .bucket(s3Properties.getBucket())
+            .key(objectKey)
+            .build();
+
+        s3Client.deleteObject(request);
+        log.info("S3 오브젝트 삭제 완료 - key: {}", objectKey);
+    }
+
+    /**
+     * S3 오브젝트 복수 삭제 (배치용, 최대 1000개)
+     *
+     * <p>S3 DeleteObjects API를 사용하여 한 번의 요청으로 최대 1000개 삭제.
+     * 호출자는 1000개 초과 시 청크를 나눠 여러 번 호출해야 한다.
+     *
+     * @param objectKeys 삭제할 S3 오브젝트 키 목록 (최대 1000개)
+     * @return 삭제 실패한 키 목록 (성공 시 빈 리스트)
+     */
+    public List<String> deleteObjects(List<String> objectKeys) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
+            return List.of();
+        }
+
+        List<ObjectIdentifier> identifiers = objectKeys.stream()
+            .map(key -> ObjectIdentifier.builder().key(key).build())
+            .toList();
+
+        DeleteObjectsRequest request = DeleteObjectsRequest.builder()
+            .bucket(s3Properties.getBucket())
+            .delete(Delete.builder().objects(identifiers).build())
+            .build();
+
+        var response = s3Client.deleteObjects(request);
+
+        List<String> failed = response.errors().stream()
+            .map(e -> e.key())
+            .toList();
+
+        if (!failed.isEmpty()) {
+            log.warn("S3 오브젝트 삭제 실패 {}건 - keys: {}", failed.size(), failed);
+        }
+        log.info("S3 오브젝트 일괄 삭제 - 성공: {}건, 실패: {}건",
+            response.deleted().size(), failed.size());
+
+        return failed;
     }
 
     /**
