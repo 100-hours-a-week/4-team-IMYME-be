@@ -3,8 +3,10 @@ package com.imyme.mine.domain.notification.repository;
 import com.imyme.mine.domain.notification.entity.NotificationLog;
 import com.imyme.mine.domain.notification.entity.NotificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,4 +35,20 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
      * 사용자의 전송 이력 조회
      */
     List<NotificationLog> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    /**
+     * 오래된 알림 발송 로그 청크 삭제 (배치용: 90일 경과, 1000건 단위)
+     * PostgreSQL 서브쿼리로 LIMIT 적용
+     */
+    @Modifying
+    @Transactional
+    @Query(value = """
+        DELETE FROM notification_logs
+        WHERE id IN (
+            SELECT id FROM notification_logs
+            WHERE created_at < :threshold
+            LIMIT :limit
+        )
+        """, nativeQuery = true)
+    int deleteOldLogs(@Param("threshold") LocalDateTime threshold, @Param("limit") int limit);
 }
