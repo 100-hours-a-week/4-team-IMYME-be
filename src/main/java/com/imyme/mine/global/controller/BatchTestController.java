@@ -1,5 +1,6 @@
 package com.imyme.mine.global.controller;
 
+import com.imyme.mine.domain.challenge.scheduler.ChallengeScheduler;
 import com.imyme.mine.global.scheduler.RetentionScheduler;
 import com.imyme.mine.global.scheduler.ZombieCleanupScheduler;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class BatchTestController {
 
     private final RetentionScheduler retentionScheduler;
     private final ZombieCleanupScheduler zombieCleanupScheduler;
+    private final ChallengeScheduler challengeScheduler;
 
     /** 03:00 — 만료 세션 삭제 */
     @PostMapping("/retention/expired-sessions")
@@ -93,5 +95,37 @@ public class BatchTestController {
         log.info("[BatchTest] 유령 카드 Soft Delete 수동 트리거");
         zombieCleanupScheduler.softDeleteGhostCards();
         return "OK: ghost cards soft-deleted";
+    }
+
+    /** 00:05 — 내일 챌린지 생성 */
+    @PostMapping("/challenge/create-tomorrow")
+    public String triggerCreateTomorrowChallenge() {
+        log.info("[BatchTest] 내일 챌린지 생성 수동 트리거");
+        challengeScheduler.createTomorrowChallenge();
+        return "OK: tomorrow challenge created";
+    }
+
+    /** 22:00 — 챌린지 OPEN */
+    @PostMapping("/challenge/open")
+    public String triggerOpenChallenge() {
+        log.info("[BatchTest] 챌린지 OPEN 수동 트리거");
+        challengeScheduler.openChallenge();
+        return "OK: challenge opened";
+    }
+
+    /** 22:10 — 챌린지 CLOSED */
+    @PostMapping("/challenge/close")
+    public String triggerCloseChallenge() {
+        log.info("[BatchTest] 챌린지 CLOSED 수동 트리거");
+        challengeScheduler.closeChallenge();
+        return "OK: challenge closed";
+    }
+
+    /** 22:12 — 챌린지 ANALYZING + MQ 발행 */
+    @PostMapping("/challenge/start-analyzing")
+    public String triggerStartAnalyzing() {
+        log.info("[BatchTest] 챌린지 ANALYZING + MQ 발행 수동 트리거");
+        challengeScheduler.startAnalyzing();
+        return "OK: challenge analyzing started";
     }
 }

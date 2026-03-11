@@ -34,6 +34,8 @@ public class RabbitMQConfig {
     public static final String PVP_DLQ = "be.pvp.dlq";
     public static final String SOLO_DLX = "be.solo.dlx";
     public static final String SOLO_DLQ = "be.solo.dlq";
+    public static final String CHALLENGE_DLX = "be.challenge.dlx";
+    public static final String CHALLENGE_DLQ = "be.challenge.dlq";
 
     public static final String PVP_DIRECT_EXCHANGE = "pvp.direct";
 
@@ -108,6 +110,45 @@ public class RabbitMQConfig {
     @Bean
     public Binding pvpFeedbackResponseBinding(Queue pvpFeedbackResponseQueue, DirectExchange pvpDirectExchange) {
         return BindingBuilder.bind(pvpFeedbackResponseQueue).to(pvpDirectExchange).with(PVP_FEEDBACK_RESPONSE_ROUTING_KEY);
+    }
+
+    // ===== Challenge DLX / DLQ =====
+
+    @Bean
+    public FanoutExchange challengeDlx() {
+        return new FanoutExchange(CHALLENGE_DLX, true, false);
+    }
+
+    @Bean
+    public Queue challengeDlq() {
+        return QueueBuilder.durable(CHALLENGE_DLQ).build();
+    }
+
+    @Bean
+    public Binding challengeDlqBinding(Queue challengeDlq, FanoutExchange challengeDlx) {
+        return BindingBuilder.bind(challengeDlq).to(challengeDlx);
+    }
+
+    // ===== Challenge Exchange / Queue / Binding (Response 큐만 선언) =====
+
+    @Bean
+    public DirectExchange challengeDirectExchange(ChallengeMqProperties props) {
+        return new DirectExchange(props.getExchange(), true, false);
+    }
+
+    @Bean
+    public Queue challengeFeedbackResponseQueue(ChallengeMqProperties props) {
+        return QueueBuilder.durable(props.getQueue().getFeedbackResponse()).build();
+    }
+
+    @Bean
+    public Binding challengeFeedbackResponseBinding(
+            Queue challengeFeedbackResponseQueue,
+            DirectExchange challengeDirectExchange,
+            ChallengeMqProperties props) {
+        return BindingBuilder.bind(challengeFeedbackResponseQueue)
+                .to(challengeDirectExchange)
+                .with(props.getQueue().getFeedbackResponse());
     }
 
     // ===== Solo Exchange / Queue / Binding (Response 큐만 선언) =====

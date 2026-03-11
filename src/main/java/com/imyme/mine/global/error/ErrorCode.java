@@ -91,6 +91,7 @@ public enum ErrorCode {
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 제한 시간이 초과되었습니다."),
     ROOM_EXPIRED(HttpStatus.GONE, "방이 만료되었습니다."),
     CHALLENGE_ENDED(HttpStatus.GONE, "종료된 챌린지입니다."),
+    CHALLENGE_NOT_OPEN(HttpStatus.FORBIDDEN, "아직 시작되지 않은 챌린지입니다."),
 
     // ========== Rate Limit (429) ==========
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수 제한을 초과했습니다. 잠시 후 다시 시도해주세요."),

@@ -167,6 +167,14 @@ solo:
             stt-request: solo.stt.request
             feedback-request: solo.feedback.request
 
+challenge:
+    mq:
+        exchange: challenge.direct
+        queue:
+            feedback-response: challenge.feedback.response
+        routing:
+            feedback-request: challenge.feedback.request
+
 knowledge:
     batch:
         enabled: false # 기본은 꺼둠 (Prod나 별도 Worker에서만 켜는 것을 권장)
