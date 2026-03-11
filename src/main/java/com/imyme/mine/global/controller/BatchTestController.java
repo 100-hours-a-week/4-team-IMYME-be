@@ -1,6 +1,7 @@
 package com.imyme.mine.global.controller;
 
 import com.imyme.mine.global.scheduler.RetentionScheduler;
+import com.imyme.mine.global.scheduler.ZombieCleanupScheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BatchTestController {
 
     private final RetentionScheduler retentionScheduler;
+    private final ZombieCleanupScheduler zombieCleanupScheduler;
 
     /** 03:00 — 만료 세션 삭제 */
     @PostMapping("/retention/expired-sessions")
@@ -67,5 +69,29 @@ public class BatchTestController {
         log.info("[BatchTest] 알림 발송 로그 삭제 수동 트리거");
         retentionScheduler.deleteOldNotificationLogs();
         return "OK: old notification logs deleted";
+    }
+
+    /** 매 30분 — 유령 PvP 방 EXPIRED 처리 */
+    @PostMapping("/zombie/ghost-rooms")
+    public String triggerGhostRooms() {
+        log.info("[BatchTest] 유령 PvP 방 EXPIRED 처리 수동 트리거");
+        zombieCleanupScheduler.expireGhostRooms();
+        return "OK: ghost rooms expired";
+    }
+
+    /** 매시간 — PvP PENDING 제출 삭제 */
+    @PostMapping("/zombie/stale-submissions")
+    public String triggerStaleSubmissions() {
+        log.info("[BatchTest] PvP PENDING 제출 삭제 수동 트리거");
+        zombieCleanupScheduler.deleteStalePendingSubmissions();
+        return "OK: stale submissions deleted";
+    }
+
+    /** 04:10 — 유령 카드 Soft Delete */
+    @PostMapping("/zombie/ghost-cards")
+    public String triggerGhostCards() {
+        log.info("[BatchTest] 유령 카드 Soft Delete 수동 트리거");
+        zombieCleanupScheduler.softDeleteGhostCards();
+        return "OK: ghost cards soft-deleted";
     }
 }
