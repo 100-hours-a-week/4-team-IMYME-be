@@ -167,6 +167,13 @@ public class PvpRoom {
     }
 
     /**
+     * 유령 방 만료 처리 (배치 전용)
+     */
+    public void expire() {
+        this.status = PvpRoomStatus.EXPIRED;
+    }
+
+    /**
      * 호스트인지 확인
      */
     public boolean isHost(Long userId) {

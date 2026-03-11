@@ -3,9 +3,12 @@ package com.imyme.mine.domain.pvp.repository;
 import com.imyme.mine.domain.pvp.entity.PvpSubmission;
 import com.imyme.mine.domain.pvp.entity.PvpSubmissionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,4 +51,16 @@ public interface PvpSubmissionRepository extends JpaRepository<PvpSubmission, Lo
      * 중복 제출 확인 (UNIQUE 제약 체크용)
      */
     boolean existsByRoomIdAndUserId(Long roomId, Long userId);
+
+    /**
+     * PENDING 상태 지연 제출 Hard Delete (배치용: 1시간 초과)
+     * PENDING 상태는 audio_url 미발급 → S3 삭제 불필요
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM PvpSubmission s WHERE s.status = :status AND s.createdAt < :threshold")
+    int deleteStaleSubmissions(
+            @Param("status") PvpSubmissionStatus status,
+            @Param("threshold") LocalDateTime threshold
+    );
 }
