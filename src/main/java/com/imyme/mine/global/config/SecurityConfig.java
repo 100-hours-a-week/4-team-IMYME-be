@@ -75,6 +75,7 @@ public class SecurityConfig {
                                 "/actuator/prometheus",  // Prometheus 메트릭 (화이트리스트)
                                 "/cards/*/attempts/*/stream" // SSE 스트림 (토큰 인증, JWT 미사용)
                         ).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
 
                 // 6. 필터 추가
