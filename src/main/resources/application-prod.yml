@@ -68,6 +68,13 @@ spring:
                     max-attempts: 3
                     multiplier: 2.0
                     max-interval: 10000ms
+    # k8s 관련된 설정 추가
+    lifecycle:
+        timeout-per-shutdown-phase: 30s
+
+# k8s 관련된 설정 추가
+server:
+    shutdown: graceful
 
 logging:
     level:
