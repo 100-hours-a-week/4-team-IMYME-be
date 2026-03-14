@@ -91,6 +91,7 @@ public enum ErrorCode {
     // ========== 챌린지 상태 (400, 410) ==========
     CHALLENGE_NOT_STARTED(HttpStatus.BAD_REQUEST, "챌린지가 아직 시작되지 않았습니다."),
     CHALLENGE_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "결과가 아직 발표되지 않았습니다."),
+    UPLOAD_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "S3 업로드가 완료되지 않았습니다."),
 
     // ========== 타임아웃/만료 (410) ==========
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 제한 시간이 초과되었습니다."),

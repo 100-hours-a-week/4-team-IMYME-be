@@ -17,7 +17,9 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -49,8 +51,16 @@ public class StorageService {
         "audio/webm"
     );
 
+    private static final Set<String> CHALLENGE_ALLOWED_CONTENT_TYPES = Set.of(
+        "audio/webm",
+        "audio/mp4",
+        "audio/m4a"
+    );
+
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    private static final long CHALLENGE_MAX_FILE_SIZE = 10 * 1024 * 1024; // 챌린지 10MB
     private static final int PVP_URL_EXPIRATION_MINUTES = 5; // 5분
+    private static final int CHALLENGE_URL_EXPIRATION_MINUTES = 5; // 5분
 
     @Transactional
     public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
@@ -235,6 +245,66 @@ public class StorageService {
             objectKey,
             presignedExpiresAt
         );
+    }
+
+    /**
+     * 챌린지 녹음 제출용 Presigned PUT URL 발급
+     * - 챌린지 전용 10MB 제한, webm/mp4 허용
+     *
+     * @return [objectKey, uploadUrl] — objectKey는 attempt에 저장, uploadUrl은 클라이언트에 전달
+     */
+    public String[] generateChallengePresignedUrl(
+            Long userId, Long challengeId, Long attemptId, String contentType, Long fileSize) {
+
+        if (fileSize > CHALLENGE_MAX_FILE_SIZE) {
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
+        }
+
+        String raw = contentType == null ? null : contentType.split(";")[0].trim().toLowerCase();
+        if (raw == null || !CHALLENGE_ALLOWED_CONTENT_TYPES.contains(raw)) {
+            throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        }
+        // audio/m4a → audio/mp4 alias
+        final String normalized = "audio/m4a".equals(raw) ? "audio/mp4" : raw;
+
+        String extension = getExtensionFromContentType(normalized);
+        String objectKey = String.format("challenges/%d/%d/%d_%s.%s",
+                userId, challengeId, attemptId, UUID.randomUUID(), extension);
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(CHALLENGE_URL_EXPIRATION_MINUTES))
+                .putObjectRequest(builder -> builder
+                        .bucket(s3Properties.getBucket())
+                        .key(objectKey)
+                        .contentType(normalized)
+                )
+                .build();
+
+        String uploadUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        log.info("챌린지 Presigned URL 생성 - attemptId={}, objectKey={}", attemptId, objectKey);
+        return new String[]{objectKey, uploadUrl};
+    }
+
+    /**
+     * S3 오브젝트 존재 여부 확인 (upload-complete 검증용)
+     * - NoSuchKeyException: 객체 없음 (404)
+     * - S3Exception 404/403: 접근 불가 또는 존재하지 않음 → false 처리
+     * - 그 외 예외: 인프라 이상으로 상위로 전파
+     */
+    public boolean doesObjectExist(String objectKey) {
+        try {
+            s3Client.headObject(builder -> builder.bucket(s3Properties.getBucket()).key(objectKey));
+            return true;
+        } catch (NoSuchKeyException e) {
+            return false;
+        } catch (S3Exception e) {
+            int status = e.statusCode();
+            if (status == 404 || status == 403) {
+                log.warn("S3 오브젝트 접근 불가 - key={}, status={}", objectKey, status);
+                return false;
+            }
+            throw e;
+        }
     }
 
     /**

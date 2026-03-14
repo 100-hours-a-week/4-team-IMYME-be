@@ -8,6 +8,7 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.config.ChallengeMqProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class ChallengeScheduler {
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final KeywordRepository keywordRepository;
+    private final StorageService storageService;
     private final RabbitTemplate rabbitTemplate;
     private final ChallengeMqProperties mqProperties;
 
@@ -158,13 +160,18 @@ public class ChallengeScheduler {
                                     );
 
                             for (ChallengeAttempt attempt : attempts) {
+                                // DB에는 audioKey(S3 object key)를 저장하지만,
+                                // AI 서버는 직접 다운로드 가능한 URL을 필요로 하므로
+                                // MQ payload의 "audioUrl" 키에는 presigned GET URL을 담는다.
+                                // Branch 3: payload["audioUrl"] = presigned GET URL (1시간 유효)
+                                String audioUrl = storageService.generatePresignedGetUrl(attempt.getAudioKey());
                                 rabbitTemplate.convertAndSend(
                                         mqProperties.getExchange(),
                                         mqProperties.getRouting().getFeedbackRequest(),
                                         Map.of(
                                                 "attemptId", attempt.getId(),
                                                 "challengeId", challenge.getId(),
-                                                "audioUrl", attempt.getAudioUrl()
+                                                "audioUrl", audioUrl
                                         )
                                 );
                             }

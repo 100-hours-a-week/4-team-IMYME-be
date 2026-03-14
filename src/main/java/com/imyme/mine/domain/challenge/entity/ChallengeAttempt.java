@@ -46,11 +46,15 @@ public class ChallengeAttempt {
     @JoinColumn(name = "user_id")
     private User user;
 
-    /** 녹음 파일 S3 URL */
-    @Column(name = "audio_url", length = 500)
-    private String audioUrl;
+    /** 녹음 파일 S3 Object Key */
+    @Column(name = "audio_key", length = 500)
+    private String audioKey;
 
-    /** STT 변환 텍스트 */
+    /** 녹음 길이 (초) — upload-complete 시 클라이언트가 전달 */
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
+
+    /** STT 변환 텍스트 — Branch 3 배치에서 채움 */
     @Column(name = "stt_text", columnDefinition = "TEXT")
     private String sttText;
 
@@ -76,11 +80,32 @@ public class ChallengeAttempt {
             createdAt = LocalDateTime.now();
         }
         if (status == null) {
-            status = ChallengeAttemptStatus.UPLOADED;
+            status = ChallengeAttemptStatus.PENDING;
         }
     }
 
     // ===== 비즈니스 메서드 =====
+
+    /**
+     * PENDING 재사용: 새 object key 재발급 시 이전 업로드 무효화
+     */
+    public void refreshUploadReservation(String audioKey) {
+        this.audioKey = audioKey;
+        this.submittedAt = null;
+        this.durationSeconds = null;
+        this.sttText = null;
+        this.status = ChallengeAttemptStatus.PENDING;
+    }
+
+    /**
+     * 업로드 완료 확정: PENDING → UPLOADED
+     */
+    public void markUploadCompleted(String audioKey, Integer durationSeconds) {
+        this.audioKey = audioKey;
+        this.durationSeconds = durationSeconds;
+        this.submittedAt = LocalDateTime.now();
+        this.status = ChallengeAttemptStatus.UPLOADED;
+    }
 
     /** AI 워커가 작업을 꺼내갔을 때 (중복 처리 방지) */
     public void startProcessing() {
@@ -98,11 +123,5 @@ public class ChallengeAttempt {
     public void fail() {
         this.status = ChallengeAttemptStatus.FAILED;
         this.finishedAt = LocalDateTime.now();
-    }
-
-    /** 파일 업로드 완료 및 제출 시각 기록 */
-    public void markSubmitted(String audioUrl) {
-        this.audioUrl = audioUrl;
-        this.submittedAt = LocalDateTime.now();
     }
 }
