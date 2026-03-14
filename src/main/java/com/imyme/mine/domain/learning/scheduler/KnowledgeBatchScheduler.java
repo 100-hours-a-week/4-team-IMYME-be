@@ -2,7 +2,6 @@ package com.imyme.mine.domain.learning.scheduler;
 
 import com.imyme.mine.domain.learning.dto.KnowledgeBatchResult;
 import com.imyme.mine.domain.learning.service.KnowledgeBatchService;
-import com.imyme.mine.global.config.KnowledgeProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,12 +20,11 @@ import org.springframework.stereotype.Component;
     prefix = "knowledge.batch",
     name = "enabled",
     havingValue = "true",
-    matchIfMissing = true  // 설정이 없으면 기본적으로 활성화
+    matchIfMissing = false  // 설정이 없으면 스케줄러 비활성화
 )
 public class KnowledgeBatchScheduler {
 
     private final KnowledgeBatchService batchService;
-    private final KnowledgeProperties properties;
 
     /**
      * 매일 자정 Knowledge 배치 실행
@@ -35,11 +33,6 @@ public class KnowledgeBatchScheduler {
      */
     @Scheduled(cron = "0 0 0 * * *")
     public void executeDailyBatch() {
-        if (!properties.isEnabled()) {
-            log.debug("Knowledge 배치가 비활성화되어 있습니다. 실행을 건너뜁니다.");
-            return;
-        }
-
         log.info("========================================");
         log.info("Knowledge 일일 배치 스케줄러 시작");
         log.info("========================================");
