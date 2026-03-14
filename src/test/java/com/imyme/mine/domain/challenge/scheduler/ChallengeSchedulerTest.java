@@ -183,11 +183,11 @@ class ChallengeSchedulerTest {
 
         ChallengeAttempt attempt1 = mock(ChallengeAttempt.class);
         when(attempt1.getId()).thenReturn(100L);
-        when(attempt1.getAudioUrl()).thenReturn("s3://bucket/audio1.m4a");
+        when(attempt1.getAudioKey()).thenReturn("s3://bucket/audio1.m4a");
 
         ChallengeAttempt attempt2 = mock(ChallengeAttempt.class);
         when(attempt2.getId()).thenReturn(101L);
-        when(attempt2.getAudioUrl()).thenReturn("s3://bucket/audio2.m4a");
+        when(attempt2.getAudioKey()).thenReturn("s3://bucket/audio2.m4a");
 
         when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
                 .thenReturn(Optional.of(challenge));
