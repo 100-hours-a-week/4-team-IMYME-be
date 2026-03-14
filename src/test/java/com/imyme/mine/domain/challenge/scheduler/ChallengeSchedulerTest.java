@@ -8,6 +8,7 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.config.ChallengeMqProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,7 @@ class ChallengeSchedulerTest {
     @Mock ChallengeRepository challengeRepository;
     @Mock ChallengeAttemptRepository challengeAttemptRepository;
     @Mock KeywordRepository keywordRepository;
+    @Mock StorageService storageService;
     @Mock RabbitTemplate rabbitTemplate;
     @Mock ChallengeMqProperties mqProperties;
     @Mock ChallengeMqProperties.Routing routing;
@@ -183,11 +185,13 @@ class ChallengeSchedulerTest {
 
         ChallengeAttempt attempt1 = mock(ChallengeAttempt.class);
         when(attempt1.getId()).thenReturn(100L);
-        when(attempt1.getAudioKey()).thenReturn("s3://bucket/audio1.m4a");
+        when(attempt1.getAudioKey()).thenReturn("challenges/1/10/100_uuid.m4a");
 
         ChallengeAttempt attempt2 = mock(ChallengeAttempt.class);
         when(attempt2.getId()).thenReturn(101L);
-        when(attempt2.getAudioKey()).thenReturn("s3://bucket/audio2.m4a");
+        when(attempt2.getAudioKey()).thenReturn("challenges/1/10/101_uuid.m4a");
+
+        when(storageService.generatePresignedGetUrl(anyString())).thenReturn("https://presigned-url");
 
         when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
                 .thenReturn(Optional.of(challenge));
