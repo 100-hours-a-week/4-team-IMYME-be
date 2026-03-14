@@ -39,6 +39,9 @@ public interface ChallengeAttemptRepository extends JpaRepository<ChallengeAttem
 
     // ===== 스케줄러 용 =====
 
+    /** upload-complete 소유권 검증 포함 단건 조회 */
+    Optional<ChallengeAttempt> findByIdAndChallengeIdAndUserId(Long id, Long challengeId, Long userId);
+
     /** 중복 참여 확인 */
     boolean existsByChallengeIdAndUserId(Long challengeId, Long userId);
 
