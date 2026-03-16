@@ -20,7 +20,7 @@ public record CreateAttemptResponse(
         @Schema(description = "S3 업로드용 Presigned PUT URL")
         String uploadUrl,
 
-        @Schema(description = "S3 Object Key (upload-complete 요청 시 전달)", example = "challenges/1/2/3_uuid.webm")
+        @Schema(description = "S3 Object Key (upload-complete 요청 시 전달)", example = "challenges/1/2/3_uuid")
         String objectKey,
 
         @Schema(description = "URL 유효기간 (초)", example = "300")

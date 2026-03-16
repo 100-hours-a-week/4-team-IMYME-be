@@ -54,7 +54,9 @@ public class StorageService {
     private static final Set<String> CHALLENGE_ALLOWED_CONTENT_TYPES = Set.of(
         "audio/webm",
         "audio/mp4",
-        "audio/m4a"
+        "audio/m4a",
+        "audio/mpeg",
+        "audio/wav"
     );
 
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -249,34 +251,30 @@ public class StorageService {
 
     /**
      * 챌린지 녹음 제출용 Presigned PUT URL 발급
-     * - 챌린지 전용 10MB 제한, webm/mp4 허용
+     * - contentType 사전 검증 후 presigned PUT에 Content-Type 제약 포함
+     * - fileSize는 받지 않음 — upload-complete 시 HeadObject로 검증
+     * - audio/m4a alias 정규화 없음: 프론트 PUT 헤더와 일치시키기 위해 입력값 그대로 사용
+     * - 클라이언트는 S3 PUT 요청 시 createAttempt에 보낸 것과 동일한 Content-Type 헤더 필수
      *
      * @return [objectKey, uploadUrl] — objectKey는 attempt에 저장, uploadUrl은 클라이언트에 전달
      */
     public String[] generateChallengePresignedUrl(
-            Long userId, Long challengeId, Long attemptId, String contentType, Long fileSize) {
-
-        if (fileSize > CHALLENGE_MAX_FILE_SIZE) {
-            throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
-        }
+            Long userId, Long challengeId, Long attemptId, String contentType) {
 
         String raw = contentType == null ? null : contentType.split(";")[0].trim().toLowerCase();
         if (raw == null || !CHALLENGE_ALLOWED_CONTENT_TYPES.contains(raw)) {
             throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
         }
-        // audio/m4a → audio/mp4 alias
-        final String normalized = "audio/m4a".equals(raw) ? "audio/mp4" : raw;
 
-        String extension = getExtensionFromContentType(normalized);
-        String objectKey = String.format("challenges/%d/%d/%d_%s.%s",
-                userId, challengeId, attemptId, UUID.randomUUID(), extension);
+        String objectKey = String.format("challenges/%d/%d/%d_%s",
+                userId, challengeId, attemptId, UUID.randomUUID());
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(CHALLENGE_URL_EXPIRATION_MINUTES))
                 .putObjectRequest(builder -> builder
                         .bucket(s3Properties.getBucket())
                         .key(objectKey)
-                        .contentType(normalized)
+                        .contentType(raw)
                 )
                 .build();
 
@@ -286,24 +284,69 @@ public class StorageService {
     }
 
     /**
-     * S3 오브젝트 존재 여부 확인 (upload-complete 검증용)
-     * - NoSuchKeyException: 객체 없음 (404)
-     * - S3Exception 404/403: 접근 불가 또는 존재하지 않음 → false 처리
-     * - 그 외 예외: 인프라 이상으로 상위로 전파
+     * 챌린지 PENDING 재발급 — 기존 objectKey 재사용
+     * - 새 UUID 없이 동일 key로 presigned URL만 재발급 → orphan 파일 방지
+     * - contentType 사전 검증 수행 (신규 발급과 동일 정책)
+     *
+     * @return uploadUrl — 클라이언트에 전달할 새 presigned PUT URL
      */
-    public boolean doesObjectExist(String objectKey) {
+    public String reissueChallengePresignedUrl(String objectKey, String contentType) {
+        String raw = contentType == null ? null : contentType.split(";")[0].trim().toLowerCase();
+        if (raw == null || !CHALLENGE_ALLOWED_CONTENT_TYPES.contains(raw)) {
+            throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        }
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(CHALLENGE_URL_EXPIRATION_MINUTES))
+                .putObjectRequest(builder -> builder
+                        .bucket(s3Properties.getBucket())
+                        .key(objectKey)
+                        .contentType(raw)
+                )
+                .build();
+
+        String uploadUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        log.info("챌린지 Presigned URL 재발급 - objectKey={}", objectKey);
+        return uploadUrl;
+    }
+
+    /**
+     * 챌린지 upload-complete 시 S3 HeadObject로 실제 파일 메타데이터 검증
+     * - 객체 없음 → UPLOAD_NOT_COMPLETED
+     * - 허용되지 않은 content-type → 즉시 deleteObject 후 INVALID_CONTENT_TYPE
+     * - 10MB 초과 → 즉시 deleteObject 후 FILE_TOO_LARGE
+     */
+    public void validateChallengeObjectMetadata(String objectKey) {
+        software.amazon.awssdk.services.s3.model.HeadObjectResponse head;
         try {
-            s3Client.headObject(builder -> builder.bucket(s3Properties.getBucket()).key(objectKey));
-            return true;
+            head = s3Client.headObject(builder -> builder.bucket(s3Properties.getBucket()).key(objectKey));
         } catch (NoSuchKeyException e) {
-            return false;
+            throw new BusinessException(ErrorCode.UPLOAD_NOT_COMPLETED);
         } catch (S3Exception e) {
-            int status = e.statusCode();
-            if (status == 404 || status == 403) {
-                log.warn("S3 오브젝트 접근 불가 - key={}, status={}", objectKey, status);
-                return false;
+            if (e.statusCode() == 404 || e.statusCode() == 403) {
+                throw new BusinessException(ErrorCode.UPLOAD_NOT_COMPLETED);
             }
             throw e;
+        }
+
+        String raw = head.contentType() == null ? null
+                : head.contentType().split(";")[0].trim().toLowerCase();
+        if (raw == null || !CHALLENGE_ALLOWED_CONTENT_TYPES.contains(raw)) {
+            deleteObjectQuietly(objectKey);
+            throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        }
+
+        if (head.contentLength() > CHALLENGE_MAX_FILE_SIZE) {
+            deleteObjectQuietly(objectKey);
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
+        }
+    }
+
+    private void deleteObjectQuietly(String objectKey) {
+        try {
+            deleteObject(objectKey);
+        } catch (Exception e) {
+            log.warn("[Challenge] 무효 파일 삭제 실패 - objectKey={}, error={}", objectKey, e.getMessage());
         }
     }
 
