@@ -70,13 +70,20 @@ public class ChallengeAttemptService {
             if (attempt.getStatus() != ChallengeAttemptStatus.PENDING) {
                 throw new BusinessException(ErrorCode.ALREADY_PARTICIPATED);
             }
-            // PENDING 재사용: 새 objectKey를 발급하고 이전 업로드(audioKey)를 무효화한다.
-            // 클라이언트가 URL만 재발급받길 원해도 이전 S3 업로드 파일은 더 이상 사용되지 않는다.
-            String[] ticket = storageService.generateChallengePresignedUrl(
-                    userId, challengeId, attempt.getId(), request.contentType(), request.fileSize());
-            attempt.refreshUploadReservation(ticket[0]);
+            // PENDING 재사용: 기존 objectKey 재사용 → orphan 파일 방지
+            // audioKey가 이미 있으면 동일 key로 presigned URL만 재발급, 없으면 신규 생성
+            String uploadUrl;
+            if (attempt.getAudioKey() != null) {
+                uploadUrl = storageService.reissueChallengePresignedUrl(
+                        attempt.getAudioKey(), request.contentType());
+            } else {
+                String[] ticket = storageService.generateChallengePresignedUrl(
+                        userId, challengeId, attempt.getId(), request.contentType());
+                attempt.refreshUploadReservation(ticket[0]);
+                uploadUrl = ticket[1];
+            }
 
-            return Map.entry(buildCreateAttemptResponse(attempt, challengeId, ticket[1]), false);
+            return Map.entry(buildCreateAttemptResponse(attempt, challengeId, uploadUrl), false);
         }
 
         // 신규 생성
@@ -88,7 +95,7 @@ public class ChallengeAttemptService {
         challengeAttemptRepository.save(attempt);
 
         String[] ticket = storageService.generateChallengePresignedUrl(
-                userId, challengeId, attempt.getId(), request.contentType(), request.fileSize());
+                userId, challengeId, attempt.getId(), request.contentType());
         attempt.refreshUploadReservation(ticket[0]);
 
         log.info("[Challenge] 참여 시작 - challengeId={}, userId={}, attemptId={}",
@@ -122,9 +129,7 @@ public class ChallengeAttemptService {
             throw new BusinessException(ErrorCode.INVALID_OBJECT_KEY);
         }
 
-        if (!storageService.doesObjectExist(request.objectKey())) {
-            throw new BusinessException(ErrorCode.UPLOAD_NOT_COMPLETED);
-        }
+        storageService.validateChallengeObjectMetadata(request.objectKey());
 
         attempt.markUploadCompleted(request.objectKey(), request.durationSeconds());
 

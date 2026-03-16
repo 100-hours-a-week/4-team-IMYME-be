@@ -154,8 +154,10 @@ public class ChallengeController {
     @Operation(
             summary = "챌린지 참여 시작",
             description = "챌린지에 참여를 시작하고 S3 업로드용 Presigned URL을 발급합니다. "
+                    + "요청 바디에 contentType만 포함합니다 (fileSize는 녹음 전 알 수 없으므로 upload-complete 시 검증). "
                     + "PENDING 상태의 기존 참여가 있으면 새 URL을 재발급합니다 (200). "
-                    + "신규 참여면 201을 반환합니다.",
+                    + "신규 참여면 201을 반환합니다. "
+                    + "클라이언트는 S3 PUT 업로드 시 createAttempt에 보낸 것과 동일한 Content-Type 헤더를 포함해야 합니다.",
             security = @SecurityRequirement(name = "JWT")
     )
     @ApiResponses({
@@ -169,7 +171,7 @@ public class ChallengeController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "챌린지 미시작 - CHALLENGE_NOT_STARTED",
+                    description = "챌린지 미시작(CHALLENGE_NOT_STARTED) / 허용되지 않는 파일 형식(INVALID_CONTENT_TYPE)",
                     content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -214,7 +216,9 @@ public class ChallengeController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "S3 업로드 미완료(UPLOAD_NOT_COMPLETED) / 챌린지 미시작(CHALLENGE_NOT_STARTED) / 잘못된 Object Key(INVALID_OBJECT_KEY)",
+                    description = "S3 업로드 미완료(UPLOAD_NOT_COMPLETED) / 챌린지 미시작(CHALLENGE_NOT_STARTED) / "
+                            + "잘못된 Object Key(INVALID_OBJECT_KEY) / "
+                            + "허용되지 않은 파일 형식(INVALID_CONTENT_TYPE) / 파일 크기 초과(FILE_TOO_LARGE)",
                     content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
