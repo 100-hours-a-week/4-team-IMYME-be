@@ -6,8 +6,8 @@
     <springProfile name="local,default,dev">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <!-- 단순하고 명확한 로그 패턴 (컬러 없이) -->
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%5p] [%15.15t] %-40.40logger{39} : %m%n%ex{full}</pattern>
+                <!-- 로컬/개발 환경에서 읽기 쉬운 텍스트 로그 -->
+                <pattern>%d{HH:mm:ss.SSS} [%5p] [%20.20t] %-36.36logger{36} - %m%n%ex{10}</pattern>
                 <charset>UTF-8</charset>
             </encoder>
         </appender>
@@ -30,8 +30,8 @@
 
         <!-- 개발할 때 유용한 로거들 -->
         <logger name="com.imyme.mine" level="DEBUG"/>
-        <logger name="org.springframework.security" level="DEBUG"/>
-        <logger name="org.springframework.web" level="DEBUG"/>
+        <logger name="org.springframework.security" level="INFO"/>
+        <logger name="org.springframework.web" level="INFO"/>
 <!--        <logger name="org.hibernate.SQL" level="DEBUG"/>-->
 <!--        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>-->
 <!--        <logger name="org.springframework.transaction" level="DEBUG"/>-->

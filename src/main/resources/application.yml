@@ -231,7 +231,7 @@ sentry:
     environment: local
     traces-sample-rate: 1.0  # 테스트용 100% 샘플링
     send-default-pii: false
-    debug: true  # 디버그 로그 활성화
+    debug: false
     logging:
         minimum-event-level: error
         minimum-breadcrumb-level: info

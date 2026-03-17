@@ -61,3 +61,8 @@ logging:
         com.imyme.mine: DEBUG
         org.flywaydb: INFO
         org.springframework.amqp: DEBUG  # RabbitMQ 디버깅
+
+sentry:
+    environment: dev
+    debug: false
+    traces-sample-rate: 1.0
