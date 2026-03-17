@@ -234,6 +234,9 @@ management:
 # ==================================================
 # Sentry (에러 추적 & 성능 모니터링)
 # ==================================================
+firebase:
+    service-account-key: ${FIREBASE_SERVICE_ACCOUNT_KEY:}
+
 sentry:
     dsn: ${SENTRY_DSN}
     environment: local
