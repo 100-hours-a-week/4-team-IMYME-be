@@ -26,6 +26,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.category.id = :categoryId
             AND r.status = :status
             ORDER BY r.createdAt DESC, r.id DESC
@@ -41,6 +44,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.category.id = :categoryId
             AND r.status = :status
             AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
@@ -59,6 +65,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.status = :status
             ORDER BY r.createdAt DESC, r.id DESC
             """)
@@ -72,6 +81,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.status = :status
             AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
             ORDER BY r.createdAt DESC, r.id DESC
