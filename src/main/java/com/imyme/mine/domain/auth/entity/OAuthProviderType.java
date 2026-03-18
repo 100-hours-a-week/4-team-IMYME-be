@@ -11,8 +11,7 @@ import lombok.RequiredArgsConstructor;
 public enum OAuthProviderType {
     KAKAO("kakao", "카카오"),
     GOOGLE("google", "구글"),
-    APPLE("apple", "애플"),
-    E2E_TEST("e2e_test", "E2E 테스트");
+    APPLE("apple", "애플");
 
     private final String code;
     private final String displayName;
