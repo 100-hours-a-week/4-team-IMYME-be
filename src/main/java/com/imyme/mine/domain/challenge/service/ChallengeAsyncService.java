@@ -43,6 +43,7 @@ public class ChallengeAsyncService {
     private final ChallengeResultRepository challengeResultRepository;
     private final NotificationCreatorService notificationCreatorService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final RankingInitService rankingInitService;
 
     /**
      * AI 채점 응답 처리
@@ -131,9 +132,8 @@ public class ChallengeAsyncService {
                         challengeId, remaining);
 
                 if (remaining != null && remaining <= 0) {
-                    log.info("[Challenge MQ] 모든 채점 완료 → 랭킹 확정 단계 시작: challengeId={}",
-                            challengeId);
-                    // TODO: rankingInitService.initRanking(challengeId) — commit 3에서 연결
+                    log.info("[Challenge MQ] 모든 채점 완료 → 랭킹 초기화 시작: challengeId={}", challengeId);
+                    rankingInitService.initRanking(challengeId);
                 }
             }
         });
