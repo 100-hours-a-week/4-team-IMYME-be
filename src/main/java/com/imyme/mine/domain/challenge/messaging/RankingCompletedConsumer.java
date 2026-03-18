@@ -142,11 +142,12 @@ public class RankingCompletedConsumer {
         String resultSummaryJson = buildSummaryJson(rankedList, userMap);
         challenge.complete(bestAttempt, resultSummaryJson, rankedList.size());
 
-        // Redis pairs:job:{id}:* 키 삭제 (pending_count는 DECR 완료 시 이미 0)
+        // Redis 정리: pairs:job:{id}:* + challenge:{id}:ranking (ZSet TTL 없음 — 명시 삭제)
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
+        stringRedisTemplate.delete("challenge:" + challengeId + ":ranking");
 
         log.info("[Ranking MQ] COMPLETED 전환 완료: challengeId={}, 참가자={}", challengeId, rankedList.size());
 
