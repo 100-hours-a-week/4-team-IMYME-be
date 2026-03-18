@@ -142,4 +142,14 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
 
     /** 내일 챌린지 존재 여부 확인 (생성 멱등성) */
     boolean existsByChallengeDate(LocalDate date);
+
+    /** 가장 최근 완료된 챌린지 조회 (keyword fetch join) */
+    @Query("""
+            SELECT c FROM Challenge c
+            JOIN FETCH c.keyword
+            WHERE c.status = com.imyme.mine.domain.challenge.entity.ChallengeStatus.COMPLETED
+            ORDER BY c.challengeDate DESC
+            LIMIT 1
+            """)
+    Optional<Challenge> findLatestCompletedWithKeyword();
 }

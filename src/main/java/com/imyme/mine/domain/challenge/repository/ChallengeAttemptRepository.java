@@ -37,6 +37,22 @@ public interface ChallengeAttemptRepository extends JpaRepository<ChallengeAttem
             @Param("userId") Long userId
     );
 
+    // ===== MQ Consumer 용 =====
+
+    /**
+     * MQ Consumer용 단건 조회 — user fetch join 포함
+     * (알림 발송을 위해 userId 필요, userId는 MQ payload에 없으므로 조인으로 확보)
+     */
+    @Query("""
+            SELECT a FROM ChallengeAttempt a
+            LEFT JOIN FETCH a.user
+            WHERE a.id = :id AND a.challenge.id = :challengeId
+            """)
+    Optional<ChallengeAttempt> findByIdAndChallengeIdWithUser(
+            @Param("id") Long id,
+            @Param("challengeId") Long challengeId
+    );
+
     // ===== 스케줄러 용 =====
 
     /** upload-complete 소유권 검증 포함 단건 조회 */

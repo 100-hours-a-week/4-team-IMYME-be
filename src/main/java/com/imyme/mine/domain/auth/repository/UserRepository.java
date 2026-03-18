@@ -30,6 +30,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.nickname FROM User u WHERE u.deletedAt IS NULL")
     List<String> findAllNicknames();
 
+    /** 챌린지 OPEN 알림 브로드캐스트용 전체 활성 유저 ID 페이지 조회 */
+    @Query(value = """
+        SELECT id FROM users
+        WHERE deleted_at IS NULL
+        ORDER BY id
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<Long> findAllActiveIdsPaged(@Param("offset") int offset, @Param("limit") int limit);
+
     // -------------------------------------------------------------------------
     // 배치용 — @SQLRestriction("deleted_at IS NULL") 우회를 위해 네이티브 쿼리 사용
     // -------------------------------------------------------------------------

@@ -169,6 +169,16 @@ public class ChallengeQueryService {
                 .build();
     }
 
+    /**
+     * 가장 최근 완료된 챌린지 랭킹 조회
+     */
+    public ChallengeRankingResponse getLatestRankings(Long userId, int page, int size) {
+        Challenge challenge = challengeRepository.findLatestCompletedWithKeyword()
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+        return getRankings(challenge.getId(), userId, page, size);
+    }
+
     // ===== 히스토리 조회 =====
 
     /**
