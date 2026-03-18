@@ -8,6 +8,8 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
 import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.config.ChallengeMqProperties;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +55,7 @@ public class ChallengeScheduler {
     private final RabbitTemplate rabbitTemplate;
     private final ChallengeMqProperties mqProperties;
     private final StringRedisTemplate stringRedisTemplate;
+    private final NotificationBroadcastService notificationBroadcastService;
 
     private static final Random RANDOM = new Random();
     private static final String REDIS_PENDING_KEY = "challenge:%d:pending_count";
@@ -104,9 +107,10 @@ public class ChallengeScheduler {
     // -------------------------------------------------------------------------
 
     /**
-     * 오늘 SCHEDULED 챌린지를 OPEN으로 전환
+     * 오늘 SCHEDULED 챌린지를 OPEN으로 전환 + 전체 유저 CHALLENGE_OPEN 알림 발송
      *
      * <p>오늘 날짜 + SCHEDULED 상태인 챌린지가 없으면 로그만 기록 후 종료.
+     * DB 커밋 후 알림을 발송하여 챌린지 상태가 확정된 이후에만 알림이 나가도록 보장.
      */
     @Scheduled(cron = "0 0 22 * * *")
     @Transactional
@@ -116,7 +120,28 @@ public class ChallengeScheduler {
                 .ifPresentOrElse(
                         challenge -> {
                             challenge.open();
-                            log.info("[Challenge] OPEN 전환 완료 - challengeId={}", challenge.getId());
+
+                            Long challengeId = challenge.getId();
+                            String keywordText = challenge.getKeywordText();
+
+                            log.info("[Challenge] OPEN 전환 완료 - challengeId={}", challengeId);
+
+                            // 커밋 후 전체 활성 유저에게 CHALLENGE_OPEN 알림 배치 발송
+                            TransactionSynchronizationManager.registerSynchronization(
+                                    new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                            notificationBroadcastService.broadcastToAllActive(
+                                                    NotificationType.CHALLENGE_OPEN,
+                                                    "오늘의 챌린지가 시작됐어요!",
+                                                    "\"" + keywordText + "\" 주제로 지금 도전해보세요.",
+                                                    challengeId,
+                                                    "CHALLENGE"
+                                            );
+                                            log.info("[Challenge] CHALLENGE_OPEN 브로드캐스트 제출 - challengeId={}", challengeId);
+                                        }
+                                    }
+                            );
                         },
                         () -> log.warn("[Challenge] OPEN 대상 챌린지 없음 - date={}", LocalDate.now())
                 );
