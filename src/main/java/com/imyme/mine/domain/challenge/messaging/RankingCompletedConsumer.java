@@ -8,9 +8,11 @@ import com.imyme.mine.domain.challenge.dto.message.ChallengeRankingCompletedDto;
 import com.imyme.mine.domain.challenge.entity.Challenge;
 import com.imyme.mine.domain.challenge.entity.ChallengeAttempt;
 import com.imyme.mine.domain.challenge.entity.ChallengeRanking;
+import com.imyme.mine.domain.challenge.entity.ChallengeResult;
 import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRankingRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
+import com.imyme.mine.domain.challenge.repository.ChallengeResultRepository;
 import com.imyme.mine.domain.notification.entity.NotificationType;
 import com.imyme.mine.domain.notification.service.NotificationCreatorService;
 import com.rabbitmq.client.Channel;
@@ -39,9 +41,11 @@ import java.util.stream.Collectors;
  * 이 Consumer는:
  * <ol>
  *   <li>ChallengeRanking Bulk INSERT (1위~N위)</li>
+ *   <li>ChallengeResult Bulk INSERT (score, feedbackJson, modelVersion)</li>
+ *   <li>ChallengeAttempt.markCompleted() 일괄 전환</li>
  *   <li>Challenge.complete() → status COMPLETED + participantCount + resultSummaryJson</li>
- *   <li>Redis pairs:job:{id}:* 키 삭제</li>
- *   <li>커밋 후 CHALLENGE_OVERALL_RESULT 알림 발송</li>
+ *   <li>Redis pairs:job:{id}:* + challenge:{id}:participants 키 삭제</li>
+ *   <li>커밋 후 CHALLENGE_PERSONAL_RESULT / CHALLENGE_OVERALL_RESULT 알림 발송</li>
  * </ol>
  */
 @Slf4j
@@ -52,6 +56,7 @@ public class RankingCompletedConsumer {
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChallengeRankingRepository challengeRankingRepository;
+    private final ChallengeResultRepository challengeResultRepository;
     private final UserRepository userRepository;
     private final NotificationCreatorService notificationCreatorService;
     private final StringRedisTemplate stringRedisTemplate;
@@ -109,20 +114,26 @@ public class RankingCompletedConsumer {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new IllegalStateException("Challenge not found: " + challengeId));
 
-        // 유저 데이터 배치 조회 (닉네임 스냅샷 + 프로필 이미지)
+        // 유저/attempt 데이터 배치 조회
         List<Long> userIds = rankedList.stream()
                 .map(ChallengeRankingCompletedDto.RankedItem::getUserId)
                 .collect(Collectors.toList());
         Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        // ChallengeRanking Bulk INSERT
+        List<Long> attemptIds = rankedList.stream()
+                .map(ChallengeRankingCompletedDto.RankedItem::getAttemptId)
+                .collect(Collectors.toList());
+        Map<Long, ChallengeAttempt> attemptMap = challengeAttemptRepository.findAllById(attemptIds).stream()
+                .collect(Collectors.toMap(ChallengeAttempt::getId, a -> a));
+
+        // ChallengeRanking + ChallengeResult Bulk INSERT, attempt COMPLETED 전환
         List<ChallengeRanking> rankings = new ArrayList<>(rankedList.size());
+        List<ChallengeResult> results = new ArrayList<>(rankedList.size());
         for (int i = 0; i < rankedList.size(); i++) {
             ChallengeRankingCompletedDto.RankedItem item = rankedList.get(i);
             User user = userMap.get(item.getUserId());
-
-            ChallengeAttempt attempt = challengeAttemptRepository.getReferenceById(item.getAttemptId());
+            ChallengeAttempt attempt = attemptMap.get(item.getAttemptId());
 
             rankings.add(ChallengeRanking.builder()
                     .challenge(challenge)
@@ -133,8 +144,19 @@ public class RankingCompletedConsumer {
                     .userNickname(user != null ? user.getNickname() : item.getNickname())
                     .userProfileImageUrl(user != null ? user.getProfileImageUrl() : null)
                     .build());
+
+            if (attempt != null) {
+                results.add(ChallengeResult.builder()
+                        .attempt(attempt)
+                        .score(item.getScore() != null ? item.getScore() : 0)
+                        .feedbackJson(item.getFeedbackJson() != null ? item.getFeedbackJson() : "{}")
+                        .modelVersion(item.getModelVersion() != null ? item.getModelVersion() : "unknown")
+                        .build());
+                attempt.markCompleted();
+            }
         }
         challengeRankingRepository.saveAll(rankings);
+        challengeResultRepository.saveAll(results);
 
         // Challenge COMPLETED 전환
         ChallengeAttempt bestAttempt = challengeAttemptRepository.getReferenceById(
@@ -142,23 +164,32 @@ public class RankingCompletedConsumer {
         String resultSummaryJson = buildSummaryJson(rankedList, userMap);
         challenge.complete(bestAttempt, resultSummaryJson, rankedList.size());
 
-        // Redis 정리: pairs:job:{id}:* + challenge:{id}:ranking (ZSet TTL 없음 — 명시 삭제)
+        // Redis 정리: pairs:job:{id}:* + challenge:{id}:participants
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
-        stringRedisTemplate.delete("challenge:" + challengeId + ":ranking");
+        stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
 
         log.info("[Ranking MQ] COMPLETED 전환 완료: challengeId={}, 참가자={}", challengeId, rankedList.size());
 
-        // 커밋 후 CHALLENGE_OVERALL_RESULT 알림 발송
-        List<Long> notifyUserIds = userIds;
+        // 커밋 후 개인/전체 결과 알림 발송
+        List<ChallengeRankingCompletedDto.RankedItem> notifyList = rankedList;
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                for (Long userId : notifyUserIds) {
+                for (ChallengeRankingCompletedDto.RankedItem item : notifyList) {
+                    if (item.getUserId() == null) continue;
                     notificationCreatorService.create(
-                            userId,
+                            item.getUserId(),
+                            NotificationType.CHALLENGE_PERSONAL_RESULT,
+                            "내 챌린지 결과가 나왔어요!",
+                            "상세 피드백을 확인해보세요.",
+                            challengeId,
+                            "CHALLENGE"
+                    );
+                    notificationCreatorService.create(
+                            item.getUserId(),
                             NotificationType.CHALLENGE_OVERALL_RESULT,
                             "챌린지 최종 랭킹이 나왔어요!",
                             "내 순위를 확인해보세요.",
@@ -166,8 +197,8 @@ public class RankingCompletedConsumer {
                             "CHALLENGE"
                     );
                 }
-                log.info("[Ranking MQ] OVERALL_RESULT 알림 발송 완료: challengeId={}, 대상={}",
-                        challengeId, notifyUserIds.size());
+                log.info("[Ranking MQ] 결과 알림 발송 완료: challengeId={}, 대상={}",
+                        challengeId, notifyList.size());
             }
         });
     }
