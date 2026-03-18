@@ -52,7 +52,7 @@ class E2EAuthControllerTest extends IntegrationTestSupport {
                 .oauthId("e2e_test_user")
                 .oauthProvider(OAuthProviderType.KAKAO)
                 .email("e2e@test.com")
-                .nickname("E2E테스터")
+                .nickname("__e2e_test_user__")
                 .role(RoleType.USER)
                 .level(1)
                 .totalCardCount(0)
@@ -88,7 +88,7 @@ class E2EAuthControllerTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.data.refreshToken").value(notNullValue()))
             .andExpect(jsonPath("$.data.expiresIn").value(notNullValue()))
             .andExpect(jsonPath("$.data.user.id").value(testUser.getId().intValue()))
-            .andExpect(jsonPath("$.data.user.nickname").value("E2E테스터"))
+            .andExpect(jsonPath("$.data.user.nickname").value("__e2e_test_user__"))
             .andExpect(jsonPath("$.data.user.oauthProvider").value("KAKAO"))
             .andExpect(jsonPath("$.data.user.isNewUser").value(false));
     }

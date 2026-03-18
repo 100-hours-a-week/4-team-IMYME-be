@@ -56,7 +56,7 @@ public class E2EAuthController {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
                     .oauthProvider(OAuthProviderType.KAKAO)
-                    .nickname("E2E테스터")
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -87,7 +87,7 @@ public class E2EAuthController {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
                     .oauthProvider(OAuthProviderType.KAKAO)
-                    .nickname("E2E테스터")
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -118,7 +118,7 @@ public class E2EAuthController {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_HOST_OAUTH_ID)
                     .oauthProvider(OAuthProviderType.KAKAO)
-                    .nickname("E2E호스트")
+                    .nickname("__e2e_socket_host__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket host auto-created: userId={}", newUser.getId());
@@ -146,7 +146,7 @@ public class E2EAuthController {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_GUEST_OAUTH_ID)
                     .oauthProvider(OAuthProviderType.KAKAO)
-                    .nickname("E2E게스트")
+                    .nickname("__e2e_socket_guest__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket guest auto-created: userId={}", newUser.getId());
