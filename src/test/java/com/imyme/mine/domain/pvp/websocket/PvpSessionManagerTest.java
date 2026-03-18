@@ -2,6 +2,8 @@ package com.imyme.mine.domain.pvp.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,53 +12,67 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.testcontainers.containers.GenericContainer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * PvpSessionManager 단위 테스트
- * - Redis 연결 필요 (localhost:6379)
- * - Redis가 없으면 테스트 스킵됨
+ * - @SpringBootTest 없이 비Spring 구조 유지
+ * - Testcontainers Redis 직접 주입 (로컬 수동 Redis 불필요)
  */
 @DisplayName("PvpSessionManager 단위 테스트")
 class PvpSessionManagerTest {
 
+    @SuppressWarnings("resource")
+    static final GenericContainer<?> REDIS =
+        new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379);
+
     private PvpSessionManager sessionManager;
     private RedisTemplate<String, Object> redisTemplate;
 
+    @BeforeAll
+    static void startContainer() {
+        REDIS.start();
+    }
+
+    @AfterAll
+    static void stopContainer() {
+        REDIS.stop();
+    }
+
     @BeforeEach
     void setUp() {
-        try {
-            RedisStandaloneConfiguration config = new RedisStandaloneConfiguration("localhost", 6379);
-            LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
-            factory.afterPropertiesSet();
+        RedisStandaloneConfiguration config =
+            new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379));
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
+        factory.afterPropertiesSet();
 
-            ObjectMapper objectMapper = new ObjectMapper();
-            objectMapper.registerModule(new JavaTimeModule());
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
 
-            Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
+        Jackson2JsonRedisSerializer<Object> serializer =
+            new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
 
-            redisTemplate = new RedisTemplate<>();
-            redisTemplate.setConnectionFactory(factory);
-            redisTemplate.setKeySerializer(new StringRedisSerializer());
-            redisTemplate.setValueSerializer(serializer);
-            redisTemplate.setHashKeySerializer(new StringRedisSerializer());
-            redisTemplate.setHashValueSerializer(serializer);
-            redisTemplate.afterPropertiesSet();
+        redisTemplate = new RedisTemplate<>();
+        redisTemplate.setConnectionFactory(factory);
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setValueSerializer(serializer);
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashValueSerializer(serializer);
+        redisTemplate.afterPropertiesSet();
 
-            sessionManager = new PvpSessionManager(redisTemplate, objectMapper);
+        sessionManager = new PvpSessionManager(redisTemplate, objectMapper);
 
-            // 테스트 전 관련 키 정리
-            var keys = redisTemplate.keys("pvp:session:*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-            }
-            var roomKeys = redisTemplate.keys("pvp:room:*:sessions");
-            if (roomKeys != null && !roomKeys.isEmpty()) {
-                redisTemplate.delete(roomKeys);
-            }
-        } catch (Exception e) {
-            org.junit.jupiter.api.Assumptions.assumeTrue(false, "Redis 연결 불가 - 테스트 스킵");
+        // 테스트 전 관련 키 정리
+        var keys = redisTemplate.keys("pvp:session:*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+        var roomKeys = redisTemplate.keys("pvp:room:*:sessions");
+        if (roomKeys != null && !roomKeys.isEmpty()) {
+            redisTemplate.delete(roomKeys);
         }
     }
 

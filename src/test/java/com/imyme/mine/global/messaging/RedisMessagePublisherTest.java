@@ -3,6 +3,7 @@ package com.imyme.mine.global.messaging;
 import com.imyme.mine.domain.pvp.entity.PvpRoomStatus;
 import com.imyme.mine.domain.pvp.messaging.PvpChannels;
 import com.imyme.mine.domain.pvp.messaging.PvpMessage;
+import com.imyme.mine.testsupport.IntegrationTestSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Redis Pub/Sub 통합 테스트
- * - Redis 컨테이너가 실행 중이어야 합니다 (docker-compose up -d redis)
+ * - Testcontainers 기반 (로컬 수동 Redis 불필요)
  */
 @Slf4j
 @SpringBootTest
-@ActiveProfiles("test")
-class RedisMessagePublisherTest {
+@ActiveProfiles({"test", "tc"})
+class RedisMessagePublisherTest extends IntegrationTestSupport {
 
     @Autowired
     private MessagePublisher messagePublisher;

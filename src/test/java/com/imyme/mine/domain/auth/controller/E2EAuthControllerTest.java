@@ -6,6 +6,7 @@ import com.imyme.mine.domain.auth.entity.OAuthProviderType;
 import com.imyme.mine.domain.auth.entity.RoleType;
 import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
+import com.imyme.mine.testsupport.IntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,13 +27,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * E2EAuthController 통합 테스트
  * - E2E 테스트 로그인 엔드포인트 검증
- * - test 프로파일에서만 실행됩니다
+ * - PostgreSQL + Redis Testcontainers 기반 (로컬 수동 기동 불필요)
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "tc"})
 @Transactional
-class E2EAuthControllerTest {
+class E2EAuthControllerTest extends IntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -45,11 +46,11 @@ class E2EAuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        // 테스트 환경에서는 Flyway가 비활성화되어 있으므로 직접 E2E 테스트 유저 생성
-        if (!userRepository.findByOauthIdAndOauthProvider("e2e_test_user", OAuthProviderType.E2E_TEST).isPresent()) {
+        // Flyway가 스키마를 생성하므로 데이터만 직접 준비
+        if (!userRepository.findByOauthIdAndOauthProvider("e2e_test_user", OAuthProviderType.KAKAO).isPresent()) {
             User testUser = User.builder()
                 .oauthId("e2e_test_user")
-                .oauthProvider(OAuthProviderType.E2E_TEST)
+                .oauthProvider(OAuthProviderType.KAKAO)
                 .email("e2e@test.com")
                 .nickname("E2E테스터")
                 .role(RoleType.USER)
@@ -72,7 +73,7 @@ class E2EAuthControllerTest {
 
         // E2E 테스트 유저 조회
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider("e2e_test_user", OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider("e2e_test_user", OAuthProviderType.KAKAO)
             .orElseThrow(() -> new AssertionError("E2E test user not found in database"));
 
         // when & then
@@ -88,7 +89,7 @@ class E2EAuthControllerTest {
             .andExpect(jsonPath("$.data.expiresIn").value(notNullValue()))
             .andExpect(jsonPath("$.data.user.id").value(testUser.getId().intValue()))
             .andExpect(jsonPath("$.data.user.nickname").value("E2E테스터"))
-            .andExpect(jsonPath("$.data.user.oauthProvider").value("E2E_TEST"))
+            .andExpect(jsonPath("$.data.user.oauthProvider").value("KAKAO"))
             .andExpect(jsonPath("$.data.user.isNewUser").value(false));
     }
 
