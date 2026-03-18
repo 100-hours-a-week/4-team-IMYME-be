@@ -77,6 +77,36 @@ public class ChallengeController {
     }
 
     @Operation(
+            summary = "최근 챌린지 랭킹 조회",
+            description = "가장 최근에 완료된 챌린지의 랭킹을 조회합니다. challengeId 없이 최신 결과를 바로 확인할 때 사용합니다.",
+            security = @SecurityRequirement(name = "JWT")
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "랭킹 조회 성공"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "인증 실패",
+                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "완료된 챌린지 없음 - CHALLENGE_NOT_FOUND",
+                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))
+            )
+    })
+    @GetMapping("/latest-rankings")
+    public ApiResponse<ChallengeRankingResponse> getLatestRankings(
+            @Parameter(description = "페이지 번호 (1부터 시작)") @RequestParam(defaultValue = "1") @Min(1) int page,
+            @Parameter(description = "페이지 크기 (최대 100)") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @CurrentUser UserPrincipal principal
+    ) {
+        return ApiResponse.success(challengeQueryService.getLatestRankings(principal.getId(), page, size));
+    }
+
+    @Operation(
             summary = "챌린지 랭킹 조회",
             description = "완료된 챌린지의 랭킹을 페이지네이션으로 조회합니다. COMPLETED 상태가 아니면 조회 불가.",
             security = @SecurityRequirement(name = "JWT")
