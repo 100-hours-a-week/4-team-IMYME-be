@@ -112,7 +112,19 @@ public class ChallengeAttempt {
         this.status = ChallengeAttemptStatus.PROCESSING;
     }
 
-    /** 분석 완료 */
+    /** STT 텍스트 저장 (PROCESSING 상태 유지 — 랭킹 완료 전 중간 단계) */
+    public void saveSttText(String sttText) {
+        this.sttText = sttText;
+    }
+
+    /** 랭킹 및 피드백 확정 완료 (PROCESSING → COMPLETED) */
+    public void markCompleted() {
+        this.status = ChallengeAttemptStatus.COMPLETED;
+        this.finishedAt = LocalDateTime.now();
+    }
+
+    /** @deprecated STT와 피드백이 분리된 새 플로우에서는 saveSttText() + markCompleted() 사용 */
+    @Deprecated
     public void complete(String sttText) {
         this.sttText = sttText;
         this.status = ChallengeAttemptStatus.COMPLETED;
