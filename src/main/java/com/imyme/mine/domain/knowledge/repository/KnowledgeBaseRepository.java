@@ -34,6 +34,10 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
     @Query("SELECT kb FROM KnowledgeBase kb WHERE kb.keyword.id = :keywordId AND kb.isActive = true")
     List<KnowledgeBase> findByKeywordId(@Param("keywordId") Long keywordId);
 
+    // 키워드 ID로 단건 조회 (챌린지 rubric 조회용 — keyword:knowledge_base 1:1 관계 전제)
+    @Query("SELECT kb FROM KnowledgeBase kb WHERE kb.keyword.id = :keywordId AND kb.isActive = true")
+    Optional<KnowledgeBase> findFirstByKeywordId(@Param("keywordId") Long keywordId);
+
     /**
      * 전체 벡터 유사도 검색 (Interface Projection 방식)
      *
