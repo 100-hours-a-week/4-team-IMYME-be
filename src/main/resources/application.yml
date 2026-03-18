@@ -172,6 +172,8 @@ challenge:
         exchange: challenge.direct
         queue:
             feedback-response: challenge.feedback.response
+            pairs-eval: challenge.pairs.eval
+            ranking-completed: challenge.ranking.completed
         routing:
             feedback-request: challenge.feedback.request
 

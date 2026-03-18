@@ -8,6 +8,8 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
 import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.config.ChallengeMqProperties;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +19,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -45,8 +54,12 @@ public class ChallengeScheduler {
     private final StorageService storageService;
     private final RabbitTemplate rabbitTemplate;
     private final ChallengeMqProperties mqProperties;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final NotificationBroadcastService notificationBroadcastService;
 
     private static final Random RANDOM = new Random();
+    private static final String REDIS_PENDING_KEY = "challenge:%d:pending_count";
+    private static final Duration PENDING_COUNT_TTL = Duration.ofHours(2);
 
     // -------------------------------------------------------------------------
     // 00:05 — 내일 챌린지 생성
@@ -94,9 +107,10 @@ public class ChallengeScheduler {
     // -------------------------------------------------------------------------
 
     /**
-     * 오늘 SCHEDULED 챌린지를 OPEN으로 전환
+     * 오늘 SCHEDULED 챌린지를 OPEN으로 전환 + 전체 유저 CHALLENGE_OPEN 알림 발송
      *
      * <p>오늘 날짜 + SCHEDULED 상태인 챌린지가 없으면 로그만 기록 후 종료.
+     * DB 커밋 후 알림을 발송하여 챌린지 상태가 확정된 이후에만 알림이 나가도록 보장.
      */
     @Scheduled(cron = "0 0 22 * * *")
     @Transactional
@@ -106,7 +120,28 @@ public class ChallengeScheduler {
                 .ifPresentOrElse(
                         challenge -> {
                             challenge.open();
-                            log.info("[Challenge] OPEN 전환 완료 - challengeId={}", challenge.getId());
+
+                            Long challengeId = challenge.getId();
+                            String keywordText = challenge.getKeywordText();
+
+                            log.info("[Challenge] OPEN 전환 완료 - challengeId={}", challengeId);
+
+                            // 커밋 후 전체 활성 유저에게 CHALLENGE_OPEN 알림 배치 발송
+                            TransactionSynchronizationManager.registerSynchronization(
+                                    new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                            notificationBroadcastService.broadcastToAllActive(
+                                                    NotificationType.CHALLENGE_OPEN,
+                                                    "오늘의 챌린지가 시작됐어요!",
+                                                    "\"" + keywordText + "\" 주제로 지금 도전해보세요.",
+                                                    challengeId,
+                                                    "CHALLENGE"
+                                            );
+                                            log.info("[Challenge] CHALLENGE_OPEN 브로드캐스트 제출 - challengeId={}", challengeId);
+                                        }
+                                    }
+                            );
                         },
                         () -> log.warn("[Challenge] OPEN 대상 챌린지 없음 - date={}", LocalDate.now())
                 );
@@ -142,8 +177,8 @@ public class ChallengeScheduler {
     /**
      * CLOSED 챌린지를 ANALYZING으로 전환 후 UPLOADED 제출 일괄 MQ 발행
      *
-     * <p>각 제출의 {@code audioUrl}을 포함한 피드백 요청을 AI 서버로 발행.
-     * MQ 발행 실패 시 예외를 던져 트랜잭션 롤백 후 다음 배치에서 재시도.
+     * <p>DB 커밋 후에 MQ를 발행하여 트랜잭션 롤백 시 MQ 발행이 일어나지 않도록 보장.
+     * Redis {@code pending_count}를 초기화하여 Consumer가 마지막 처리 완료를 감지할 수 있게 함.
      */
     @Scheduled(cron = "0 12 22 * * *")
     @Transactional
@@ -159,25 +194,55 @@ public class ChallengeScheduler {
                                             challenge.getId(), ChallengeAttemptStatus.UPLOADED
                                     );
 
-                            for (ChallengeAttempt attempt : attempts) {
-                                // DB에는 audioKey(S3 object key)를 저장하지만,
-                                // AI 서버는 직접 다운로드 가능한 URL을 필요로 하므로
-                                // MQ payload의 "audioUrl" 키에는 presigned GET URL을 담는다.
-                                // Branch 3: payload["audioUrl"] = presigned GET URL (1시간 유효)
-                                String audioUrl = storageService.generatePresignedGetUrl(attempt.getAudioKey());
-                                rabbitTemplate.convertAndSend(
-                                        mqProperties.getExchange(),
-                                        mqProperties.getRouting().getFeedbackRequest(),
-                                        Map.of(
-                                                "attemptId", attempt.getId(),
-                                                "challengeId", challenge.getId(),
-                                                "audioUrl", audioUrl
-                                        )
-                                );
+                            if (attempts.isEmpty()) {
+                                log.info("[Challenge] 제출 없음 → ANALYZING만 전환: challengeId={}",
+                                        challenge.getId());
+                                return;
                             }
 
-                            log.info("[Challenge] ANALYZING 전환 완료 - challengeId={}, 발행 건수={}",
-                                    challenge.getId(), attempts.size());
+                            Long challengeId = challenge.getId();
+                            int attemptCount = attempts.size();
+
+                            // presigned URL은 트랜잭션 내에서 미리 생성 (S3 외부 호출)
+                            List<Map<String, Object>> payloads = new ArrayList<>(attemptCount);
+                            for (ChallengeAttempt attempt : attempts) {
+                                String audioUrl = storageService.generatePresignedGetUrl(attempt.getAudioKey());
+                                Map<String, Object> payload = new HashMap<>();
+                                payload.put("attemptId", attempt.getId());
+                                payload.put("challengeId", challengeId);
+                                payload.put("audioUrl", audioUrl);
+                                payloads.add(payload);
+                            }
+
+                            // 커밋 후 실행: Redis 초기화 + MQ 발행 (롤백 시 미발행 보장)
+                            TransactionSynchronizationManager.registerSynchronization(
+                                    new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                            // pending_count 초기화 (TTL: 2시간)
+                                            stringRedisTemplate.opsForValue().set(
+                                                    String.format(REDIS_PENDING_KEY, challengeId),
+                                                    String.valueOf(attemptCount),
+                                                    PENDING_COUNT_TTL
+                                            );
+
+                                            // MQ 발행
+                                            for (Map<String, Object> payload : payloads) {
+                                                rabbitTemplate.convertAndSend(
+                                                        mqProperties.getExchange(),
+                                                        mqProperties.getRouting().getFeedbackRequest(),
+                                                        payload
+                                                );
+                                            }
+
+                                            log.info("[Challenge] MQ 발행 완료: challengeId={}, 건수={}",
+                                                    challengeId, payloads.size());
+                                        }
+                                    }
+                            );
+
+                            log.info("[Challenge] ANALYZING 전환 완료 - challengeId={}, 발행 예정={}",
+                                    challengeId, attemptCount);
                         },
                         () -> log.warn("[Challenge] ANALYZING 대상 챌린지 없음")
                 );
