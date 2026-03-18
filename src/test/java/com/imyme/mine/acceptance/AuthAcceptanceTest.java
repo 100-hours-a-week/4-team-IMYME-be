@@ -78,13 +78,15 @@ class AuthAcceptanceTest extends IntegrationTestSupport {
 
     @Test
     @DisplayName("동일 디바이스로 두 번 로그인 - 모두 성공 (세션 재사용 정책)")
-    void e2eLogin_sameDevice_bothSucceed() {
+    void e2eLogin_sameDevice_bothSucceed() throws InterruptedException {
         // given
         String url = "http://localhost:" + port + "/e2e/login";
         Map<String, String> request = Map.of("deviceUuid", "550e8400-e29b-41d4-a716-446655440001");
 
         // when
+        Thread.sleep(1100); // 이전 테스트와 초(second)가 달라지도록 대기 (JWT는 초 단위 정밀도)
         ResponseEntity<Map> first = restTemplate.postForEntity(url, request, Map.class);
+        Thread.sleep(1100); // 동일 초 내 JWT 중복 생성 방지
         ResponseEntity<Map> second = restTemplate.postForEntity(url, request, Map.class);
 
         // then
