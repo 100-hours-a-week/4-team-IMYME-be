@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.UUID;
 
 /**
  * JWT 토큰 생성 및 검증
@@ -35,7 +34,6 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessTokenExpiration());
 
         return Jwts.builder()
-            .id(UUID.randomUUID().toString())
             .subject(String.valueOf(userId))
             .issuedAt(now)
             .expiration(expiryDate)
@@ -49,7 +47,6 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + jwtProperties.getRefreshTokenExpiration());
 
         return Jwts.builder()
-            .id(UUID.randomUUID().toString())
             .subject(String.valueOf(userId))
             .issuedAt(now)
             .expiration(expiryDate)
