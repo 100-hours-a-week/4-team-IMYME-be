@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -20,6 +21,10 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     // deviceUuid로 기기 조회 (Soft Delete 필터 적용)
     Optional<Device> findByDeviceUuid(String deviceUuid);
+
+    // FCM 푸시 발송 가능한 기기 조회 (fcmToken 있음 + 푸시 수신 동의)
+    @Query("SELECT d FROM Device d WHERE d.lastUser.id = :userId AND d.fcmToken IS NOT NULL AND d.isPushEnabled = true")
+    List<Device> findPushableDevicesByUserId(@Param("userId") Long userId);
 
     // deviceUuid로 기기 Soft Delete
     @Modifying

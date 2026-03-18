@@ -87,6 +87,9 @@ dependencies {
     // Sentry (에러 추적 & 성능 모니터링) - Jakarta Starter
     implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.1.0'
     implementation 'io.sentry:sentry-logback:8.1.0'
+
+    // Firebase Admin SDK (FCM 푸시 알림)
+    implementation 'com.google.firebase:firebase-admin:9.4.2'
 }
 
 tasks.named('test') {

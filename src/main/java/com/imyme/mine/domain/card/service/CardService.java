@@ -16,6 +16,8 @@ import com.imyme.mine.domain.category.entity.Category;
 import com.imyme.mine.domain.category.repository.CategoryRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationCreatorService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class CardService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final KeywordRepository keywordRepository;
+    private final NotificationCreatorService notificationCreatorService;
 
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
@@ -67,9 +70,21 @@ public class CardService {
 
         Card savedCard = cardRepository.save(card);
 
+        int prevLevel = user.getLevel();
         user.incrementTotalCardCount();
 
         log.info("카드 생성 완료 - cardId: {}, userId: {}", savedCard.getId(), userId);
+
+        if (user.getLevel() > prevLevel) {
+            notificationCreatorService.create(
+                userId,
+                NotificationType.LEVEL_UP,
+                "레벨업!",
+                "Lv." + user.getLevel() + " 달성! 계속 성장하고 있어요.",
+                null,
+                null
+            );
+        }
 
         return CardResponse.from(savedCard);
     }
