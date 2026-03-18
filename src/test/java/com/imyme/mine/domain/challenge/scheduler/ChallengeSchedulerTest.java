@@ -8,8 +8,10 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
 import com.imyme.mine.domain.storage.service.StorageService;
 import com.imyme.mine.global.config.ChallengeMqProperties;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,8 +21,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,16 +48,26 @@ class ChallengeSchedulerTest {
     @Mock ChallengeMqProperties mqProperties;
     @Mock ChallengeMqProperties.Routing routing;
     @Mock ChallengeMqProperties.Queue queue;
+    @Mock StringRedisTemplate stringRedisTemplate;
+    @Mock NotificationBroadcastService notificationBroadcastService;
 
     @InjectMocks
     ChallengeScheduler scheduler;
 
     @BeforeEach
-    void setUpMqProperties() {
+    void setUp() {
         lenient().when(mqProperties.getExchange()).thenReturn("challenge.direct");
         lenient().when(mqProperties.getRouting()).thenReturn(routing);
         lenient().when(routing.getFeedbackRequest()).thenReturn("challenge.feedback.request");
         lenient().when(mqProperties.getQueue()).thenReturn(queue);
+
+        // @Transactional 없는 단위 테스트에서 registerSynchronization() 호출을 허용
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clearSynchronization();
     }
 
     // =========================================================================
@@ -118,6 +135,8 @@ class ChallengeSchedulerTest {
     @DisplayName("챌린지 OPEN - 오늘 SCHEDULED 챌린지 존재 시 open() 호출")
     void openChallenge_callsOpenOnChallenge() {
         Challenge challenge = mock(Challenge.class);
+        when(challenge.getId()).thenReturn(1L);
+        when(challenge.getKeywordText()).thenReturn("발표");
         when(challengeRepository.findByChallengeDateAndStatus(LocalDate.now(), ChallengeStatus.SCHEDULED))
                 .thenReturn(Optional.of(challenge));
 
@@ -198,7 +217,14 @@ class ChallengeSchedulerTest {
         when(challengeAttemptRepository.findByChallengeIdAndStatusOrderBySubmittedAtAsc(10L, ChallengeAttemptStatus.UPLOADED))
                 .thenReturn(List.of(attempt1, attempt2));
 
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
+
         scheduler.startAnalyzing();
+
+        // afterCommit() 콜백 수동 실행 (단위 테스트에는 실제 트랜잭션 커밋이 없음)
+        new ArrayList<>(TransactionSynchronizationManager.getSynchronizations())
+                .forEach(TransactionSynchronization::afterCommit);
 
         verify(rabbitTemplate, times(2)).convertAndSend(
                 eq("challenge.direct"),
