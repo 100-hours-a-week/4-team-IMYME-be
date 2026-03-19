@@ -3,6 +3,8 @@ package com.imyme.mine.domain.challenge.entity;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -67,6 +69,7 @@ public class Challenge {
      * }
      * </pre>
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "result_summary_json", columnDefinition = "jsonb")
     private String resultSummaryJson;
 
