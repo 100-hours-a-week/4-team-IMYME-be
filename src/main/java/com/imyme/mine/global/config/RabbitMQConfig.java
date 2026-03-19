@@ -159,10 +159,10 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(props.getQueue().getPairsEval()).build();
     }
 
-    /** 토너먼트 랭킹 완료 큐 — AI → Spring */
+    /** 토너먼트 최종 완료 큐 — AI → Spring */
     @Bean
-    public Queue challengeRankingCompletedQueue(ChallengeMqProperties props) {
-        return QueueBuilder.durable(props.getQueue().getRankingCompleted()).build();
+    public Queue challengeFinalDoneQueue(ChallengeMqProperties props) {
+        return QueueBuilder.durable(props.getQueue().getFinalDone()).build();
     }
 
     @Bean
@@ -176,13 +176,13 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Binding challengeRankingCompletedBinding(
-            Queue challengeRankingCompletedQueue,
+    public Binding challengeFinalDoneBinding(
+            Queue challengeFinalDoneQueue,
             DirectExchange challengeDirectExchange,
             ChallengeMqProperties props) {
-        return BindingBuilder.bind(challengeRankingCompletedQueue)
+        return BindingBuilder.bind(challengeFinalDoneQueue)
                 .to(challengeDirectExchange)
-                .with(props.getQueue().getRankingCompleted());
+                .with(props.getQueue().getFinalDone());
     }
 
     // ===== Solo Exchange / Queue / Binding (Response 큐만 선언) =====

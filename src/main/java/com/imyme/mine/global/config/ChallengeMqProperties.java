@@ -27,8 +27,8 @@ public class ChallengeMqProperties {
         private String feedbackResponse = "challenge.feedback.response";
         /** 토너먼트 페어 병합 미션 큐 (Spring → AI 초기 발행, AI → AI 자율 재발행) */
         private String pairsEval = "challenge.pairs.eval";
-        /** 토너먼트 랭킹 완료 큐 (AI → Spring) */
-        private String rankingCompleted = "challenge.ranking.completed";
+        /** 토너먼트 최종 완료 큐 (AI → Spring) */
+        private String finalDone = "challenge.final.done";
     }
 
     @Getter

@@ -5,6 +5,7 @@ import com.imyme.mine.domain.learning.service.KnowledgeBatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component;
 public class KnowledgeBatchScheduler {
 
     private final KnowledgeBatchService batchService;
+    private final CacheManager cacheManager;
 
     /**
      * 매일 자정 Knowledge 배치 실행
@@ -55,6 +57,13 @@ public class KnowledgeBatchScheduler {
             if (!result.errors().isEmpty()) {
                 log.warn("배치 실행 중 {}개 오류 발생:", result.errors().size());
                 result.errors().forEach(error -> log.warn("  - {}", error));
+            }
+
+            // 배치 완료 후 AI 채점 기준 캐시 초기화 (Solo/PvP 최신 knowledge 즉시 반영)
+            var criteriaCache = cacheManager.getCache("keywords:criteria");
+            if (criteriaCache != null) {
+                criteriaCache.clear();
+                log.info("keywords:criteria 캐시 초기화 완료");
             }
 
             log.info("========================================");
