@@ -4,6 +4,7 @@ import com.imyme.mine.domain.challenge.entity.Challenge;
 import com.imyme.mine.domain.challenge.entity.ChallengeStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -152,4 +153,16 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             LIMIT 1
             """)
     Optional<Challenge> findLatestCompletedWithKeyword();
+
+    /** 챌린지 상태 초기화 (관리자 테스트용 — dev/release 전용) */
+    @Modifying
+    @Query("""
+            UPDATE Challenge c
+            SET c.status = com.imyme.mine.domain.challenge.entity.ChallengeStatus.SCHEDULED,
+                c.bestSubmission = null,
+                c.resultSummaryJson = null,
+                c.participantCount = 0
+            WHERE c.id = :id
+            """)
+    void resetToScheduled(@Param("id") Long id);
 }

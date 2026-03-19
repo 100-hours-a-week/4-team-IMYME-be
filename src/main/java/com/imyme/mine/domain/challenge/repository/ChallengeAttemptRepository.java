@@ -3,6 +3,7 @@ package com.imyme.mine.domain.challenge.repository;
 import com.imyme.mine.domain.challenge.entity.ChallengeAttempt;
 import com.imyme.mine.domain.challenge.entity.ChallengeAttemptStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -68,4 +69,8 @@ public interface ChallengeAttemptRepository extends JpaRepository<ChallengeAttem
     List<ChallengeAttempt> findByChallengeIdAndStatusOrderBySubmittedAtAsc(
             Long challengeId, ChallengeAttemptStatus status
     );
+
+    @Modifying
+    @Query("DELETE FROM ChallengeAttempt a WHERE a.challenge.id = :challengeId")
+    void deleteByChallengeId(@Param("challengeId") Long challengeId);
 }
