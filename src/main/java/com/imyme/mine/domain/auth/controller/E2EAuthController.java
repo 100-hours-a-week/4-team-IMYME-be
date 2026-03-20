@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -157,5 +158,38 @@ public class E2EAuthController {
         log.info("E2E socket guest login successful: userId={}", guestUser.getId());
 
         return ApiResponse.success(response, "E2E 소켓 게스트 로그인 성공");
+    }
+
+    /**
+     * 부하 테스트용 VU별 로그인
+     * - 각 VU(Virtual User)가 다른 유저로 로그인합니다.
+     * - vuId에 따라 e2e_load_test_user_1, e2e_load_test_user_2, ... 유저가 생성됩니다.
+     */
+    @PostMapping("/login/{vuId}")
+    @Transactional
+    public ApiResponse<OAuthLoginResponse> e2eLoadTestLogin(
+        @PathVariable int vuId,
+        @Valid @RequestBody E2ELoginRequest request
+    ) {
+        String oauthId = "e2e_load_test_user_" + vuId;
+        log.info("E2E load test login attempt: vuId={}, deviceUuid={}", vuId, request.deviceUuid());
+
+        User testUser = userRepository
+            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.KAKAO)
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(oauthId)
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("부하테스터" + vuId)
+                    .build();
+                userRepository.save(newUser);
+                log.info("E2E load test user auto-created: vuId={}, userId={}", vuId, newUser.getId());
+                return newUser;
+            });
+
+        OAuthLoginResponse response = oauthService.login(testUser, request.deviceUuid(), false);
+        log.info("E2E load test login successful: vuId={}, userId={}", vuId, testUser.getId());
+
+        return ApiResponse.success(response, "E2E 부하 테스트 로그인 성공");
     }
 }
