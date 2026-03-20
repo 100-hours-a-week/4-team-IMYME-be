@@ -175,11 +175,11 @@ public class E2EAuthController {
         log.info("E2E load test login attempt: vuId={}, deviceUuid={}", vuId, request.deviceUuid());
 
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(oauthId)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .oauthProvider(OAuthProviderType.KAKAO)
                     .nickname("부하테스터" + vuId)
                     .build();
                 userRepository.save(newUser);
