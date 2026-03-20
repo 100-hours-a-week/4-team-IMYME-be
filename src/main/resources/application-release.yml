@@ -73,7 +73,7 @@ spring:
 logging:
     level:
         root: INFO
-        com.imyme.mine: DEBUG  # Prod보다는 상세한 로그 (디버깅용)
+        com.imyme.mine: INFO
         org.springframework.security: INFO
         org.hibernate.SQL: WARN
 
@@ -85,3 +85,9 @@ solo:
 knowledge:
     batch:
         enabled: false  # 필요 시 true로 변경
+
+# Sentry 설정 (Release 환경용)
+sentry:
+    environment: release
+    debug: false
+    traces-sample-rate: 0.1
