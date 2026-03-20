@@ -6,6 +6,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
+import exec from 'k6/execution';
 
 const errorRate = new Rate('errors');
 
@@ -23,8 +24,9 @@ export const options = {
 
 const BASE_URL = 'http://host.docker.internal:8080';
 
-// 로그인하여 JWT 토큰 얻기
+// 로그인하여 JWT 토큰 얻기 (VU별 다른 유저)
 function login() {
+  const vuId = exec.vu.idInTest;  // VU 번호 (1, 2, 3, ...)
   const deviceUuid = uuidv4();
 
   const payload = JSON.stringify({
@@ -37,7 +39,7 @@ function login() {
     },
   };
 
-  const res = http.post(`${BASE_URL}/e2e/login`, payload, params);
+  const res = http.post(`${BASE_URL}/e2e/login/${vuId}`, payload, params);
 
   if (!check(res, {
     'login status is 200': (r) => r.status === 200,
