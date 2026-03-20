@@ -52,12 +52,12 @@ public class E2EAuthController {
         log.info("E2E test user creation attempt");
 
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E테스터")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -83,12 +83,12 @@ public class E2EAuthController {
 
         // E2E 테스트 유저 조회 (없으면 자동 생성)
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E테스터")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -114,12 +114,12 @@ public class E2EAuthController {
         log.info("E2E socket host login attempt: deviceUuid={}", request.deviceUuid());
 
         User hostUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_SOCKET_HOST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_HOST_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_HOST_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E호스트")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_socket_host__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket host auto-created: userId={}", newUser.getId());
@@ -142,12 +142,12 @@ public class E2EAuthController {
         log.info("E2E socket guest login attempt: deviceUuid={}", request.deviceUuid());
 
         User guestUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_SOCKET_GUEST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_GUEST_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_GUEST_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E게스트")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_socket_guest__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket guest auto-created: userId={}", newUser.getId());
@@ -175,11 +175,11 @@ public class E2EAuthController {
         log.info("E2E load test login attempt: vuId={}, deviceUuid={}", vuId, request.deviceUuid());
 
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(oauthId)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
+                    .oauthProvider(OAuthProviderType.KAKAO)
                     .nickname("부하테스터" + vuId)
                     .build();
                 userRepository.save(newUser);

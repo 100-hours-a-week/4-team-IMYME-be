@@ -14,6 +14,7 @@ spring:
         properties:
             hibernate:
                 format_sql: true  # 쿼리 예쁘게 정렬
+                session_factory.statement_inspector: com.imyme.mine.global.logging.QueryCountInterceptor
 
     # Dev 환경 카카오 OAuth 설정
     security:

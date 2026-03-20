@@ -2,6 +2,8 @@ package com.imyme.mine.domain.pvp.service;
 
 import com.imyme.mine.domain.auth.entity.User;
 import com.imyme.mine.domain.auth.repository.UserRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationCreatorService;
 import com.imyme.mine.domain.pvp.dto.message.FeedbackRequestDto;
 import com.imyme.mine.domain.pvp.dto.message.FeedbackResponseDto;
 import com.imyme.mine.domain.pvp.dto.message.SttResponseDto;
@@ -47,6 +49,7 @@ public class PvpMqConsumerService {
     private final RabbitMQMessagePublisher rabbitMQMessagePublisher;
     private final MessagePublisher messagePublisher;
     private final com.imyme.mine.domain.user.service.UserService userService;
+    private final NotificationCreatorService notificationCreatorService;
 
     /**
      * STT Response 처리
@@ -298,6 +301,18 @@ public class PvpMqConsumerService {
 
         log.info("[MQ] 게임 완료: roomId={}, winner={}", roomId,
                 winner != null ? winner.getId() : "둘다패배(0점)");
+
+        // PvP 결과 알림 (host, guest 모두 — 트랜잭션 커밋 후 FCM 비동기 발송)
+        for (User participant : participants) {
+            notificationCreatorService.create(
+                participant.getId(),
+                NotificationType.PVP_RESULT,
+                "PvP 결과가 나왔어요!",
+                "대결 결과를 확인해보세요.",
+                roomId,
+                "PVP_ROOM"
+            );
+        }
 
         // 브로드캐스트
         broadcastAfterCommit(roomId, PvpMessage.analysisCompleted(roomId));

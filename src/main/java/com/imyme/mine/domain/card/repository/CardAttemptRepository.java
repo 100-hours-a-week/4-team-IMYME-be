@@ -53,4 +53,10 @@ public interface CardAttemptRepository extends JpaRepository<CardAttempt, Long> 
      */
     @Query("SELECT ca.status FROM CardAttempt ca WHERE ca.id = :id")
     Optional<AttemptStatus> findStatusById(@Param("id") Long id);
+
+    /**
+     * 카드 ID 목록에 해당하는 S3 오디오 키 조회 (배치용 Hard Delete 전처리)
+     */
+    @Query("SELECT ca.audioKey FROM CardAttempt ca WHERE ca.card.id IN :cardIds AND ca.audioKey IS NOT NULL")
+    List<String> findAudioKeysByCardIds(@Param("cardIds") List<Long> cardIds);
 }

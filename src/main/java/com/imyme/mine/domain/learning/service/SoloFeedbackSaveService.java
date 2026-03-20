@@ -8,6 +8,8 @@ import com.imyme.mine.domain.card.entity.CardAttempt;
 import com.imyme.mine.domain.card.entity.CardFeedback;
 import com.imyme.mine.domain.card.repository.CardAttemptRepository;
 import com.imyme.mine.domain.card.repository.CardFeedbackRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationCreatorService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class SoloFeedbackSaveService {
     private final CardAttemptRepository attemptRepository;
     private final CardFeedbackRepository feedbackRepository;
     private final ObjectMapper objectMapper;
+    private final NotificationCreatorService notificationCreatorService;
 
     @Transactional
     public void save(Long attemptId, SoloResult result) {
@@ -77,6 +80,16 @@ public class SoloFeedbackSaveService {
 
         log.info("Solo feedback saved - attemptId: {}, score: {}, level: {}",
             attemptId, result.overallScore(), result.level());
+
+        // 채점 완료 알림 (트랜잭션 커밋 후 FCM 비동기 발송)
+        notificationCreatorService.create(
+            card.getUser().getId(),
+            NotificationType.SOLO_RESULT,
+            "학습 결과가 도착했어요!",
+            "'" + card.getTitle() + "' 카드의 피드백을 확인해보세요.",
+            card.getId(),   // path: /mypage/cards/{cardId}
+            "CARD_ATTEMPT"
+        );
     }
 
     /**

@@ -124,7 +124,7 @@ public class RedisConfig {
         cacheConfigs.put("keywords",
             defaultConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigs.put("keywords:criteria",
-            defaultConfig.entryTtl(Duration.ofHours(2)));  // AI 채점 기준 (v1 사용 중)
+            defaultConfig.entryTtl(Duration.ofHours(24)));  // AI 채점 기준 — Knowledge 배치 주기(24h)에 맞춤
 
         // Tier 2: 동적 데이터
         cacheConfigs.put("userProfile",

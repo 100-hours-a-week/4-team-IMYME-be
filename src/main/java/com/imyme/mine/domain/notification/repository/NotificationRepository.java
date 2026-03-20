@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,4 +66,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
      * 읽지 않은 알림 개수 조회
      */
     long countByUserIdAndIsReadFalse(Long userId);
+
+    /**
+     * 읽은 알림 Hard Delete (배치용: 30일 경과)
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Notification n WHERE n.isRead = true AND n.createdAt < :threshold")
+    int deleteOldReadNotifications(@Param("threshold") LocalDateTime threshold);
 }

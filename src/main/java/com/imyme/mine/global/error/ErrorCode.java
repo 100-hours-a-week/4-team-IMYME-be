@@ -47,6 +47,7 @@ public enum ErrorCode {
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "PvP 방을 찾을 수 없습니다."),
     SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "제출 정보를 찾을 수 없습니다."),
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없습니다."),
+    PARTICIPATION_NOT_FOUND(HttpStatus.NOT_FOUND, "참여 기록을 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
 
     // ========== 잘못된 요청 (400) ==========
@@ -87,10 +88,16 @@ public enum ErrorCode {
     EMPTY_TITLE(HttpStatus.BAD_REQUEST, "제목이 비어있습니다."),
     INVALID_TITLE_LENGTH(HttpStatus.BAD_REQUEST, "제목은 1~20자여야 합니다."),
 
+    // ========== 챌린지 상태 (400, 410) ==========
+    CHALLENGE_NOT_STARTED(HttpStatus.BAD_REQUEST, "챌린지가 아직 시작되지 않았습니다."),
+    CHALLENGE_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "결과가 아직 발표되지 않았습니다."),
+    UPLOAD_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "S3 업로드가 완료되지 않았습니다."),
+
     // ========== 타임아웃/만료 (410) ==========
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 제한 시간이 초과되었습니다."),
     ROOM_EXPIRED(HttpStatus.GONE, "방이 만료되었습니다."),
     CHALLENGE_ENDED(HttpStatus.GONE, "종료된 챌린지입니다."),
+    CHALLENGE_NOT_OPEN(HttpStatus.FORBIDDEN, "아직 시작되지 않은 챌린지입니다."),
 
     // ========== Rate Limit (429) ==========
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수 제한을 초과했습니다. 잠시 후 다시 시도해주세요."),
