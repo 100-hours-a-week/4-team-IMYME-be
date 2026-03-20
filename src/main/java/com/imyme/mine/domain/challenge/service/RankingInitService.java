@@ -101,10 +101,12 @@ public class RankingInitService {
         for (int i = 0; i + 1 < n; i += 2) {
             Map<String, Object> payload = new HashMap<>();
             payload.put("job_id", jobId);
-            payload.put("knowledge_id", knowledgeId);
+            payload.put("knowledgeBase_id", String.valueOf(knowledgeId));
             payload.put("level", 0);
             payload.put("array_a", List.of(String.valueOf(attemptIds.get(i))));
             payload.put("array_b", List.of(String.valueOf(attemptIds.get(i + 1))));
+            payload.put("target_count", n);
+            payload.put("expected_count", n);
 
             rabbitTemplate.convertAndSend(
                     mqProperties.getExchange(),
