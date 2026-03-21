@@ -266,8 +266,9 @@ public class StorageService {
             throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
         }
 
-        String objectKey = String.format("challenges/%d/%d/%d_%s",
-                userId, challengeId, attemptId, UUID.randomUUID());
+        String ext = getChallengeExtensionFromContentType(raw);
+        String objectKey = String.format("challenges/%d/%d/%d_%s.%s",
+                userId, challengeId, attemptId, UUID.randomUUID(), ext);
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(CHALLENGE_URL_EXPIRATION_MINUTES))
@@ -340,6 +341,16 @@ public class StorageService {
             deleteObjectQuietly(objectKey);
             throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
         }
+    }
+
+    private String getChallengeExtensionFromContentType(String contentType) {
+        return switch (contentType) {
+            case "audio/webm" -> "webm";
+            case "audio/mp4", "audio/m4a" -> "m4a";
+            case "audio/mpeg" -> "mp3";
+            case "audio/wav" -> "wav";
+            default -> throw new BusinessException(ErrorCode.INVALID_CONTENT_TYPE);
+        };
     }
 
     private void deleteObjectQuietly(String objectKey) {
