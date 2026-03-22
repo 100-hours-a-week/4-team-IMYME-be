@@ -8,9 +8,8 @@ import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.challenge.service.ChallengeGateService;
 import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
-import com.imyme.mine.domain.storage.service.StorageService;
-import com.imyme.mine.global.config.ChallengeMqProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,16 +19,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,24 +38,15 @@ class ChallengeSchedulerTest {
     @Mock ChallengeRepository challengeRepository;
     @Mock ChallengeAttemptRepository challengeAttemptRepository;
     @Mock KeywordRepository keywordRepository;
-    @Mock StorageService storageService;
-    @Mock RabbitTemplate rabbitTemplate;
-    @Mock ChallengeMqProperties mqProperties;
-    @Mock ChallengeMqProperties.Routing routing;
-    @Mock ChallengeMqProperties.Queue queue;
     @Mock StringRedisTemplate stringRedisTemplate;
     @Mock NotificationBroadcastService notificationBroadcastService;
+    @Mock ChallengeGateService challengeGateService;
 
     @InjectMocks
     ChallengeScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        lenient().when(mqProperties.getExchange()).thenReturn("challenge.direct");
-        lenient().when(mqProperties.getRouting()).thenReturn(routing);
-        lenient().when(routing.getFeedbackRequest()).thenReturn("challenge.feedback.request");
-        lenient().when(mqProperties.getQueue()).thenReturn(queue);
-
         // @Transactional 없는 단위 테스트에서 registerSynchronization() 호출을 허용
         TransactionSynchronizationManager.initSynchronization();
     }
@@ -178,74 +164,20 @@ class ChallengeSchedulerTest {
     }
 
     // =========================================================================
-    // 22:12 — ANALYZING + MQ 발행
+    // 22:11:30 — 분석 게이트 타임아웃 (CLOSED + 90초)
     // =========================================================================
 
     @Test
-    @DisplayName("ANALYZING 전환 - CLOSED 챌린지 존재 시 startAnalyzing() 호출")
-    void startAnalyzing_callsStartAnalyzingOnChallenge() {
+    @DisplayName("분석 게이트 타임아웃 - CLOSED 챌린지 존재 시 closeGate() 호출")
+    void startAnalyzing_callsCloseGateWhenClosedChallengeExists() {
         Challenge challenge = mock(Challenge.class);
         when(challenge.getId()).thenReturn(1L);
         when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
                 .thenReturn(Optional.of(challenge));
-        when(challengeAttemptRepository.findByChallengeIdAndStatusOrderBySubmittedAtAsc(1L, ChallengeAttemptStatus.UPLOADED))
-                .thenReturn(List.of());
 
         scheduler.startAnalyzing();
 
-        verify(challenge).startAnalyzing();
-    }
-
-    @Test
-    @DisplayName("ANALYZING 전환 - UPLOADED 제출 건수만큼 MQ 메시지 발행")
-    void startAnalyzing_publishesMqMessagePerAttempt() {
-        Challenge challenge = mock(Challenge.class);
-        when(challenge.getId()).thenReturn(10L);
-
-        ChallengeAttempt attempt1 = mock(ChallengeAttempt.class);
-        when(attempt1.getId()).thenReturn(100L);
-        when(attempt1.getAudioKey()).thenReturn("challenges/1/10/100_uuid.m4a");
-
-        ChallengeAttempt attempt2 = mock(ChallengeAttempt.class);
-        when(attempt2.getId()).thenReturn(101L);
-        when(attempt2.getAudioKey()).thenReturn("challenges/1/10/101_uuid.m4a");
-
-        when(storageService.generatePresignedGetUrl(anyString())).thenReturn("https://presigned-url");
-
-        when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
-                .thenReturn(Optional.of(challenge));
-        when(challengeAttemptRepository.findByChallengeIdAndStatusOrderBySubmittedAtAsc(10L, ChallengeAttemptStatus.UPLOADED))
-                .thenReturn(List.of(attempt1, attempt2));
-
-        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
-
-        scheduler.startAnalyzing();
-
-        // afterCommit() 콜백 수동 실행 (단위 테스트에는 실제 트랜잭션 커밋이 없음)
-        new ArrayList<>(TransactionSynchronizationManager.getSynchronizations())
-                .forEach(TransactionSynchronization::afterCommit);
-
-        verify(rabbitTemplate, times(2)).convertAndSend(
-                eq("challenge.direct"),
-                eq("challenge.feedback.request"),
-                any(Map.class)
-        );
-    }
-
-    @Test
-    @DisplayName("ANALYZING 전환 - 제출 없어도 예외 없이 종료")
-    void startAnalyzing_noAttempts_noException() {
-        Challenge challenge = mock(Challenge.class);
-        when(challenge.getId()).thenReturn(1L);
-        when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
-                .thenReturn(Optional.of(challenge));
-        when(challengeAttemptRepository.findByChallengeIdAndStatusOrderBySubmittedAtAsc(1L, ChallengeAttemptStatus.UPLOADED))
-                .thenReturn(List.of());
-
-        scheduler.startAnalyzing(); // 예외 없이 정상 완료
-
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(challengeGateService).closeGate(1L);
     }
 
     @Test
