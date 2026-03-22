@@ -17,6 +17,9 @@ spring:
             ddl-auto: validate
         show-sql: false      # 운영에선 쿼리 로그 끔
         open-in-view: false
+        properties:
+            hibernate:
+                session_factory.statement_inspector: com.imyme.mine.global.logging.QueryCountInterceptor
 
     # Prod 환경 카카오 OAuth 설정
     security:
