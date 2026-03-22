@@ -76,7 +76,7 @@ public class RankingInitService {
         Long knowledgeId = resolveAndStoreRubric(challengeId);
 
         int n = attemptIds.size();
-        String jobId = "job:" + challengeId;
+        String jobId = String.valueOf(challengeId);
 
         // 참가자별 개별 leaf 노드 생성: pairs:job:{id}:level:0:node:{i}
         for (int i = 0; i < n; i++) {
