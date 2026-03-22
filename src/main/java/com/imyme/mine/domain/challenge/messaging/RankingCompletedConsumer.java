@@ -280,7 +280,7 @@ public class RankingCompletedConsumer {
             entry.put("rank", i + 1);
             entry.put("user_id", fb != null ? fb.getUserId() : null);
             entry.put("nickname", user != null ? user.getNickname() : null);
-            entry.put("score", fb != null ? fb.getScore() : 0);
+            entry.put("score", fb != null && fb.getScore() != null ? fb.getScore() : 0);
             entry.put("attempt_id", attemptId);
             top3.add(entry);
         }
