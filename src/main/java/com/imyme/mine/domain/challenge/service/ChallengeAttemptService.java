@@ -20,14 +20,21 @@ import com.imyme.mine.domain.challenge.repository.ChallengeRankingRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeResultRepository;
 import com.imyme.mine.domain.storage.service.StorageService;
+import com.imyme.mine.global.config.ChallengeMqProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -37,6 +44,9 @@ import java.util.Optional;
 public class ChallengeAttemptService {
 
     private static final int UPLOAD_URL_EXPIRES_IN = 300; // 5분 (초)
+    private static final String REDIS_ACTIVE_STT_KEY = "challenge:%d:active_stt_count";
+    private static final String REDIS_PENDING_UPLOADS_KEY = "challenge:%d:pending_uploads";
+    private static final Duration STT_KEY_TTL = Duration.ofHours(4);
 
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
@@ -45,6 +55,10 @@ public class ChallengeAttemptService {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ChallengeMqProperties mqProperties;
+    private final ChallengeGateService challengeGateService;
 
     // ===== 참여 시작 =====
 
@@ -135,6 +149,44 @@ public class ChallengeAttemptService {
 
         log.info("[Challenge] 업로드 완료 - challengeId={}, userId={}, attemptId={}",
                 challengeId, userId, attemptId);
+
+        // Eager STT: 업로드 완료 즉시 STT MQ 발행 (22:11:30 게이트까지 기다리지 않음)
+        boolean isClosed = challenge.getStatus() == ChallengeStatus.CLOSED;
+        String audioUrl = storageService.generatePresignedGetUrl(request.objectKey());
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // 1. STT MQ 발행
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("attemptId", attemptId);
+                payload.put("challengeId", challengeId);
+                payload.put("audioUrl", audioUrl);
+                rabbitTemplate.convertAndSend(
+                        mqProperties.getExchange(),
+                        mqProperties.getRouting().getFeedbackRequest(),
+                        payload
+                );
+
+                // 2. active_stt_count INCR (in-flight STT 수 추적)
+                String sttKey = String.format(REDIS_ACTIVE_STT_KEY, challengeId);
+                stringRedisTemplate.opsForValue().increment(sttKey);
+                stringRedisTemplate.expire(sttKey, STT_KEY_TTL);
+
+                log.info("[Challenge] Eager STT MQ 발행: challengeId={}, attemptId={}", challengeId, attemptId);
+
+                // 3. CLOSED 상태 upload-complete: pending_uploads DECR → 0이면 조기 게이트 종료
+                if (isClosed) {
+                    String pendingKey = String.format(REDIS_PENDING_UPLOADS_KEY, challengeId);
+                    Long remaining = stringRedisTemplate.opsForValue().decrement(pendingKey);
+                    log.info("[Challenge] pending_uploads DECR: challengeId={}, remaining={}", challengeId, remaining);
+                    if (remaining != null && remaining <= 0) {
+                        log.info("[Challenge] 모든 업로드 수신 → 조기 게이트 종료: challengeId={}", challengeId);
+                        challengeGateService.closeGate(challengeId);
+                    }
+                }
+            }
+        });
 
         return UploadCompleteResponse.builder()
                 .attemptId(attempt.getId())
