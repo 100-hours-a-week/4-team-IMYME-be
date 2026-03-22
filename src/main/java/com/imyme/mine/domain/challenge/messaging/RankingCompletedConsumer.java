@@ -65,9 +65,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingCompletedConsumer {
 
-    private static final String REDIS_FINAL_RANKING_KEY = "challenge:%d:final_ranking";
-    private static final String REDIS_FEEDBACKS_KEY     = "challenge:%d:feedbacks";
-    private static final String REDIS_PARTICIPANTS_KEY  = "challenge:%d:participants";
+    private static final String REDIS_FINAL_RANKING_KEY   = "challenge:%d:final_ranking";
+    private static final String REDIS_FEEDBACKS_KEY       = "challenge:%d:feedbacks";
+    private static final String REDIS_PARTICIPANTS_KEY    = "challenge:%d:participants";
+    private static final String REDIS_SUBMITTED_COUNT_KEY = "challenge:%d:submitted_count";
 
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
@@ -254,6 +255,7 @@ public class RankingCompletedConsumer {
         stringRedisTemplate.delete(String.format(REDIS_PARTICIPANTS_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FINAL_RANKING_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FEEDBACKS_KEY, challengeId));
+        stringRedisTemplate.delete(String.format(REDIS_SUBMITTED_COUNT_KEY, challengeId));
     }
 
     // ===== 유틸 =====
@@ -280,7 +282,7 @@ public class RankingCompletedConsumer {
             entry.put("rank", i + 1);
             entry.put("user_id", fb != null ? fb.getUserId() : null);
             entry.put("nickname", user != null ? user.getNickname() : null);
-            entry.put("score", fb != null ? fb.getScore() : 0);
+            entry.put("score", fb != null && fb.getScore() != null ? fb.getScore() : 0);
             entry.put("attempt_id", attemptId);
             top3.add(entry);
         }
