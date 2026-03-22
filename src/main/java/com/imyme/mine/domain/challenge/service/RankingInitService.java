@@ -76,12 +76,33 @@ public class RankingInitService {
         Long knowledgeId = resolveAndStoreRubric(challengeId);
 
         int n = attemptIds.size();
+        String jobId = "job:" + challengeId;
 
         // 참가자별 개별 leaf 노드 생성: pairs:job:{id}:level:0:node:{i}
         for (int i = 0; i < n; i++) {
             String nodeKey = String.format(REDIS_PAIRS_NODE_KEY, challengeId, 0, i);
             stringRedisTemplate.opsForList().rightPush(nodeKey, String.valueOf(attemptIds.get(i)));
             stringRedisTemplate.expire(nodeKey, PAIRS_TTL);
+        }
+
+        // 단독 참가자: array_b 빈 배열로 pairs.eval 발행 (AI가 단독 처리 후 final.done 발행)
+        if (n == 1) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("job_id", jobId);
+            payload.put("knowledgeBase_id", String.valueOf(knowledgeId));
+            payload.put("level", 0);
+            payload.put("array_a", List.of(String.valueOf(attemptIds.get(0))));
+            payload.put("array_b", List.of());
+            payload.put("target_count", 1);
+            payload.put("expected_count", 1);
+            rabbitTemplate.convertAndSend(
+                    mqProperties.getExchange(),
+                    mqProperties.getQueue().getPairsEval(),
+                    payload
+            );
+            log.info("[RankingInit] 단독 참가자 pairs.eval 발행: challengeId={}, attemptId={}",
+                    challengeId, attemptIds.get(0));
+            return;
         }
 
         // 홀수 bye 처리: 마지막 노드를 level:1:node:{n/2}로 복사
@@ -92,11 +113,11 @@ public class RankingInitService {
             String byeKey = String.format(REDIS_PAIRS_NODE_KEY, challengeId, 1, byeNodeIdx);
             stringRedisTemplate.opsForList().rightPush(byeKey, String.valueOf(byeAttemptId));
             stringRedisTemplate.expire(byeKey, PAIRS_TTL);
-            log.info("[RankingInit] bye 처리: challengeId={}, byeAttemptId={}, level:1:node:{}", challengeId, byeAttemptId, byeNodeIdx);
+            log.info("[RankingInit] bye 처리: challengeId={}, byeAttemptId={}, level:1:node:{}",
+                    challengeId, byeAttemptId, byeNodeIdx);
         }
 
         // 2개씩 짝지어 challenge.pairs.eval 발행
-        String jobId = "job:" + challengeId;
         int pairCount = 0;
         for (int i = 0; i + 1 < n; i += 2) {
             Map<String, Object> payload = new HashMap<>();

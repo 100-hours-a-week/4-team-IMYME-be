@@ -15,14 +15,21 @@ import com.imyme.mine.domain.challenge.repository.ChallengeRankingRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeResultRepository;
 import com.imyme.mine.domain.storage.service.StorageService;
+import com.imyme.mine.domain.challenge.service.ChallengeGateService;
+import com.imyme.mine.global.config.ChallengeMqProperties;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 import java.util.Optional;
@@ -44,9 +51,27 @@ class ChallengeAttemptServiceTest {
     @Mock UserRepository userRepository;
     @Mock StorageService storageService;
     @Mock ObjectMapper objectMapper;
+    @Mock RabbitTemplate rabbitTemplate;
+    @Mock StringRedisTemplate stringRedisTemplate;
+    @Mock ChallengeMqProperties mqProperties;
+    @Mock ChallengeMqProperties.Routing routing;
+    @Mock ChallengeGateService challengeGateService;
 
     @InjectMocks
     ChallengeAttemptService challengeAttemptService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(mqProperties.getRouting()).thenReturn(routing);
+        lenient().when(routing.getFeedbackRequest()).thenReturn("challenge.feedback.request");
+        // @Transactional 없는 단위 테스트에서 registerSynchronization() 호출을 허용
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
 
     // =========================================================================
     // 참여 시작 — contentType 포함 요청으로 presigned URL 발급

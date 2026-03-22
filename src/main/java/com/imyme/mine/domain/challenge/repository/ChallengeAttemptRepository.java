@@ -62,6 +62,9 @@ public interface ChallengeAttemptRepository extends JpaRepository<ChallengeAttem
     /** 중복 참여 확인 */
     boolean existsByChallengeIdAndUserId(Long challengeId, Long userId);
 
+    /** 특정 상태의 참여 수 (CLOSED 시점 pending_uploads 스냅샷용) */
+    int countByChallengeIdAndStatus(Long challengeId, ChallengeAttemptStatus status);
+
     /** 특정 상태의 제출 목록 조회 */
     List<ChallengeAttempt> findByChallengeIdAndStatus(Long challengeId, ChallengeAttemptStatus status);
 

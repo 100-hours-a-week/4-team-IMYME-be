@@ -154,6 +154,19 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             """)
     Optional<Challenge> findLatestCompletedWithKeyword();
 
+    /**
+     * CLOSED → ANALYZING 원자적 전환 (멱등: 이미 ANALYZING이면 0 반환)
+     * ChallengeGateService에서 단독 호출 — 중복 트리거 방지용
+     */
+    @Modifying
+    @Query("""
+            UPDATE Challenge c
+            SET c.status = com.imyme.mine.domain.challenge.entity.ChallengeStatus.ANALYZING
+            WHERE c.id = :id
+              AND c.status = com.imyme.mine.domain.challenge.entity.ChallengeStatus.CLOSED
+            """)
+    int transitionToAnalyzing(@Param("id") Long id);
+
     /** 챌린지 상태 초기화 (관리자 테스트용 — dev/release 전용) */
     @Modifying
     @Query("""
