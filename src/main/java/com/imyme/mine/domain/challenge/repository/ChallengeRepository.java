@@ -172,10 +172,14 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     @Query("""
             UPDATE Challenge c
             SET c.status = com.imyme.mine.domain.challenge.entity.ChallengeStatus.SCHEDULED,
+                c.startAt = :startAt,
+                c.endAt = :endAt,
                 c.bestSubmission = null,
                 c.resultSummaryJson = null,
                 c.participantCount = 0
             WHERE c.id = :id
             """)
-    void resetToScheduled(@Param("id") Long id);
+    void resetToScheduled(@Param("id") Long id,
+                          @Param("startAt") java.time.LocalDateTime startAt,
+                          @Param("endAt") java.time.LocalDateTime endAt);
 }
