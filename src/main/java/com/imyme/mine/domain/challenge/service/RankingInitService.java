@@ -105,7 +105,7 @@ public class RankingInitService {
             return;
         }
 
-        // 홀수 bye 처리: 마지막 노드를 level:1:node:{n/2}로 복사
+        // 홀수 bye 처리: 마지막 노드를 level:1:node:{n/2}로 복사 + pairs.eval 발행 (array_b=[])
         // (AI가 생성할 level:1 페어 결과 노드들은 node:0 ~ node:(n/2-1), bye는 그 다음)
         if (n % 2 == 1) {
             Long byeAttemptId = attemptIds.get(n - 1);
@@ -115,6 +115,21 @@ public class RankingInitService {
             stringRedisTemplate.expire(byeKey, PAIRS_TTL);
             log.info("[RankingInit] bye 처리: challengeId={}, byeAttemptId={}, level:1:node:{}",
                     challengeId, byeAttemptId, byeNodeIdx);
+
+            Map<String, Object> byePayload = new HashMap<>();
+            byePayload.put("job_id", jobId);
+            byePayload.put("knowledgeBase_id", String.valueOf(knowledgeId));
+            byePayload.put("level", 0);
+            byePayload.put("array_a", List.of(String.valueOf(byeAttemptId)));
+            byePayload.put("array_b", List.of());
+            byePayload.put("target_count", n);
+            byePayload.put("expected_count", n);
+            rabbitTemplate.convertAndSend(
+                    mqProperties.getExchange(),
+                    mqProperties.getQueue().getPairsEval(),
+                    byePayload
+            );
+            log.info("[RankingInit] bye pairs.eval 발행: challengeId={}, byeAttemptId={}", challengeId, byeAttemptId);
         }
 
         // 2개씩 짝지어 challenge.pairs.eval 발행
