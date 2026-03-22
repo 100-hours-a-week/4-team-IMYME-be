@@ -74,7 +74,8 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/actuator/health",      // 헬스체크 (화이트리스트)
                                 "/actuator/prometheus",  // Prometheus 메트릭 (화이트리스트)
-                                "/cards/*/attempts/*/stream" // SSE 스트림 (토큰 인증, JWT 미사용)
+                                "/cards/*/attempts/*/stream",          // SSE 스트림 (토큰 인증, JWT 미사용)
+                                "/challenges/*/participants/stream"    // 챌린지 참여자 수 SSE (인증 불필요)
                         ).permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

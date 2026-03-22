@@ -40,6 +40,7 @@ public class ChallengeGateService {
     private final ChallengeRepository challengeRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final RankingInitService rankingInitService;
+    private final ChallengeParticipantSseService challengeParticipantSseService;
 
     /**
      * 게이트 종료: CLOSED → ANALYZING 원자 전환 + gate_closed 플래그 설정 + ranking 조기 트리거
@@ -75,6 +76,9 @@ public class ChallengeGateService {
 
                 log.info("[Challenge Gate] gate_closed 설정: challengeId={}, active_stt_count={}",
                         challengeId, activeStt);
+
+                // SSE 참여자 수 스트림 종료 (CLOSED → 이후 참여 불가)
+                challengeParticipantSseService.closeAll(challengeId);
 
                 if (activeStt <= 0) {
                     log.info("[Challenge Gate] STT 모두 완료 → 즉시 ranking 시작: challengeId={}", challengeId);

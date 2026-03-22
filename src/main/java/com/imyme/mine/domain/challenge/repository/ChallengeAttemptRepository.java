@@ -73,6 +73,14 @@ public interface ChallengeAttemptRepository extends JpaRepository<ChallengeAttem
             Long challengeId, ChallengeAttemptStatus status
     );
 
+    /** 제출 완료된 참여자 수 (PENDING 제외) — SSE 참여자 수 브로드캐스트용 */
+    @Query("""
+            SELECT COUNT(a) FROM ChallengeAttempt a
+            WHERE a.challenge.id = :challengeId
+              AND a.status <> com.imyme.mine.domain.challenge.entity.ChallengeAttemptStatus.PENDING
+            """)
+    int countSubmittedByChallengeId(@Param("challengeId") Long challengeId);
+
     @Modifying
     @Query("DELETE FROM ChallengeAttempt a WHERE a.challenge.id = :challengeId")
     void deleteByChallengeId(@Param("challengeId") Long challengeId);

@@ -46,6 +46,7 @@ public class ChallengeAttemptService {
     private static final int UPLOAD_URL_EXPIRES_IN = 300; // 5분 (초)
     private static final String REDIS_ACTIVE_STT_KEY = "challenge:%d:active_stt_count";
     private static final String REDIS_PENDING_UPLOADS_KEY = "challenge:%d:pending_uploads";
+    private static final String REDIS_SUBMITTED_COUNT_KEY = "challenge:%d:submitted_count";
     private static final Duration STT_KEY_TTL = Duration.ofHours(4);
 
     private final ChallengeRepository challengeRepository;
@@ -59,6 +60,7 @@ public class ChallengeAttemptService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ChallengeMqProperties mqProperties;
     private final ChallengeGateService challengeGateService;
+    private final ChallengeParticipantSseService challengeParticipantSseService;
 
     // ===== 참여 시작 =====
 
@@ -175,7 +177,15 @@ public class ChallengeAttemptService {
 
                 log.info("[Challenge] Eager STT MQ 발행: challengeId={}, attemptId={}", challengeId, attemptId);
 
-                // 3. CLOSED 상태 upload-complete: pending_uploads DECR → 0이면 조기 게이트 종료
+                // 3. submitted_count INCR (오늘의 챌린지 참여자 수 실시간 제공)
+                String submittedKey = String.format(REDIS_SUBMITTED_COUNT_KEY, challengeId);
+                stringRedisTemplate.opsForValue().increment(submittedKey);
+                stringRedisTemplate.expire(submittedKey, STT_KEY_TTL);
+
+                // 4. 참여자 수 SSE 브로드캐스트
+                challengeParticipantSseService.broadcast(challengeId);
+
+                // 5. CLOSED 상태 upload-complete: pending_uploads DECR → 0이면 조기 게이트 종료
                 if (isClosed) {
                     String pendingKey = String.format(REDIS_PENDING_UPLOADS_KEY, challengeId);
                     Long remaining = stringRedisTemplate.opsForValue().decrement(pendingKey);

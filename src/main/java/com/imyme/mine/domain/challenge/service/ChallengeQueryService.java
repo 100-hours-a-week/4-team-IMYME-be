@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,10 +41,13 @@ public class ChallengeQueryService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    private static final String REDIS_SUBMITTED_COUNT_KEY = "challenge:%d:submitted_count";
+
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChallengeRankingRepository challengeRankingRepository;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
     // ===== 오늘의 챌린지 =====
 
@@ -85,7 +89,7 @@ public class ChallengeQueryService {
 
         int participantCount = challenge.getStatus() == ChallengeStatus.COMPLETED
                 ? challenge.getParticipantCount()
-                : 0;
+                : readSubmittedCount(challenge.getId());
 
         String message = challenge.getStatus() == ChallengeStatus.SCHEDULED
                 ? "22:00에 시작됩니다."
@@ -309,6 +313,12 @@ public class ChallengeQueryService {
     }
 
     // ===== 공통 유틸 =====
+
+    private int readSubmittedCount(Long challengeId) {
+        String val = stringRedisTemplate.opsForValue()
+                .get(String.format(REDIS_SUBMITTED_COUNT_KEY, challengeId));
+        return val != null ? Integer.parseInt(val) : 0;
+    }
 
     private double calculatePercentile(int rank, int participantCount) {
         if (participantCount <= 0) return 0.0;
