@@ -36,6 +36,7 @@ public class ChallengeParticipantSseService {
      * @return SseEmitter (컨트롤러가 반환)
      */
     public SseEmitter subscribe(Long challengeId) {
+        log.info("[Challenge SSE] 구독 요청: challengeId={}", challengeId);
         challengeRepository.findById(challengeId)
                 .filter(c -> c.getStatus() == ChallengeStatus.OPEN)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
