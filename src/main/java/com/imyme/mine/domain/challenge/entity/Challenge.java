@@ -101,6 +101,13 @@ public class Challenge {
         this.status = ChallengeStatus.OPEN;
     }
 
+    /** 테스트용: startAt/endAt을 현재 시각 기준으로 갱신 후 OPEN */
+    public void openForTest(LocalDateTime startAt, LocalDateTime endAt) {
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.status = ChallengeStatus.OPEN;
+    }
+
     /** 제출 마감 (22:10) */
     public void close() {
         this.status = ChallengeStatus.CLOSED;

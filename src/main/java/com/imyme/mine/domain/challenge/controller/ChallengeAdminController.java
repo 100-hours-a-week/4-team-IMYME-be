@@ -83,8 +83,12 @@ public class ChallengeAdminController {
             // 2. Redis 정리
             cleanupRedis(challengeId);
 
-            // 3. Challenge 상태 초기화
-            challengeRepository.resetToScheduled(challengeId);
+            // 3. Challenge 상태 초기화 (startAt/endAt도 원래 시간으로 복구)
+            challengeRepository.resetToScheduled(
+                    challengeId,
+                    today.atTime(22, 0),
+                    today.atTime(22, 9, 59)
+            );
 
             log.info("[Admin] 챌린지 초기화 완료: id={}, date={}", challengeId, today);
             return ResponseEntity.ok("챌린지 초기화 완료 (SCHEDULED 리셋): " + existing.getKeywordText());
@@ -113,10 +117,22 @@ public class ChallengeAdminController {
         return ResponseEntity.ok("챌린지 생성 완료 - 키워드: " + keyword.getName());
     }
 
-    /** SCHEDULED → OPEN (+ CHALLENGE_OPEN 알림 브로드캐스트) */
+    /**
+     * SCHEDULED → OPEN
+     *
+     * <p>테스트 편의를 위해 startAt/endAt을 호출 시점 기준으로 갱신.
+     * (스케줄러 생성분은 22:09:59 고정이라 프론트 녹음 타이머가 즉시 만료됨)
+     */
     @PostMapping("/open")
+    @Transactional
     public ResponseEntity<String> open() {
-        challengeScheduler.openChallenge();
+        LocalDateTime now = LocalDateTime.now();
+        challengeRepository
+                .findByChallengeDateAndStatus(LocalDate.now(), ChallengeStatus.SCHEDULED)
+                .ifPresentOrElse(
+                        challenge -> challenge.openForTest(now, now.plusMinutes(10)),
+                        () -> log.warn("[Admin] OPEN 대상 챌린지 없음")
+                );
         return ResponseEntity.ok("open 완료");
     }
 
