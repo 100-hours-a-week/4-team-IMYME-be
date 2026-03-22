@@ -154,7 +154,7 @@ public class ChallengeScheduler {
     @Transactional
     public void closeChallenge() {
         challengeRepository
-                .findByStatus(ChallengeStatus.OPEN)
+                .findFirstByStatusOrderByIdDesc(ChallengeStatus.OPEN)
                 .ifPresentOrElse(
                         challenge -> {
                             challenge.close();
@@ -221,7 +221,7 @@ public class ChallengeScheduler {
     @Scheduled(cron = "30 11 22 * * *")
     public void startAnalyzing() {
         challengeRepository
-                .findByStatus(ChallengeStatus.CLOSED)
+                .findFirstByStatusOrderByIdDesc(ChallengeStatus.CLOSED)
                 .ifPresentOrElse(
                         challenge -> {
                             log.info("[Challenge] 90s 타임아웃 → 게이트 종료 시도: challengeId={}", challenge.getId());

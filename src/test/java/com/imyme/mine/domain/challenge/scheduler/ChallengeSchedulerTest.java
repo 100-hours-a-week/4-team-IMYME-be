@@ -147,7 +147,7 @@ class ChallengeSchedulerTest {
     @DisplayName("챌린지 CLOSED - OPEN 챌린지 존재 시 close() 호출")
     void closeChallenge_callsCloseOnChallenge() {
         Challenge challenge = mock(Challenge.class);
-        when(challengeRepository.findByStatus(ChallengeStatus.OPEN))
+        when(challengeRepository.findFirstByStatusOrderByIdDesc(ChallengeStatus.OPEN))
                 .thenReturn(Optional.of(challenge));
 
         scheduler.closeChallenge();
@@ -158,7 +158,7 @@ class ChallengeSchedulerTest {
     @Test
     @DisplayName("챌린지 CLOSED - 대상 없으면 예외 없이 종료")
     void closeChallenge_noTargetNoException() {
-        when(challengeRepository.findByStatus(ChallengeStatus.OPEN)).thenReturn(Optional.empty());
+        when(challengeRepository.findFirstByStatusOrderByIdDesc(ChallengeStatus.OPEN)).thenReturn(Optional.empty());
 
         scheduler.closeChallenge(); // 예외 없이 정상 완료
     }
@@ -172,7 +172,7 @@ class ChallengeSchedulerTest {
     void startAnalyzing_callsCloseGateWhenClosedChallengeExists() {
         Challenge challenge = mock(Challenge.class);
         when(challenge.getId()).thenReturn(1L);
-        when(challengeRepository.findByStatus(ChallengeStatus.CLOSED))
+        when(challengeRepository.findFirstByStatusOrderByIdDesc(ChallengeStatus.CLOSED))
                 .thenReturn(Optional.of(challenge));
 
         scheduler.startAnalyzing();
@@ -183,7 +183,7 @@ class ChallengeSchedulerTest {
     @Test
     @DisplayName("ANALYZING 전환 - 대상 없으면 예외 없이 종료")
     void startAnalyzing_noTargetNoException() {
-        when(challengeRepository.findByStatus(ChallengeStatus.CLOSED)).thenReturn(Optional.empty());
+        when(challengeRepository.findFirstByStatusOrderByIdDesc(ChallengeStatus.CLOSED)).thenReturn(Optional.empty());
 
         scheduler.startAnalyzing(); // 예외 없이 정상 완료
     }
