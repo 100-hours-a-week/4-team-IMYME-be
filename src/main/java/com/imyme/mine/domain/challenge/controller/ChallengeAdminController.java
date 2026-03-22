@@ -156,6 +156,7 @@ public class ChallengeAdminController {
             stringRedisTemplate.delete(pairsKeys);
         }
         stringRedisTemplate.delete("challenge:" + challengeId + ":active_stt_count");
+        stringRedisTemplate.delete("challenge:" + challengeId + ":submitted_count");
         stringRedisTemplate.delete("challenge:" + challengeId + ":gate_closed");
         stringRedisTemplate.delete("challenge:" + challengeId + ":pending_uploads");
         stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
