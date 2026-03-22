@@ -123,8 +123,8 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     /** 날짜로 챌린지 조회 */
     Optional<Challenge> findByChallengeDate(LocalDate date);
 
-    /** 특정 상태의 챌린지 조회 */
-    Optional<Challenge> findByStatus(ChallengeStatus status);
+    /** 특정 상태의 챌린지 조회 (최신 우선, 중복 방어) */
+    Optional<Challenge> findFirstByStatusOrderByIdDesc(ChallengeStatus status);
 
     /** 날짜 + 상태로 챌린지 조회 (스케줄러용) */
     Optional<Challenge> findByChallengeDateAndStatus(LocalDate date, ChallengeStatus status);
