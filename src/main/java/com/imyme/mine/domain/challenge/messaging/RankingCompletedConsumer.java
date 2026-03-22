@@ -259,9 +259,9 @@ public class RankingCompletedConsumer {
     // ===== 유틸 =====
 
     private Long parseChallengeId(String jobId) {
-        if (jobId == null || !jobId.startsWith("job:")) return null;
+        if (jobId == null) return null;
         try {
-            return Long.parseLong(jobId.substring(4));
+            return Long.parseLong(jobId);
         } catch (NumberFormatException e) {
             return null;
         }

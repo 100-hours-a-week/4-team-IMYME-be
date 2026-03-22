@@ -36,7 +36,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChallengeAsyncService {
 
-    private static final String REDIS_PENDING_KEY = "challenge:%d:pending_count";
+    // upload-complete 시 INCR, STT 응답 수신 시 DECR — 현재 in-flight STT 수
+    private static final String REDIS_ACTIVE_STT_KEY = "challenge:%d:active_stt_count";
+    // ChallengeGateService가 ANALYZING 전환 시 설정 — 이 플래그 + count==0이면 ranking 시작
+    private static final String REDIS_GATE_CLOSED_KEY = "challenge:%d:gate_closed";
     private static final String REDIS_PARTICIPANTS_KEY = "challenge:%d:participants";
     private static final Duration PARTICIPANTS_TTL = Duration.ofHours(4);
 
@@ -116,16 +119,22 @@ public class ChallengeAsyncService {
                     }
                 }
 
-                // 2. pending_count DECR — 마지막 처리 완료 시 토너먼트 초기화
+                // 2. active_stt_count DECR — 0이 되고 gate_closed이면 ranking 시작
                 Long remaining = stringRedisTemplate.opsForValue()
-                        .decrement(String.format(REDIS_PENDING_KEY, challengeId));
+                        .decrement(String.format(REDIS_ACTIVE_STT_KEY, challengeId));
 
-                log.info("[Challenge MQ] pending_count DECR: challengeId={}, remaining={}",
+                log.info("[Challenge MQ] active_stt_count DECR: challengeId={}, remaining={}",
                         challengeId, remaining);
 
                 if (remaining != null && remaining <= 0) {
-                    log.info("[Challenge MQ] 모든 STT 완료 → 토너먼트 초기화 시작: challengeId={}", challengeId);
-                    rankingInitService.initRanking(challengeId);
+                    Boolean gateClosed = stringRedisTemplate.hasKey(
+                            String.format(REDIS_GATE_CLOSED_KEY, challengeId));
+                    if (Boolean.TRUE.equals(gateClosed)) {
+                        log.info("[Challenge MQ] 모든 STT 완료 + gate closed → ranking 시작: challengeId={}", challengeId);
+                        rankingInitService.initRanking(challengeId);
+                    } else {
+                        log.info("[Challenge MQ] 모든 STT 완료, gate 대기 중: challengeId={}", challengeId);
+                    }
                 }
             }
         });
