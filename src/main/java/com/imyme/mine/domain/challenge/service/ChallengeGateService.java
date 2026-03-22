@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -47,7 +48,7 @@ public class ChallengeGateService {
      *
      * @param challengeId 대상 챌린지 ID
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void closeGate(Long challengeId) {
         int updated = challengeRepository.transitionToAnalyzing(challengeId);
         if (updated == 0) {
