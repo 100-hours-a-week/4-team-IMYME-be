@@ -395,17 +395,18 @@ public class ChallengeAdminController {
     }
 
     private void cleanupRedis(Long challengeId) {
+        // challenge:{id}:* — 현재/미래 모든 챌린지 키 일괄 삭제
+        Set<String> challengeKeys = stringRedisTemplate.keys("challenge:" + challengeId + ":*");
+        if (challengeKeys != null && !challengeKeys.isEmpty()) {
+            stringRedisTemplate.delete(challengeKeys);
+        }
+        // pairs:job:{id}:* — 토너먼트 노드 키 삭제
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
-        stringRedisTemplate.delete("challenge:" + challengeId + ":active_stt_count");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":submitted_count");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":gate_closed");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":pending_uploads");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":final_ranking");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":feedbacks");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":ranking_initialized");
+        // 스케줄러 락 키 삭제 — setup 후 재테스트 시 close/open 스킵 방지
+        stringRedisTemplate.delete("scheduler:challenge:open:" + LocalDate.now() + ":lock");
+        stringRedisTemplate.delete("scheduler:challenge:close:" + LocalDate.now() + ":lock");
     }
 }
