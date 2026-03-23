@@ -132,6 +132,12 @@ public class Challenge {
         this.status = ChallengeStatus.COMPLETED;
     }
 
+    /** 테스트용: 챌린지 키워드 변경 */
+    public void changeKeyword(Keyword keyword) {
+        this.keyword = keyword;
+        this.keywordText = keyword.getName();
+    }
+
     /** 진행 중 여부 */
     public boolean isOpen() {
         return this.status == ChallengeStatus.OPEN;
