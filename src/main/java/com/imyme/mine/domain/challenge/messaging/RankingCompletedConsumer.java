@@ -248,6 +248,11 @@ public class RankingCompletedConsumer {
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
+        // AI 서버가 job_id 기반으로 생성하는 키 삭제 (challenge:job:{id}:*)
+        Set<String> aiKeys = stringRedisTemplate.keys("challenge:job:" + challengeId + ":*");
+        if (aiKeys != null && !aiKeys.isEmpty()) {
+            stringRedisTemplate.delete(aiKeys);
+        }
         stringRedisTemplate.delete(String.format(REDIS_PARTICIPANTS_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FINAL_RANKING_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FEEDBACKS_KEY, challengeId));
