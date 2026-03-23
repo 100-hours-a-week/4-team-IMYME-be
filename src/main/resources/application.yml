@@ -72,10 +72,7 @@ spring:
                 prefetch: 1               # QoS - 동시 처리 메시지 수 제한
                 missing-queues-fatal: false  # AI 서버가 큐 생성 담당, 큐 없어도 부팅 가능
                 retry:
-                    enabled: true
-                    initial-interval: 3000ms
-                    max-attempts: 3
-                    multiplier: 2.0
+                    enabled: false
 
     # ==================================================
     # Security / OAuth2 공통
@@ -173,7 +170,6 @@ challenge:
         queue:
             feedback-response: challenge.feedback.response
             pairs-eval: challenge.pairs.eval
-            ranking-completed: challenge.ranking.completed
         routing:
             feedback-request: challenge.feedback.request
 
