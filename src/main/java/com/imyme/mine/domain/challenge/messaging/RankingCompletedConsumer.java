@@ -257,7 +257,8 @@ public class RankingCompletedConsumer {
     private Long parseChallengeId(String jobId) {
         if (jobId == null) return null;
         try {
-            return Long.parseLong(jobId);
+            String numeric = jobId.startsWith("job:") ? jobId.substring(4) : jobId;
+            return Long.parseLong(numeric);
         } catch (NumberFormatException e) {
             return null;
         }
