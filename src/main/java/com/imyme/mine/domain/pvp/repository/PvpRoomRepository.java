@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +26,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.category.id = :categoryId
             AND r.status = :status
             ORDER BY r.createdAt DESC, r.id DESC
@@ -39,6 +44,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.category.id = :categoryId
             AND r.status = :status
             AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
@@ -57,6 +65,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.status = :status
             ORDER BY r.createdAt DESC, r.id DESC
             """)
@@ -70,6 +81,9 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
      */
     @Query("""
             SELECT r FROM PvpRoom r
+            LEFT JOIN FETCH r.category
+            LEFT JOIN FETCH r.hostUser
+            LEFT JOIN FETCH r.guestUser
             WHERE r.status = :status
             AND (r.createdAt < :cursor OR (r.createdAt = :cursor AND r.id < :lastId))
             ORDER BY r.createdAt DESC, r.id DESC
@@ -113,4 +127,23 @@ public interface PvpRoomRepository extends JpaRepository<PvpRoom, Long> {
             WHERE r.id = :roomId
             """)
     Optional<PvpRoom> findByIdWithDetailsForUpdate(@Param("roomId") Long roomId);
+
+    /**
+     * 유령 방 일괄 EXPIRED 처리 (배치용)
+     * - OPEN / MATCHED / THINKING 상태에서 1시간 초과 방을 EXPIRED로 전환
+     * - @Version 낙관적 잠금 미적용 (배치 맥락: 해당 방은 이미 이탈된 상태)
+     */
+    @Modifying
+    @Transactional
+    @Query("""
+            UPDATE PvpRoom r
+            SET r.status = :expired
+            WHERE r.status IN :statuses
+            AND r.createdAt < :threshold
+            """)
+    int expireGhostRooms(
+            @Param("expired") PvpRoomStatus expired,
+            @Param("statuses") List<PvpRoomStatus> statuses,
+            @Param("threshold") LocalDateTime threshold
+    );
 }

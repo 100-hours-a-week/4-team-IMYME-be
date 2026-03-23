@@ -14,6 +14,7 @@ spring:
         properties:
             hibernate:
                 format_sql: true  # 쿼리 예쁘게 정렬
+                session_factory.statement_inspector: com.imyme.mine.global.logging.QueryCountInterceptor
 
     # Dev 환경 카카오 OAuth 설정
     security:
@@ -47,10 +48,7 @@ spring:
                 acknowledge-mode: manual
                 prefetch: 1  # 동시 처리 메시지 수 제한
                 retry:
-                    enabled: true
-                    initial-interval: 3000ms
-                    max-attempts: 3
-                    multiplier: 2.0
+                    enabled: false
 
 solo:
     mq:
@@ -61,3 +59,8 @@ logging:
         com.imyme.mine: DEBUG
         org.flywaydb: INFO
         org.springframework.amqp: DEBUG  # RabbitMQ 디버깅
+
+sentry:
+    environment: dev
+    debug: false
+    traces-sample-rate: 1.0

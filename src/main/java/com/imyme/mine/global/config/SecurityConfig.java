@@ -61,6 +61,7 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/oauth2/**",     // 혹시 모를 OAuth 기본 경로
                                 "/e2e/**", // E2E 테스트 전용 (test 프로파일에서만 활성화)
+                                "/admin/challenge/**", // 챌린지 수동 트리거 (dev/release 프로파일에서만 활성화)
                                 "/ws/**",  // WebSocket 엔드포인트 (핸드셰이크에서 JWT 검증)
                                 "/websocket-test", // WebSocket 테스트 페이지
                                 "/test/pvp/**", // PvP WebSocket 테스트 API
@@ -73,8 +74,10 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/actuator/health",      // 헬스체크 (화이트리스트)
                                 "/actuator/prometheus",  // Prometheus 메트릭 (화이트리스트)
-                                "/cards/*/attempts/*/stream" // SSE 스트림 (토큰 인증, JWT 미사용)
+                                "/cards/*/attempts/*/stream",          // SSE 스트림 (토큰 인증, JWT 미사용)
+                                "/challenges/*/participants/stream"    // 챌린지 참여자 수 SSE (인증 불필요)
                         ).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
 
                 // 6. 필터 추가

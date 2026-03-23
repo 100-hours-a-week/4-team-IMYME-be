@@ -1,6 +1,8 @@
 package com.imyme.mine.domain.card.dto;
 
 import com.imyme.mine.domain.card.entity.Card;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.List;
 
 public record CardListResponse(
@@ -9,8 +11,13 @@ public record CardListResponse(
 ) {
 
     public record Pagination(
+        @Schema(description = "다음 페이지 커서 (마지막 페이지면 null)")
         String nextCursor,
+
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
         boolean hasNext,
+
+        @Schema(description = "페이지 크기", example = "20")
         int limit
     ) {}
 

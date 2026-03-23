@@ -70,6 +70,12 @@ dependencies {
 
     testImplementation 'com.h2database:h2'
 
+    // Testcontainers
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    // org.testcontainers:redis 미추가 — GenericContainer로 처리
+
     // Flyway (DB 마이그레이션 도구)
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
@@ -87,6 +93,9 @@ dependencies {
     // Sentry (에러 추적 & 성능 모니터링) - Jakarta Starter
     implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.1.0'
     implementation 'io.sentry:sentry-logback:8.1.0'
+
+    // Firebase Admin SDK (FCM 푸시 알림)
+    implementation 'com.google.firebase:firebase-admin:9.4.2'
 }
 
 tasks.named('test') {

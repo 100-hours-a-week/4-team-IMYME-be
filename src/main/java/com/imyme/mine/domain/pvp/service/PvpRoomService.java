@@ -210,8 +210,13 @@ public class PvpRoomService {
 
         log.info("게스트 입장: roomId={}, userId={}, status=MATCHED", roomId, userId);
 
-        // 3초 후 키워드 배정 및 THINKING 전환 (비동기)
-        pvpAsyncService.scheduleThinkingTransition(roomId);
+        // 커밋 후 3초 타이머 예약 (커밋 전 예약 시 롤백돼도 타이머가 실행될 수 있으므로 afterCommit에서 등록)
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                pvpAsyncService.scheduleThinkingTransition(roomId);
+            }
+        });
 
         return toRoomResponse(room, "매칭 완료! 잠시 후 키워드가 공개됩니다.");
     }
@@ -267,10 +272,11 @@ public class PvpRoomService {
             pvpReadyManager.clearReady(roomId);
             log.info("양쪽 READY → RECORDING 즉시 전환: roomId={}", roomId);
 
-            // 커밋 후 RECORDING 브로드캐스트 + 타임아웃 예약
+            // 커밋 후 RECORDING_TRANSITION 타이머 취소 + 브로드캐스트 + 타임아웃 예약
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
+                    pvpAsyncService.cancelTimer(roomId, PvpAsyncService.TimerType.RECORDING_TRANSITION);
                     messagePublisher.publish(PvpChannels.getRoomChannel(roomId),
                             PvpMessage.recordingStarted(roomId));
                     pvpAsyncService.scheduleRecordingTimeout(roomId);
@@ -439,10 +445,11 @@ public class PvpRoomService {
             // - AI 서버가 Feedback Response 반환
             // - Feedback Response Consumer에서 승패 결정 및 결과 저장
 
-            // PROCESSING 브로드캐스트 (커밋 후 Redis Pub/Sub)
+            // RECORDING_TIMEOUT 타이머 취소 + PROCESSING 브로드캐스트 (커밋 후 Redis Pub/Sub)
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
+                    pvpAsyncService.cancelTimer(currentRoomId, PvpAsyncService.TimerType.RECORDING_TIMEOUT);
                     messagePublisher.publish(PvpChannels.getRoomChannel(currentRoomId),
                             PvpMessage.statusChange(currentRoomId, PvpRoomStatus.PROCESSING, "양쪽 모두 제출 완료! AI 분석이 시작됩니다."));
                 }
@@ -511,6 +518,13 @@ public class PvpRoomService {
             room.cancel();
             pvpRoomRepository.save(room);
             log.info("호스트 방 나가기: roomId={}, status=CANCELED", roomId);
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    pvpAsyncService.cancelAllTimers(roomId);
+                }
+            });
             return new LeaveResult(roomId, LeaveType.HOST_LEFT, PvpRoomStatus.CANCELED);
 
         } else {
@@ -525,6 +539,13 @@ public class PvpRoomService {
             pvpRoomRepository.save(room);
             pvpReadyManager.clearReady(roomId);
             log.info("게스트 방 나가기: roomId={}, status=OPEN", roomId);
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    pvpAsyncService.cancelAllTimers(roomId);
+                }
+            });
             return new LeaveResult(roomId, LeaveType.GUEST_LEFT, PvpRoomStatus.OPEN);
         }
     }

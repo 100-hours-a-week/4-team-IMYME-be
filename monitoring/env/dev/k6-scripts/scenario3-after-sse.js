@@ -20,15 +20,28 @@ import { check, sleep } from 'k6';
  */
 
 export const options = {
-  stages: [
-    { duration: '15s', target: 10 },   // 10명까지 ramp-up
-    { duration: '60s', target: 50 },   // 50명 유지 (측정 구간)
-    { duration: '15s', target: 0 },    // ramp-down
-  ],
+  scenarios: {
+    default: {
+      executor: 'ramping-vus',
+      stages: [
+        { duration: '15s', target: 10 },   // 10명까지 ramp-up
+        { duration: '60s', target: 50 },   // 50명 유지 (측정 구간)
+        { duration: '15s', target: 0 },    // ramp-down
+      ],
+      gracefulRampDown: '95s',             // ramp-down 중 VU 강제 종료 유예
+      gracefulStop: '95s',                 // 스테이지 종료 후 VU 강제 종료 유예
+    },
+  },
   thresholds: {
-    http_req_duration: ['p(95)<2000'],
-    http_req_failed: ['rate<0.1'],
+    // SSE 연결(sse-stream)은 장기 연결이므로 duration threshold 제외
+    // 카드 생성 / 시도 생성 / 토큰 발급만 응답시간 측정
+    'http_req_duration{scenario:create-card}': ['p(95)<2000'],
+    'http_req_duration{scenario:create-attempt}': ['p(95)<2000'],
     'http_req_duration{scenario:stream-token}': ['p(95)<300'],
+    // SSE timeout은 정상 종료이므로 실패율 제외
+    'http_req_failed{scenario:create-card}': ['rate<0.05'],
+    'http_req_failed{scenario:create-attempt}': ['rate<0.05'],
+    'http_req_failed{scenario:stream-token}': ['rate<0.05'],
   },
 };
 

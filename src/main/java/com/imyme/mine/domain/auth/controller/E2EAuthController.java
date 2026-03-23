@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,12 +52,12 @@ public class E2EAuthController {
         log.info("E2E test user creation attempt");
 
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E테스터")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -82,12 +83,12 @@ public class E2EAuthController {
 
         // E2E 테스트 유저 조회 (없으면 자동 생성)
         User testUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_TEST_USER_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_TEST_USER_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E테스터")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_test_user__")
                     .build();
 
                 userRepository.save(newUser);
@@ -113,12 +114,12 @@ public class E2EAuthController {
         log.info("E2E socket host login attempt: deviceUuid={}", request.deviceUuid());
 
         User hostUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_SOCKET_HOST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_HOST_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_HOST_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E호스트")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_socket_host__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket host auto-created: userId={}", newUser.getId());
@@ -141,12 +142,12 @@ public class E2EAuthController {
         log.info("E2E socket guest login attempt: deviceUuid={}", request.deviceUuid());
 
         User guestUser = userRepository
-            .findByOauthIdAndOauthProvider(E2E_SOCKET_GUEST_OAUTH_ID, OAuthProviderType.E2E_TEST)
+            .findByOauthIdAndOauthProvider(E2E_SOCKET_GUEST_OAUTH_ID, OAuthProviderType.KAKAO)
             .orElseGet(() -> {
                 User newUser = User.builder()
                     .oauthId(E2E_SOCKET_GUEST_OAUTH_ID)
-                    .oauthProvider(OAuthProviderType.E2E_TEST)
-                    .nickname("E2E게스트")
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("__e2e_socket_guest__")
                     .build();
                 userRepository.save(newUser);
                 log.info("E2E socket guest auto-created: userId={}", newUser.getId());
@@ -157,5 +158,38 @@ public class E2EAuthController {
         log.info("E2E socket guest login successful: userId={}", guestUser.getId());
 
         return ApiResponse.success(response, "E2E 소켓 게스트 로그인 성공");
+    }
+
+    /**
+     * 부하 테스트용 VU별 로그인
+     * - 각 VU(Virtual User)가 다른 유저로 로그인합니다.
+     * - vuId에 따라 e2e_load_test_user_1, e2e_load_test_user_2, ... 유저가 생성됩니다.
+     */
+    @PostMapping("/login/{vuId}")
+    @Transactional
+    public ApiResponse<OAuthLoginResponse> e2eLoadTestLogin(
+        @PathVariable int vuId,
+        @Valid @RequestBody E2ELoginRequest request
+    ) {
+        String oauthId = "e2e_load_test_user_" + vuId;
+        log.info("E2E load test login attempt: vuId={}, deviceUuid={}", vuId, request.deviceUuid());
+
+        User testUser = userRepository
+            .findByOauthIdAndOauthProvider(oauthId, OAuthProviderType.KAKAO)
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .oauthId(oauthId)
+                    .oauthProvider(OAuthProviderType.KAKAO)
+                    .nickname("부하테스터" + vuId)
+                    .build();
+                userRepository.save(newUser);
+                log.info("E2E load test user auto-created: vuId={}, userId={}", vuId, newUser.getId());
+                return newUser;
+            });
+
+        OAuthLoginResponse response = oauthService.login(testUser, request.deviceUuid(), false);
+        log.info("E2E load test login successful: vuId={}, userId={}", vuId, testUser.getId());
+
+        return ApiResponse.success(response, "E2E 부하 테스트 로그인 성공");
     }
 }
