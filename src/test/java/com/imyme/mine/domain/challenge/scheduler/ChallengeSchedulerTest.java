@@ -46,8 +46,8 @@ class ChallengeSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
         // @Transactional 없는 단위 테스트에서 registerSynchronization() 호출을 허용
         TransactionSynchronizationManager.initSynchronization();
     }
