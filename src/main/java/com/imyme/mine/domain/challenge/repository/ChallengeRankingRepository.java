@@ -21,8 +21,11 @@ public interface ChallengeRankingRepository extends JpaRepository<ChallengeRanki
 
     /**
      * 챌린지 랭킹 목록 조회 - 페이지네이션 (GET /rankings 용)
+     * User LEFT JOIN FETCH: 프로필 이미지 resolve에 필요 (N+1 방지)
      */
-    Page<ChallengeRanking> findByChallengeIdOrderByRankNoAsc(Long challengeId, Pageable pageable);
+    @Query(value = "SELECT r FROM ChallengeRanking r LEFT JOIN FETCH r.user WHERE r.challenge.id = :challengeId ORDER BY r.rankNo ASC",
+            countQuery = "SELECT COUNT(r) FROM ChallengeRanking r WHERE r.challenge.id = :challengeId")
+    Page<ChallengeRanking> findByChallengeIdOrderByRankNoAsc(@Param("challengeId") Long challengeId, Pageable pageable);
 
     /**
      * 특정 챌린지에서 유저의 랭킹 조회 (내 순위 조회용)

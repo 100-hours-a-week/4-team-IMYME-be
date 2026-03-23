@@ -3,6 +3,7 @@ package com.imyme.mine.domain.challenge.controller;
 import com.imyme.mine.domain.challenge.service.ChallengeParticipantSseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +40,9 @@ public class ChallengeParticipantSseController {
      */
     @Operation(summary = "챌린지 참여자 수 실시간 구독 (SSE)")
     @GetMapping(value = "/{challengeId}/participants/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@PathVariable Long challengeId) {
+    public SseEmitter stream(@PathVariable Long challengeId, HttpServletResponse response) {
+        // Nginx proxy_buffering off 없이도 스트리밍 동작하도록 강제
+        response.setHeader("X-Accel-Buffering", "no");
         return sseService.subscribe(challengeId);
     }
 }

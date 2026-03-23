@@ -48,10 +48,7 @@ spring:
                 acknowledge-mode: manual
                 prefetch: 1  # 동시 처리 메시지 수 제한
                 retry:
-                    enabled: true
-                    initial-interval: 3000ms
-                    max-attempts: 3
-                    multiplier: 2.0
+                    enabled: false
 
 solo:
     mq:

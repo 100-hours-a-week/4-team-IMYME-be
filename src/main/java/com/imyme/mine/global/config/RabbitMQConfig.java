@@ -94,12 +94,16 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue pvpSttResponseQueue() {
-        return QueueBuilder.durable(PVP_STT_RESPONSE_QUEUE).build();
+        return QueueBuilder.durable(PVP_STT_RESPONSE_QUEUE)
+                .deadLetterExchange(PVP_DLX)
+                .build();
     }
 
     @Bean
     public Queue pvpFeedbackResponseQueue() {
-        return QueueBuilder.durable(PVP_FEEDBACK_RESPONSE_QUEUE).build();
+        return QueueBuilder.durable(PVP_FEEDBACK_RESPONSE_QUEUE)
+                .deadLetterExchange(PVP_DLX)
+                .build();
     }
 
     @Bean
@@ -138,7 +142,9 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue challengeFeedbackResponseQueue(ChallengeMqProperties props) {
-        return QueueBuilder.durable(props.getQueue().getFeedbackResponse()).build();
+        return QueueBuilder.durable(props.getQueue().getFeedbackResponse())
+                .deadLetterExchange(CHALLENGE_DLX)
+                .build();
     }
 
     @Bean
@@ -156,7 +162,9 @@ public class RabbitMQConfig {
     /** 토너먼트 최종 완료 큐 — AI → Spring (BE가 소비하는 큐만 선언) */
     @Bean
     public Queue challengeFinalDoneQueue(ChallengeMqProperties props) {
-        return QueueBuilder.durable(props.getQueue().getFinalDone()).build();
+        return QueueBuilder.durable(props.getQueue().getFinalDone())
+                .deadLetterExchange(CHALLENGE_DLX)
+                .build();
     }
 
     @Bean
@@ -178,12 +186,16 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue soloSttResponseQueue(SoloMqProperties soloMqProperties) {
-        return QueueBuilder.durable(soloMqProperties.getQueue().getSttResponse()).build();
+        return QueueBuilder.durable(soloMqProperties.getQueue().getSttResponse())
+                .deadLetterExchange(SOLO_DLX)
+                .build();
     }
 
     @Bean
     public Queue soloFeedbackResponseQueue(SoloMqProperties soloMqProperties) {
-        return QueueBuilder.durable(soloMqProperties.getQueue().getFeedbackResponse()).build();
+        return QueueBuilder.durable(soloMqProperties.getQueue().getFeedbackResponse())
+                .deadLetterExchange(SOLO_DLX)
+                .build();
     }
 
     @Bean
