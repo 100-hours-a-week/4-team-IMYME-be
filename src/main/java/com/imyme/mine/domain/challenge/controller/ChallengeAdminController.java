@@ -406,5 +406,6 @@ public class ChallengeAdminController {
         stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
         stringRedisTemplate.delete("challenge:" + challengeId + ":final_ranking");
         stringRedisTemplate.delete("challenge:" + challengeId + ":feedbacks");
+        stringRedisTemplate.delete("challenge:" + challengeId + ":ranking_initialized");
     }
 }
