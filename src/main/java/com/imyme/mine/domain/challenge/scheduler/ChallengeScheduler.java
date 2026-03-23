@@ -50,10 +50,11 @@ public class ChallengeScheduler {
 
     private static final Random RANDOM = new Random();
     // CLOSED 시점에 아직 upload-complete를 보내지 않은 PENDING 수 (조기 게이트 종료 판단용)
-    private static final String REDIS_PENDING_UPLOADS_KEY = "challenge:%d:pending_uploads";
-    // CLOSED 시점의 active_stt_count 확인용
-    private static final String REDIS_ACTIVE_STT_KEY = "challenge:%d:active_stt_count";
-    private static final Duration PENDING_UPLOADS_TTL = Duration.ofHours(2);
+    private static final String REDIS_PENDING_UPLOADS_KEY  = "challenge:%d:pending_uploads";
+    private static final String REDIS_ACTIVE_STT_KEY       = "challenge:%d:active_stt_count";
+    private static final String REDIS_SCHEDULER_LOCK_KEY   = "scheduler:challenge:%s:lock";
+    private static final Duration PENDING_UPLOADS_TTL      = Duration.ofHours(2);
+    private static final Duration SCHEDULER_LOCK_TTL       = Duration.ofMinutes(5);
 
     // -------------------------------------------------------------------------
     // 00:05 — 내일 챌린지 생성
@@ -109,6 +110,11 @@ public class ChallengeScheduler {
     @Scheduled(cron = "0 0 22 * * *")
     @Transactional
     public void openChallenge() {
+        String lockKey = String.format(REDIS_SCHEDULER_LOCK_KEY, "open:" + LocalDate.now());
+        if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", SCHEDULER_LOCK_TTL))) {
+            log.info("[Challenge] openChallenge 중복 실행 스킵");
+            return;
+        }
         challengeRepository
                 .findByChallengeDateAndStatus(LocalDate.now(), ChallengeStatus.SCHEDULED)
                 .ifPresentOrElse(
@@ -153,6 +159,11 @@ public class ChallengeScheduler {
     @Scheduled(cron = "0 10 22 * * *")
     @Transactional
     public void closeChallenge() {
+        String lockKey = String.format(REDIS_SCHEDULER_LOCK_KEY, "close:" + LocalDate.now());
+        if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", SCHEDULER_LOCK_TTL))) {
+            log.info("[Challenge] closeChallenge 중복 실행 스킵");
+            return;
+        }
         challengeRepository
                 .findFirstByStatusOrderByIdDesc(ChallengeStatus.OPEN)
                 .ifPresentOrElse(

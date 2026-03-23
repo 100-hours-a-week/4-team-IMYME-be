@@ -241,6 +241,8 @@ public class RankingCompletedConsumer {
 
     // ===== Redis 정리 =====
 
+    private static final String REDIS_RANKING_INIT_KEY = "challenge:%d:ranking_initialized";
+
     private void cleanupRedis(Long challengeId) {
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
@@ -250,6 +252,7 @@ public class RankingCompletedConsumer {
         stringRedisTemplate.delete(String.format(REDIS_FINAL_RANKING_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FEEDBACKS_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_SUBMITTED_COUNT_KEY, challengeId));
+        stringRedisTemplate.delete(String.format(REDIS_RANKING_INIT_KEY, challengeId));
     }
 
     // ===== 유틸 =====
