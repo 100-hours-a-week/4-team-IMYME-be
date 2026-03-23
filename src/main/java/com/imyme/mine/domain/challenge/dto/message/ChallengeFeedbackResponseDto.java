@@ -2,6 +2,7 @@ package com.imyme.mine.domain.challenge.dto.message;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * AI 서버 → Spring: 챌린지 STT 응답 MQ DTO
@@ -11,6 +12,7 @@ import lombok.NoArgsConstructor;
  * status = "FAIL"인 경우 sttText는 null일 수 있음.
  */
 @Getter
+@Setter
 @NoArgsConstructor
 public class ChallengeFeedbackResponseDto {
 
