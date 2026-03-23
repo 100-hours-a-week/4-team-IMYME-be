@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingInitService {
 
-    private static final String REDIS_PARTICIPANTS_KEY   = "challenge:%d:participants";
+    private static final String REDIS_PARTICIPANTS_KEY   = "challenge:job:%d:participants";
     private static final String REDIS_PAIRS_NODE_KEY    = "pairs:job:%d:level:%d:node:%d";
     private static final String REDIS_RUBRIC_KEY        = "knowledge:%d:rubric";
     private static final String REDIS_RANKING_INIT_KEY  = "challenge:%d:ranking_initialized";
