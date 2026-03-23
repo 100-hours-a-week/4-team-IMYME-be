@@ -18,4 +18,6 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
 
     @Query("SELECT k FROM Keyword k JOIN FETCH k.category ORDER BY k.category.displayOrder, k.displayOrder")
     List<Keyword> findAllWithCategory();
+
+    boolean existsByIdAndCategoryId(Long id, Long categoryId);
 }
