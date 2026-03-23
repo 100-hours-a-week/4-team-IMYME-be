@@ -395,10 +395,15 @@ public class ChallengeAdminController {
     }
 
     private void cleanupRedis(Long challengeId) {
-        // challenge:{id}:* — 현재/미래 모든 챌린지 키 일괄 삭제
+        // challenge:{id}:* — 백엔드 챌린지 키 일괄 삭제
         Set<String> challengeKeys = stringRedisTemplate.keys("challenge:" + challengeId + ":*");
         if (challengeKeys != null && !challengeKeys.isEmpty()) {
             stringRedisTemplate.delete(challengeKeys);
+        }
+        // challenge:job:{id}:* — AI 서버가 job_id 기반으로 생성하는 키 삭제
+        Set<String> aiChallengeKeys = stringRedisTemplate.keys("challenge:job:" + challengeId + ":*");
+        if (aiChallengeKeys != null && !aiChallengeKeys.isEmpty()) {
+            stringRedisTemplate.delete(aiChallengeKeys);
         }
         // pairs:job:{id}:* — 토너먼트 노드 키 삭제
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
