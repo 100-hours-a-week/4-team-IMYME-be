@@ -14,12 +14,16 @@ import com.imyme.mine.domain.challenge.repository.ChallengeResultRepository;
 import com.imyme.mine.domain.challenge.scheduler.ChallengeScheduler;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,6 +59,7 @@ public class ChallengeAdminController {
 
     private final ChallengeScheduler challengeScheduler;
     private final ChallengeRepository challengeRepository;
+    private final NotificationBroadcastService notificationBroadcastService;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChallengeRankingRepository challengeRankingRepository;
     private final ChallengeResultRepository challengeResultRepository;
@@ -247,7 +252,28 @@ public class ChallengeAdminController {
         challengeRepository
                 .findByChallengeDateAndStatus(LocalDate.now(), ChallengeStatus.SCHEDULED)
                 .ifPresentOrElse(
-                        challenge -> challenge.openForTest(now, now.plusMinutes(10)),
+                        challenge -> {
+                            challenge.openForTest(now, now.plusMinutes(10));
+
+                            Long challengeId = challenge.getId();
+                            String keywordText = challenge.getKeywordText();
+
+                            TransactionSynchronizationManager.registerSynchronization(
+                                    new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                            notificationBroadcastService.broadcastToAllActive(
+                                                    NotificationType.CHALLENGE_OPEN,
+                                                    "오늘의 챌린지가 시작됐어요!",
+                                                    "\"" + keywordText + "\" 주제로 지금 도전해보세요.",
+                                                    challengeId,
+                                                    "CHALLENGE"
+                                            );
+                                            log.info("[Admin] CHALLENGE_OPEN 브로드캐스트 완료: challengeId={}", challengeId);
+                                        }
+                                    }
+                            );
+                        },
                         () -> log.warn("[Admin] OPEN 대상 챌린지 없음")
                 );
         return ResponseEntity.ok("open 완료");
@@ -380,5 +406,6 @@ public class ChallengeAdminController {
         stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
         stringRedisTemplate.delete("challenge:" + challengeId + ":final_ranking");
         stringRedisTemplate.delete("challenge:" + challengeId + ":feedbacks");
+        stringRedisTemplate.delete("challenge:" + challengeId + ":ranking_initialized");
     }
 }

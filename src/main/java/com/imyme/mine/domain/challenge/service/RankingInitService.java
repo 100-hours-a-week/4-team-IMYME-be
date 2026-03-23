@@ -37,11 +37,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingInitService {
 
-    private static final String REDIS_PARTICIPANTS_KEY = "challenge:%d:participants";
-    private static final String REDIS_PAIRS_NODE_KEY   = "pairs:job:%d:level:%d:node:%d";
-    private static final String REDIS_RUBRIC_KEY       = "knowledge:%d:rubric";
-    private static final Duration PAIRS_TTL  = Duration.ofHours(2);
-    private static final Duration RUBRIC_TTL = Duration.ofHours(4);
+    private static final String REDIS_PARTICIPANTS_KEY   = "challenge:%d:participants";
+    private static final String REDIS_PAIRS_NODE_KEY    = "pairs:job:%d:level:%d:node:%d";
+    private static final String REDIS_RUBRIC_KEY        = "knowledge:%d:rubric";
+    private static final String REDIS_RANKING_INIT_KEY  = "challenge:%d:ranking_initialized";
+    private static final Duration PAIRS_TTL    = Duration.ofHours(2);
+    private static final Duration RUBRIC_TTL   = Duration.ofHours(4);
+    private static final Duration INIT_LOCK_TTL = Duration.ofMinutes(10);
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RabbitTemplate rabbitTemplate;
@@ -56,6 +58,14 @@ public class RankingInitService {
      */
     @Transactional(readOnly = true)
     public void initRanking(Long challengeId) {
+        // 멱등성 보호: 다중 인스턴스 환경에서 중복 초기화 방지 (SETNX)
+        String initKey = String.format(REDIS_RANKING_INIT_KEY, challengeId);
+        Boolean acquired = stringRedisTemplate.opsForValue().setIfAbsent(initKey, "1", INIT_LOCK_TTL);
+        if (!Boolean.TRUE.equals(acquired)) {
+            log.info("[RankingInit] 이미 초기화 중 (스킵): challengeId={}", challengeId);
+            return;
+        }
+
         String participantsKey = String.format(REDIS_PARTICIPANTS_KEY, challengeId);
 
         // Hash 전체 조회 (field=attemptId string, value=JSON string)
@@ -76,7 +86,7 @@ public class RankingInitService {
         Long knowledgeId = resolveAndStoreRubric(challengeId);
 
         int n = attemptIds.size();
-        String jobId = String.valueOf(challengeId);
+        String jobId = "job:" + challengeId;
 
         // 참가자별 개별 leaf 노드 생성: pairs:job:{id}:level:0:node:{i}
         for (int i = 0; i < n; i++) {
