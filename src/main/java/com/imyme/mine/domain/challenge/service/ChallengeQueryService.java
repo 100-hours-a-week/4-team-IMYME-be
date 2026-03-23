@@ -11,6 +11,8 @@ import com.imyme.mine.domain.challenge.entity.ChallengeStatus;
 import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRankingRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
+import com.imyme.mine.domain.auth.entity.User;
+import com.imyme.mine.domain.user.service.ProfileImageService;
 import com.imyme.mine.global.error.BusinessException;
 import com.imyme.mine.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,7 @@ public class ChallengeQueryService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChallengeRankingRepository challengeRankingRepository;
+    private final ProfileImageService profileImageService;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -134,14 +137,21 @@ public class ChallengeQueryService {
         int participantCount = challenge.getParticipantCount();
 
         List<ChallengeRankingResponse.RankingItem> rankingItems = rankingPage.getContent().stream()
-                .map(r -> ChallengeRankingResponse.RankingItem.builder()
-                        .rank(r.getRankNo())
-                        .userId(r.getUser() != null ? r.getUser().getId() : null)
-                        .nickname(r.getUserNickname())
-                        .profileImageUrl(r.getUserProfileImageUrl())
-                        .score(r.getScore())
-                        .isMe(r.getUser() != null && r.getUser().getId().equals(userId))
-                        .build())
+                .map(r -> {
+                    User user = r.getUser();
+                    String resolvedImageUrl = (user != null)
+                            ? profileImageService.resolveProfileImageUrl(user.getProfileImageKey(), user.getProfileImageUrl())
+                            : r.getUserProfileImageUrl();
+
+                    return ChallengeRankingResponse.RankingItem.builder()
+                            .rank(r.getRankNo())
+                            .userId(user != null ? user.getId() : null)
+                            .nickname(r.getUserNickname())
+                            .profileImageUrl(resolvedImageUrl)
+                            .score(r.getScore())
+                            .isMe(user != null && user.getId().equals(userId))
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         ChallengeRankingResponse.MyRank myRank = myRankingOpt.map(r ->
