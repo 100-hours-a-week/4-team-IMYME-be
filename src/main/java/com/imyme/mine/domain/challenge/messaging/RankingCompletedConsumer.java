@@ -27,8 +27,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -189,33 +187,29 @@ public class RankingCompletedConsumer {
         log.info("[Ranking MQ] COMPLETED 전환 완료: challengeId={}, 참가자={}",
                 challengeId, rankedAttemptIds.size());
 
-        // 커밋 후 개인/전체 결과 알림
-        List<Long> notifyUserIds = userIds;
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                for (Long userId : notifyUserIds) {
-                    notificationCreatorService.create(
-                            userId,
-                            NotificationType.CHALLENGE_PERSONAL_RESULT,
-                            "내 챌린지 결과가 나왔어요!",
-                            "상세 피드백을 확인해보세요.",
-                            challengeId,
-                            "CHALLENGE"
-                    );
-                    notificationCreatorService.create(
-                            userId,
-                            NotificationType.CHALLENGE_OVERALL_RESULT,
-                            "챌린지 최종 랭킹이 나왔어요!",
-                            "내 순위를 확인해보세요.",
-                            challengeId,
-                            "CHALLENGE"
-                    );
-                }
-                log.info("[Ranking MQ] 결과 알림 발송 완료: challengeId={}, 대상={}",
-                        challengeId, notifyUserIds.size());
-            }
-        });
+        // 개인/전체 결과 알림 — 메인 트랜잭션 안에서 직접 호출
+        // notificationCreatorService.create()는 @Transactional(REQUIRED)로 외부 트랜잭션에 join.
+        // 트랜잭션 커밋 시 @TransactionalEventListener(AFTER_COMMIT)이 정상 발화하여 FCM 발송됨.
+        // (afterCommit() 콜백 안에서 호출하면 동일 스레드의 트랜잭션 컨텍스트 문제로 FcmDispatcher에 이벤트가 전달되지 않음)
+        for (Long userId : userIds) {
+            notificationCreatorService.create(
+                    userId,
+                    NotificationType.CHALLENGE_PERSONAL_RESULT,
+                    "내 챌린지 결과가 나왔어요!",
+                    "상세 피드백을 확인해보세요.",
+                    challengeId,
+                    "CHALLENGE"
+            );
+            notificationCreatorService.create(
+                    userId,
+                    NotificationType.CHALLENGE_OVERALL_RESULT,
+                    "챌린지 최종 랭킹이 나왔어요!",
+                    "내 순위를 확인해보세요.",
+                    challengeId,
+                    "CHALLENGE"
+            );
+        }
+        log.info("[Ranking MQ] 결과 알림 발송 요청 완료: challengeId={}, 대상={}", challengeId, userIds.size());
     }
 
     // ===== Redis 읽기 =====
@@ -247,15 +241,23 @@ public class RankingCompletedConsumer {
 
     // ===== Redis 정리 =====
 
+    private static final String REDIS_RANKING_INIT_KEY = "challenge:%d:ranking_initialized";
+
     private void cleanupRedis(Long challengeId) {
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
+        // AI 서버가 job_id 기반으로 생성하는 키 삭제 (challenge:job:{id}:*)
+        Set<String> aiKeys = stringRedisTemplate.keys("challenge:job:" + challengeId + ":*");
+        if (aiKeys != null && !aiKeys.isEmpty()) {
+            stringRedisTemplate.delete(aiKeys);
+        }
         stringRedisTemplate.delete(String.format(REDIS_PARTICIPANTS_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FINAL_RANKING_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_FEEDBACKS_KEY, challengeId));
         stringRedisTemplate.delete(String.format(REDIS_SUBMITTED_COUNT_KEY, challengeId));
+        stringRedisTemplate.delete(String.format(REDIS_RANKING_INIT_KEY, challengeId));
     }
 
     // ===== 유틸 =====
@@ -263,7 +265,8 @@ public class RankingCompletedConsumer {
     private Long parseChallengeId(String jobId) {
         if (jobId == null) return null;
         try {
-            return Long.parseLong(jobId);
+            String numeric = jobId.startsWith("job:") ? jobId.substring(4) : jobId;
+            return Long.parseLong(numeric);
         } catch (NumberFormatException e) {
             return null;
         }

@@ -1,8 +1,6 @@
 package com.imyme.mine.domain.challenge.scheduler;
 
 import com.imyme.mine.domain.challenge.entity.Challenge;
-import com.imyme.mine.domain.challenge.entity.ChallengeAttempt;
-import com.imyme.mine.domain.challenge.entity.ChallengeAttemptStatus;
 import com.imyme.mine.domain.challenge.entity.ChallengeStatus;
 import com.imyme.mine.domain.challenge.repository.ChallengeAttemptRepository;
 import com.imyme.mine.domain.challenge.repository.ChallengeRepository;
@@ -20,7 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
@@ -41,12 +39,15 @@ class ChallengeSchedulerTest {
     @Mock StringRedisTemplate stringRedisTemplate;
     @Mock NotificationBroadcastService notificationBroadcastService;
     @Mock ChallengeGateService challengeGateService;
+    @Mock ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     ChallengeScheduler scheduler;
 
     @BeforeEach
     void setUp() {
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
         // @Transactional 없는 단위 테스트에서 registerSynchronization() 호출을 허용
         TransactionSynchronizationManager.initSynchronization();
     }

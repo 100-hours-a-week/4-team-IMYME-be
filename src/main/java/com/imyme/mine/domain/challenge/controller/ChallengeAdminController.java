@@ -14,12 +14,16 @@ import com.imyme.mine.domain.challenge.repository.ChallengeResultRepository;
 import com.imyme.mine.domain.challenge.scheduler.ChallengeScheduler;
 import com.imyme.mine.domain.keyword.entity.Keyword;
 import com.imyme.mine.domain.keyword.repository.KeywordRepository;
+import com.imyme.mine.domain.notification.entity.NotificationType;
+import com.imyme.mine.domain.notification.service.NotificationBroadcastService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,6 +59,7 @@ public class ChallengeAdminController {
 
     private final ChallengeScheduler challengeScheduler;
     private final ChallengeRepository challengeRepository;
+    private final NotificationBroadcastService notificationBroadcastService;
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChallengeRankingRepository challengeRankingRepository;
     private final ChallengeResultRepository challengeResultRepository;
@@ -247,7 +252,28 @@ public class ChallengeAdminController {
         challengeRepository
                 .findByChallengeDateAndStatus(LocalDate.now(), ChallengeStatus.SCHEDULED)
                 .ifPresentOrElse(
-                        challenge -> challenge.openForTest(now, now.plusMinutes(10)),
+                        challenge -> {
+                            challenge.openForTest(now, now.plusMinutes(10));
+
+                            Long challengeId = challenge.getId();
+                            String keywordText = challenge.getKeywordText();
+
+                            TransactionSynchronizationManager.registerSynchronization(
+                                    new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                            notificationBroadcastService.broadcastToAllActive(
+                                                    NotificationType.CHALLENGE_OPEN,
+                                                    "오늘의 챌린지가 시작됐어요!",
+                                                    "\"" + keywordText + "\" 주제로 지금 도전해보세요.",
+                                                    challengeId,
+                                                    "CHALLENGE"
+                                            );
+                                            log.info("[Admin] CHALLENGE_OPEN 브로드캐스트 완료: challengeId={}", challengeId);
+                                        }
+                                    }
+                            );
+                        },
                         () -> log.warn("[Admin] OPEN 대상 챌린지 없음")
                 );
         return ResponseEntity.ok("open 완료");
@@ -369,16 +395,23 @@ public class ChallengeAdminController {
     }
 
     private void cleanupRedis(Long challengeId) {
+        // challenge:{id}:* — 백엔드 챌린지 키 일괄 삭제
+        Set<String> challengeKeys = stringRedisTemplate.keys("challenge:" + challengeId + ":*");
+        if (challengeKeys != null && !challengeKeys.isEmpty()) {
+            stringRedisTemplate.delete(challengeKeys);
+        }
+        // challenge:job:{id}:* — AI 서버가 job_id 기반으로 생성하는 키 삭제
+        Set<String> aiChallengeKeys = stringRedisTemplate.keys("challenge:job:" + challengeId + ":*");
+        if (aiChallengeKeys != null && !aiChallengeKeys.isEmpty()) {
+            stringRedisTemplate.delete(aiChallengeKeys);
+        }
+        // pairs:job:{id}:* — 토너먼트 노드 키 삭제
         Set<String> pairsKeys = stringRedisTemplate.keys("pairs:job:" + challengeId + ":*");
         if (pairsKeys != null && !pairsKeys.isEmpty()) {
             stringRedisTemplate.delete(pairsKeys);
         }
-        stringRedisTemplate.delete("challenge:" + challengeId + ":active_stt_count");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":submitted_count");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":gate_closed");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":pending_uploads");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":participants");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":final_ranking");
-        stringRedisTemplate.delete("challenge:" + challengeId + ":feedbacks");
+        // 스케줄러 락 키 삭제 — setup 후 재테스트 시 close/open 스킵 방지
+        stringRedisTemplate.delete("scheduler:challenge:open:" + LocalDate.now() + ":lock");
+        stringRedisTemplate.delete("scheduler:challenge:close:" + LocalDate.now() + ":lock");
     }
 }
