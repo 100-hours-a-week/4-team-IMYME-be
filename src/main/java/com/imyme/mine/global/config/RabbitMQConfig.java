@@ -92,18 +92,16 @@ public class RabbitMQConfig {
         return new DirectExchange(PVP_DIRECT_EXCHANGE, true, false);
     }
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     @Bean
     public Queue pvpSttResponseQueue() {
-        return QueueBuilder.durable(PVP_STT_RESPONSE_QUEUE)
-                .deadLetterExchange(PVP_DLX)
-                .build();
+        return QueueBuilder.durable(PVP_STT_RESPONSE_QUEUE).build();
     }
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     @Bean
     public Queue pvpFeedbackResponseQueue() {
-        return QueueBuilder.durable(PVP_FEEDBACK_RESPONSE_QUEUE)
-                .deadLetterExchange(PVP_DLX)
-                .build();
+        return QueueBuilder.durable(PVP_FEEDBACK_RESPONSE_QUEUE).build();
     }
 
     @Bean
@@ -140,11 +138,10 @@ public class RabbitMQConfig {
         return new DirectExchange(props.getExchange(), true, false);
     }
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     @Bean
     public Queue challengeFeedbackResponseQueue(ChallengeMqProperties props) {
-        return QueueBuilder.durable(props.getQueue().getFeedbackResponse())
-                .deadLetterExchange(CHALLENGE_DLX)
-                .build();
+        return QueueBuilder.durable(props.getQueue().getFeedbackResponse()).build();
     }
 
     @Bean
@@ -159,12 +156,11 @@ public class RabbitMQConfig {
 
     // ===== Challenge 토너먼트 큐 =====
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     /** 토너먼트 최종 완료 큐 — AI → Spring (BE가 소비하는 큐만 선언) */
     @Bean
     public Queue challengeFinalDoneQueue(ChallengeMqProperties props) {
-        return QueueBuilder.durable(props.getQueue().getFinalDone())
-                .deadLetterExchange(CHALLENGE_DLX)
-                .build();
+        return QueueBuilder.durable(props.getQueue().getFinalDone()).build();
     }
 
     @Bean
@@ -184,18 +180,16 @@ public class RabbitMQConfig {
         return new DirectExchange(soloMqProperties.getExchange(), true, false);
     }
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     @Bean
     public Queue soloSttResponseQueue(SoloMqProperties soloMqProperties) {
-        return QueueBuilder.durable(soloMqProperties.getQueue().getSttResponse())
-                .deadLetterExchange(SOLO_DLX)
-                .build();
+        return QueueBuilder.durable(soloMqProperties.getQueue().getSttResponse()).build();
     }
 
+    // ⚠️ DLX는 Broker Policy로 주입 — 코드에 직접 x-dead-letter-exchange 추가 금지 (406 PRECONDITION_FAILED 방지)
     @Bean
     public Queue soloFeedbackResponseQueue(SoloMqProperties soloMqProperties) {
-        return QueueBuilder.durable(soloMqProperties.getQueue().getFeedbackResponse())
-                .deadLetterExchange(SOLO_DLX)
-                .build();
+        return QueueBuilder.durable(soloMqProperties.getQueue().getFeedbackResponse()).build();
     }
 
     @Bean
