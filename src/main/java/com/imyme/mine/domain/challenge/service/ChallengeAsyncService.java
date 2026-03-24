@@ -40,7 +40,7 @@ public class ChallengeAsyncService {
     private static final String REDIS_ACTIVE_STT_KEY = "challenge:%d:active_stt_count";
     // ChallengeGateService가 ANALYZING 전환 시 설정 — 이 플래그 + count==0이면 ranking 시작
     private static final String REDIS_GATE_CLOSED_KEY = "challenge:%d:gate_closed";
-    private static final String REDIS_PARTICIPANTS_KEY = "challenge:%d:participants";
+    private static final String REDIS_PARTICIPANTS_KEY = "challenge:job:%d:participants";
     private static final Duration PARTICIPANTS_TTL = Duration.ofHours(4);
 
     private final ChallengeAttemptRepository challengeAttemptRepository;
