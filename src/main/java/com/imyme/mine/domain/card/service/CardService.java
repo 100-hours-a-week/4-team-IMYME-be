@@ -52,14 +52,15 @@ public class CardService {
         log.debug("카드 생성 시작 - userId: {}, categoryId: {}, keywordId: {}",
             userId, request.categoryId(), request.keywordId());
 
+        if (!keywordRepository.existsByIdAndCategoryId(request.keywordId(), request.categoryId())) {
+            throw new BusinessException(ErrorCode.KEYWORD_NOT_FOUND);
+        }
+
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Category category = categoryRepository.findById(request.categoryId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
-
-        Keyword keyword = keywordRepository.findById(request.keywordId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+        Category category = categoryRepository.getReferenceById(request.categoryId());
+        Keyword keyword = keywordRepository.getReferenceById(request.keywordId());
 
         Card card = Card.builder()
             .user(user)
