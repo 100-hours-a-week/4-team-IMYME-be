@@ -273,15 +273,11 @@ public class KnowledgeBatchService {
                                         keywordId,
                                         properties.getMaxSimilarCount());
 
-                        // Step 3: Filter RRF results by threshold
-                        double threshold = 1.0 - properties.getSimilarityThreshold();
-                        List<KnowledgeSearchResult> filteredRrfResults = rrfResults.stream()
-                                .filter(s -> s.getDistance() <= threshold)
-                                .collect(Collectors.toList());
-
-                        // Step 4: Merge & Deduplicate (Same-keyword items + RRF results)
+                        // Step 3: Merge & Deduplicate (Same-keyword items + RRF results)
+                        // RRF 점수 기준 Top-N cut-off는 SQL LIMIT에서 이미 처리됨
+                        // 코사인 거리 등으로 재필터링 금지 (키워드로 찾고 벡터로 버리는 문제 방지)
                         List<KnowledgeSearchResult> mergedSimilars = mergeSimilarResults(
-                                sameKeywordItems, filteredRrfResults, keyword);
+                                sameKeywordItems, rrfResults, keyword);
 
                         log.debug("유사 지식 검색 결과: Same-keyword={}, RRF={}, Merged={}",
                                 sameKeywordItems.size(), filteredRrfResults.size(), mergedSimilars.size());

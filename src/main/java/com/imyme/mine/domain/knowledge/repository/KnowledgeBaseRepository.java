@@ -171,6 +171,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
    */
   @Query(value = """
       WITH keyword_results AS (
+          -- [1단계 Pre-Fusion] 키워드 브랜치: FTS ts_rank 기준 상위 20개
           SELECT
               id,
               ts_rank(search_vector, websearch_to_tsquery('simple', :queryText)) AS rank
@@ -182,6 +183,8 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
           LIMIT 20
       ),
       semantic_results AS (
+          -- [1단계 Pre-Fusion] 시맨틱 브랜치: 코사인 거리 <= 0.3 필터 적용 후 상위 20개
+          -- 문맥상 전혀 엉뚱한 문서가 RRF 병합 단계로 넘어오는 것을 여기서 차단
           SELECT
               id,
               1 - (embedding <=> CAST(:queryEmbedding AS vector)) AS similarity
@@ -189,6 +192,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
           WHERE embedding IS NOT NULL
             AND is_active = true
             AND keyword_id = :keywordId
+            AND (embedding <=> CAST(:queryEmbedding AS vector)) <= 0.3
           ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
           LIMIT 20
       ),
@@ -203,10 +207,12 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
               sr.similarity
           FROM semantic_results sr
       )
+      -- [3단계 Post-Fusion] RRF 점수 기준 정렬 후 Top-N cut-off만 수행
+      -- 코사인 거리 등 다른 점수로 재필터링 금지
       SELECT
           kb.id AS id,
           kb.keyword_id AS keywordId,
-          k.name AS keywordName,  -- NEW: Keyword Name 추가
+          k.name AS keywordName,
           kb.content AS content,
           kb.embedding AS embedding,
           kb.content_hash AS contentHash,
@@ -215,12 +221,16 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
           kb.updated_at AS updatedAt,
           COALESCE(sr.similarity, 0.0) AS distance
       FROM knowledge_base kb
-      JOIN keywords k ON kb.keyword_id = k.id  -- NEW: Join keywords table
+      JOIN keywords k ON kb.keyword_id = k.id
       LEFT JOIN keyword_ranked kr ON kb.id = kr.id
       LEFT JOIN semantic_ranked sr ON kb.id = sr.id
       WHERE (kr.id IS NOT NULL OR sr.id IS NOT NULL)
         AND kb.is_active = true
-      ORDER BY (0.65 * COALESCE(1.0/(60 + kr.rank_num), 0)) + (0.35 * COALESCE(1.0/(60 + sr.rank_num), 0)) DESC
+      ORDER BY
+          -- [2단계 RRF] 차집합(한쪽에만 있는 문서)은 R_missing=1000 페널티 적용
+          -- COALESCE(0) 대신 1.0/1060.0 으로 아주 작은 기여만 허용
+          (0.65 * COALESCE(1.0/(60 + kr.rank_num), 1.0/1060.0))
+          + (0.35 * COALESCE(1.0/(60 + sr.rank_num), 1.0/1060.0)) DESC
       LIMIT :limit
       """, nativeQuery = true)
   List<KnowledgeSearchResult> findSimilarKnowledgeByHybridRRF(
