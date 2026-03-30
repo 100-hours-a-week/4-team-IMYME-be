@@ -20,7 +20,7 @@ public record KnowledgeCandidate(
     @JsonProperty("refinedText")
     String refinedText,
 
-    // 벡터 임베딩 (1024차원, float32) : OpenAI text-embedding-3-small 또는 유사 모델
+    // 벡터 임베딩 (1024차원, float32) : Qwen3-Embedding-0.6B
     List<Double> embedding
 ) {
 }

@@ -258,31 +258,18 @@ public class KnowledgeBatchService {
                     try {
                         String embeddingVector = convertEmbeddingToString(candidate.embedding());
 
-                        // Step 1: Fetch same-keyword items (Strict Inclusion)
-                        List<KnowledgeBase> sameKeywordItems = knowledgeRepository
-                                .findByKeywordId(keywordId)
-                                .stream()
-                                .limit(10) // Safety limit
-                                .collect(Collectors.toList());
-
-                        // Step 2: Hybrid RRF Search: 키워드 + 벡터 검색 결합
-                        List<KnowledgeSearchResult> rrfResults = knowledgeRepository
+                        // Hybrid RRF Search: FTS + Vector 결합 (keyword_id 스코프 내)
+                        // keyword_id 필터가 쿼리에 포함되어 있으므로 별도 sameKeywordItems 조회 불필요
+                        List<KnowledgeSearchResult> mergedSimilars = knowledgeRepository
                                 .findSimilarKnowledgeByHybridRRF(
-                                        candidate.refinedText(), // queryText: 키워드 검색용
-                                        embeddingVector, // queryEmbedding: 벡터 검색용
+                                        candidate.refinedText(), // queryText: FTS 검색용
+                                        embeddingVector,          // queryEmbedding: 벡터 검색용
                                         keywordId,
                                         properties.getMaxSimilarCount());
 
-                        // Step 3: Merge & Deduplicate (Same-keyword items + RRF results)
-                        // RRF 점수 기준 Top-N cut-off는 SQL LIMIT에서 이미 처리됨
-                        // 코사인 거리 등으로 재필터링 금지 (키워드로 찾고 벡터로 버리는 문제 방지)
-                        List<KnowledgeSearchResult> mergedSimilars = mergeSimilarResults(
-                                sameKeywordItems, rrfResults, keyword);
+                        log.debug("유사 지식 검색 결과: RRF={}", mergedSimilars.size());
 
-                        log.debug("유사 지식 검색 결과: Same-keyword={}, RRF={}, Merged={}",
-                                sameKeywordItems.size(), filteredRrfResults.size(), mergedSimilars.size());
-
-                        // Step 5: Build evaluation request with keyword context
+                        // Build evaluation request with keyword context
                         KnowledgeEvaluationRequest evalRequest = buildEvaluationRequest(
                                 candidate, mergedSimilars, keyword);
                         KnowledgeEvaluationResponse.Data evalResult = aiServerClient.evaluateKnowledge(evalRequest);
@@ -487,46 +474,6 @@ public class KnowledgeBatchService {
     }
 
     /**
-     * Merge same-keyword items and RRF results
-     */
-    private List<KnowledgeSearchResult> mergeSimilarResults(
-            List<KnowledgeBase> sameKeywordItems,
-            List<KnowledgeSearchResult> rrfResults,
-            Keyword keyword) {
-        // 1. Convert KnowledgeBase to KnowledgeSearchResult
-        List<KnowledgeSearchResult> sameKeywordResults = sameKeywordItems.stream()
-                .map(kb -> new KnowledgeSearchResultImpl(
-                        kb.getId(),
-                        kb.getKeyword().getId(),
-                        keyword.getName(),
-                        kb.getContent(),
-                        kb.getEmbedding(), // Already String
-                        kb.getContentHash(),
-                        kb.getIsActive(),
-                        kb.getCreatedAt(),
-                        kb.getUpdatedAt(),
-                        0.0 // distance (same keyword = perfect match contextually)
-                ))
-                .collect(Collectors.toList());
-
-        // 2. Get IDs to avoid duplicates
-        Set<Long> sameKeywordIds = sameKeywordItems.stream()
-                .map(KnowledgeBase::getId)
-                .collect(Collectors.toSet());
-
-        // 3. Filter RRF results (exclude items already in sameKeywordItems)
-        List<KnowledgeSearchResult> uniqueRrfResults = rrfResults.stream()
-                .filter(r -> !sameKeywordIds.contains(r.getId()))
-                .collect(Collectors.toList());
-
-        // 4. Merge
-        List<KnowledgeSearchResult> merged = new ArrayList<>();
-        merged.addAll(sameKeywordResults);
-        merged.addAll(uniqueRrfResults);
-        return merged;
-    }
-
-    /**
      * Update knowledge based on AI evaluation result
      */
     private void updateKnowledgeWithEvalResult(
@@ -548,85 +495,6 @@ public class KnowledgeBatchService {
         }
 
         knowledgeRepository.save(knowledge);
-    }
-
-    // Inner class for KnowledgeSearchResult implementation
-    private static class KnowledgeSearchResultImpl implements KnowledgeSearchResult {
-        private final Long id;
-        private final Long keywordId;
-        private final String keywordName;
-        private final String content;
-        private final String embedding;
-        private final String contentHash;
-        private final Boolean isActive;
-        private final LocalDateTime createdAt;
-        private final LocalDateTime updatedAt;
-        private final Double distance;
-
-        public KnowledgeSearchResultImpl(Long id, Long keywordId, String keywordName, String content, String embedding,
-                String contentHash, Boolean isActive, LocalDateTime createdAt, LocalDateTime updatedAt,
-                Double distance) {
-            this.id = id;
-            this.keywordId = keywordId;
-            this.keywordName = keywordName;
-            this.content = content;
-            this.embedding = embedding;
-            this.contentHash = contentHash;
-            this.isActive = isActive;
-            this.createdAt = createdAt;
-            this.updatedAt = updatedAt;
-            this.distance = distance;
-        }
-
-        @Override
-        public Long getId() {
-            return id;
-        }
-
-        @Override
-        public Long getKeywordId() {
-            return keywordId;
-        }
-
-        @Override
-        public String getKeywordName() {
-            return keywordName;
-        }
-
-        @Override
-        public String getContent() {
-            return content;
-        }
-
-        @Override
-        public String getEmbedding() {
-            return embedding;
-        }
-
-        @Override
-        public String getContentHash() {
-            return contentHash;
-        }
-
-        @Override
-        public Boolean getIsActive() {
-            return isActive;
-        }
-
-        @Override
-        public LocalDateTime getCreatedAt() {
-            return createdAt;
-        }
-
-        @Override
-        public LocalDateTime getUpdatedAt() {
-            return updatedAt;
-        }
-
-        @Override
-        public Double getDistance() {
-            return distance;
-        }
     }
 
     /**

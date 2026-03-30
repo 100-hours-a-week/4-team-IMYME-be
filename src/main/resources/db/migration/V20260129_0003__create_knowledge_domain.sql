@@ -55,4 +55,4 @@ CREATE INDEX idx_kb_created_at ON knowledge_base(created_at DESC);
 
 -- 코멘트 (문서화)
 COMMENT ON TABLE knowledge_base IS 'RAG 시스템용 벡터 지식 베이스';
-COMMENT ON COLUMN knowledge_base.embedding IS '1024차원 벡터 (OpenAI text-embedding-3-small). 코사인 유사도 검색용.';
+COMMENT ON COLUMN knowledge_base.embedding IS '1024차원 벡터 (Qwen3-Embedding-0.6B). 코사인 유사도 검색용.';

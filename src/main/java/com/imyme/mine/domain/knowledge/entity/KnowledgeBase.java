@@ -46,7 +46,7 @@ public class KnowledgeBase {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    // 벡터 임베딩: OpenAI text-embedding-3-small 모델 기준 1024차원
+    // 벡터 임베딩: Qwen3-Embedding-0.6B 모델 기준 1024차원
     // 의미적 유사도 검색용 벡터 데이터
     // PostgreSQL vector 타입으로 명시적 형변환(Casting) 추가
     @Column(name = "embedding", columnDefinition = "vector")

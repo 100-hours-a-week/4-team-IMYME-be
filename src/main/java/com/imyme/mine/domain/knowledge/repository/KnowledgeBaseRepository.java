@@ -219,7 +219,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
           kb.is_active AS isActive,
           kb.created_at AS createdAt,
           kb.updated_at AS updatedAt,
-          COALESCE(sr.similarity, 0.0) AS distance
+          COALESCE(1.0 - sr.similarity, 1.0) AS distance
       FROM knowledge_base kb
       JOIN keywords k ON kb.keyword_id = k.id
       LEFT JOIN keyword_ranked kr ON kb.id = kr.id
