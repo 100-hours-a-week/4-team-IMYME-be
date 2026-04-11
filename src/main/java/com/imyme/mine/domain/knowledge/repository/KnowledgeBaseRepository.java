@@ -184,14 +184,14 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBase, Lo
       ),
       semantic_results AS (
           -- [1단계 Pre-Fusion] 시맨틱 브랜치: 코사인 거리 <= 0.3 필터 적용 후 상위 20개
-          -- 문맥상 전혀 엉뚱한 문서가 RRF 병합 단계로 넘어오는 것을 여기서 차단
+          -- keyword_id 필터 없음: '프로세스'/'스레드'처럼 의미가 겹치는 타 keyword criteria도 포함
+          -- → AI 평가 서버가 내용 추가/거절을 최종 판단
           SELECT
               id,
               1 - (embedding <=> CAST(:queryEmbedding AS vector)) AS similarity
           FROM knowledge_base
           WHERE embedding IS NOT NULL
             AND is_active = true
-            AND keyword_id = :keywordId
             AND (embedding <=> CAST(:queryEmbedding AS vector)) <= 0.3
           ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
           LIMIT 20
