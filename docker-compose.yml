@@ -14,7 +14,7 @@ services:
       - mine-network
 
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: mine-postgres
     environment:
       POSTGRES_DB: mine
