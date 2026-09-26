@@ -1,5 +1,9 @@
 # MINE — 말하면서 내 것으로
 
+<p align="center">
+  <img src=".github/readme/cover.png" width="820" alt="MINE">
+</p>
+
 CS 개념을 **말로 설명**하면 AI가 잘한 점과 보완할 점을 피드백해 주는 **음성 기반 CS 학습 플랫폼**의 백엔드 레포지토리입니다. 설명할 수 있어야 아는 것이라는 생각에서 출발했습니다.
 
 | | |
@@ -13,6 +17,11 @@ CS 개념을 **말로 설명**하면 AI가 잘한 점과 보완할 점을 피드
 <br>
 
 ## 주요 기능
+
+<p align="center">
+  <img src=".github/readme/modes.png" width="820" alt="3가지 학습 모드">
+  <br><sub>레벨업 · PvP · 챌린지 화면</sub>
+</p>
 
 | 모드 | 설명 |
 |---|---|
@@ -71,7 +80,12 @@ flowchart LR
 - **명령은 REST, 알림은 WebSocket/SSE** — 상태를 바꾸는 요청은 REST로, 서버가 알려야 하는 변화는 푸시로 분리
 - **AI 처리는 전부 비동기** — 서버와 AI 서버는 RabbitMQ 큐로만 통신 (`solo.*`, `pvp.*`, `challenge.*`)
 - **오디오 파일은 서버를 거치지 않음** — 클라이언트가 S3 Presigned URL로 직접 업로드. URL에는 허용된 오디오 MIME 타입(`audio/webm·mp4·m4a·mpeg·wav`)만 서명하고, PvP는 요청한 파일 크기 100MB 초과 시 발급 거부, 챌린지는 업로드 완료 시 `HeadObject`로 실제 크기(10MB)·타입을 다시 확인
-- **실패 처리** — AI 큐는 수동 ack(`prefetch 1`), AI 워커가 재시도 후에도 실패하면 `status: FAIL` 응답 → 서버가 모드별로 실패 상태 전환. 업로드되지 않은 시도는 10분 뒤 `EXPIRED`
+- **실패 처리** — AI 응답 큐는 수동 ack(`prefetch` dev 1 · release 3 · prod 5), AI 워커가 재시도 후에도 실패하면 `status: FAIL` 응답 → 서버가 모드별로 실패 상태 전환. 업로드되지 않은 시도는 10분 뒤 `EXPIRED`
+
+<p align="center">
+  <img src=".github/readme/architecture.png" width="860" alt="전체 인프라 아키텍처">
+  <br><sub>전체 서비스 인프라 — Kubernetes 클러스터·관측 스택·CI/CD는 Cloud 파트 구성</sub>
+</p>
 
 <br>
 
@@ -117,6 +131,12 @@ OPEN → MATCHED → THINKING(30초) → RECORDING → PROCESSING → FINISHED
   → 승자를 다음 레벨로 올리며 반복 (홀수면 bye)
   → 최종 랭킹 저장 → 개인 결과 / 전체 결과 알림 + FCM
 ```
+
+<p align="center">
+  <img src=".github/readme/challenge-timeline.png" width="420" alt="챌린지 타임라인">
+  <img src=".github/readme/pairs-tournament.png" width="420" alt="PAIRS 토너먼트">
+  <br><sub>챌린지 타임라인 · PAIRS 토너먼트 (2인 비교 병합 정렬)</sub>
+</p>
 
 <br>
 
